@@ -3,6 +3,7 @@ WORK IN PROGRESS
 0) (SE NON L'HAI GIA FATTO) PER CREARE CARTELLA CON FILE DI QUESTA REPO DA 0 COLLEGATA :
 
   git init
+  
   git remote add origin https://github.com/yeddaTech/roomdate
 
   OPPURE SEMPLICEMENTE GIT CLONE
