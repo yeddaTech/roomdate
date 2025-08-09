@@ -1,5 +1,5 @@
 # roomdate
-# https://yeddatech.github.io/roomdate/
+# https://roomdate.infinityfreeapp.com/login.php
 WORK IN PROGRESS
 0) (SE NON L'HAI GIA FATTO) PER CREARE CARTELLA CON FILE DI QUESTA REPO DA 0 COLLEGATA :
 
