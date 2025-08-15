@@ -1,4 +1,4 @@
- <?php 
+<?php 
 require_once 'db.php';
 
 // No-cache headers
@@ -15,20 +15,29 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// Recupera altri utenti
-try {
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE id != ?");
-    $stmt->execute([$_SESSION['user_id']]);
-    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $users = [];
-}
+
 
 // Recupera immagine profilo utente loggato
 $stmt = $pdo->prepare("SELECT image_url FROM users WHERE id = ?");
 $stmt->execute([$_SESSION['user_id']]);
 $currentUser = $stmt->fetch(PDO::FETCH_ASSOC);
 $profileImage = !empty($currentUser['image_url']) ? $currentUser['image_url'] : 'images/default.png';
+
+$stmt = $pdo->prepare("SELECT image_url, gender FROM users WHERE id = ?");
+$stmt->execute([$_SESSION['user_id']]);
+$currentUser = $stmt->fetch(PDO::FETCH_ASSOC);
+$profileImage = !empty($currentUser['image_url']) ? $currentUser['image_url'] : 'images/default.png';
+$userGender = $currentUser['gender'];
+
+// Recupera altri utenti
+try {
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE id != ? AND gender = ?");
+    $stmt->execute([$_SESSION['user_id'], $userGender]);
+    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $users = [];
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="it">
@@ -41,14 +50,14 @@ $profileImage = !empty($currentUser['image_url']) ? $currentUser['image_url'] : 
 </head>
 <body>
 
-<header class="app-header">
+
     <div style="display:flex; align-items:center;">
         <a href="index.php" class="logo-link"><img src="images/logo.png" alt="RoomDate Logo"></a>
        <div class="header-buttons">
         <a href="presentazione.php" class="header-btn">Presentazione</a>
           <a href="index.php" class="header-btn">Home</a>
-         <a href="match.php" class="header-btn">Match</a>
-</div>
+          <a href="match.php" class="header-btn">Match</a>
+        </div>
 
     </div>
     <div style="display:flex; align-items:center; gap:12px;">
@@ -57,7 +66,7 @@ $profileImage = !empty($currentUser['image_url']) ? $currentUser['image_url'] : 
          </a>
         <a href="logout.php" class="btn-logout">Logout</a>
     </div>
-</header>
+
 
 <main class="app-content" id="app-content">
   <div id="swipe-container">
