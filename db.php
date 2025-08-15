@@ -6,10 +6,10 @@ if (session_status() === PHP_SESSION_NONE) {
 // ... resto del codice db.php ...
 
 // Impostazioni per localhost
-$host = "sql102.infinityfree.com"; // o "127.0.0.1"
-$dbname = "if0_39665147_roomdate"; // nome del DB che hai creato in phpMyAdmin
-$username = "if0_39665147";   // utente predefinito di MySQL in locale
-$password = "FqgVSlCo0tjjF";       // di solito vuoto in locale (con XAMPP o MAMP)
+$host = "mysql.railway.internal"; // o "127.0.0.1"
+$dbname = "railway"; // nome del DB che hai creato in phpMyAdmin
+$username = "root";   // utente predefinito di MySQL in locale
+$password = "VRGDqDxfpHZstDXnYFwZtTtIwnrxvQOy";       // di solito vuoto in locale (con XAMPP o MAMP)
 
 // Connessione
 try {
@@ -18,4 +18,4 @@ try {
 } catch (PDOException $e) {
     die("Errore connessione DB: " . $e->getMessage());
 }
-?>
+?>
