@@ -1,146 +1,68 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=DM+Sans:wght@300;400;500;600&display=swap');
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 :root {
-  --terra:        #C4603A;
-  --terra-light:  #D4835E;
-  --terra-dark:   #A0492C;
-  --sand:         #F5E3CC;
-  --sand-light:   #FBF3E8;
-  --cream:        #FEFAF4;
-  --warm-brown:   #7A4B2A;
-  --warm-gray:    #8A7B6E;
-  --warm-dark:    #2C1A0E;
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-* { box-sizing: border-box; }
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #535bf2;
+}
 
 body {
-  font-family: 'DM Sans', sans-serif;
-  background-color: var(--cream);
-  color: var(--warm-dark);
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
 }
 
-.font-display { font-family: 'Playfair Display', serif; }
-
-/* Grain overlay for texture */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 9999;
-  opacity: 0.4;
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
 }
 
-.btn-primary {
-  background-color: var(--terra);
-  color: white;
-  padding: 0.75rem 2rem;
-  border-radius: 9999px;
-  font-weight: 600;
-  font-size: 0.95rem;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(196, 96, 58, 0.35);
-  cursor: pointer;
-  border: none;
-  letter-spacing: 0.01em;
-}
-.btn-primary:hover {
-  background-color: var(--terra-dark);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(196, 96, 58, 0.45);
-}
-
-.btn-outline {
-  background: transparent;
-  color: var(--terra);
-  padding: 0.75rem 2rem;
-  border-radius: 9999px;
-  font-weight: 600;
-  font-size: 0.95rem;
-  transition: all 0.2s ease;
-  cursor: pointer;
-  border: 2px solid var(--terra);
-  letter-spacing: 0.01em;
-}
-.btn-outline:hover {
-  background-color: var(--terra);
-  color: white;
-}
-
-.card-warm {
-  background: white;
-  border-radius: 1.25rem;
-  overflow: hidden;
-  box-shadow: 0 2px 20px rgba(122, 75, 42, 0.08);
-  transition: all 0.3s ease;
-}
-.card-warm:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 32px rgba(122, 75, 42, 0.15);
-}
-
-/* Animated underline for nav links */
-.nav-link {
-  position: relative;
-  color: var(--warm-brown);
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
   font-weight: 500;
-  text-decoration: none;
-  transition: color 0.2s;
-}
-.nav-link::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: 0;
-  width: 0;
-  height: 2px;
-  background-color: var(--terra);
-  transition: width 0.25s ease;
-  border-radius: 2px;
-}
-.nav-link:hover { color: var(--terra); }
-.nav-link:hover::after { width: 100%; }
-
-/* Tag chip */
-.tag {
-  background-color: var(--sand);
-  color: var(--warm-brown);
-  padding: 0.2rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.78rem;
-  font-weight: 500;
-}
-
-/* Search tab */
-.search-tab {
-  padding: 0.5rem 1.5rem;
-  border-radius: 9999px;
-  font-weight: 500;
-  font-size: 0.9rem;
+  font-family: inherit;
+  background-color: #1a1a1a;
   cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-  background: transparent;
-  color: var(--warm-gray);
+  transition: border-color 0.25s;
 }
-.search-tab.active {
-  background: var(--terra);
-  color: white;
-  box-shadow: 0 2px 10px rgba(196, 96, 58, 0.3);
+button:hover {
+  border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
 }
 
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(24px); }
-  to   { opacity: 1; transform: translateY(0); }
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
 }
-.animate-fadeup { animation: fadeUp 0.7s ease forwards; }
-.delay-1 { animation-delay: 0.1s; opacity: 0; }
-.delay-2 { animation-delay: 0.25s; opacity: 0; }
-.delay-3 { animation-delay: 0.4s; opacity: 0; }
-.delay-4 { animation-delay: 0.55s; opacity: 0; }
