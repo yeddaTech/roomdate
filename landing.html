@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RoomDate — Trova la tua stanza</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --t:#C4603A;--tl:#D4835E;--td:#9A4628;
+  --s:#F5E3CC;--sl:#FBF3E8;--cr:#FEFAF4;
+  --wb:#7A4B2A;--wg:#8A7B6E;--wd:#2C1A0E;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--cr);color:var(--wd);overflow-x:hidden}
+.serif{font-family:'Playfair Display',serif}
+
+/* NAV */
+nav{background:var(--wd);padding:0 5%;display:flex;align-items:center;justify-content:space-between;height:62px;position:sticky;top:0;z-index:100;border-bottom:2px solid var(--t)}
+.logo{font-family:'Playfair Display',serif;font-size:1.5rem;color:white;letter-spacing:-.02em}
+.logo span{color:var(--tl)}
+.nav-links{display:flex;gap:2rem}
+.nav-links a{color:rgba(255,255,255,.7);text-decoration:none;font-size:.87rem;font-weight:500;transition:.2s}
+.nav-links a:hover{color:var(--tl)}
+.nav-btns{display:flex;gap:.75rem;align-items:center}
+.btn-ghost{background:transparent;border:1.5px solid rgba(255,255,255,.25);color:rgba(255,255,255,.8);padding:.45rem 1.2rem;border-radius:999px;font-size:.85rem;cursor:pointer;font-family:inherit;transition:.2s}
+.btn-ghost:hover{border-color:var(--tl);color:var(--tl)}
+.btn-fill{background:var(--t);border:none;color:white;padding:.5rem 1.3rem;border-radius:999px;font-size:.85rem;font-weight:600;cursor:pointer;font-family:inherit;transition:.2s}
+.btn-fill:hover{background:var(--td)}
+
+/* HERO */
+.hero{background:var(--t);position:relative;overflow:hidden;padding:4.5rem 5% 4rem}
+.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center;max-width:1280px;margin:0 auto;position:relative;z-index:2}
+.hero-badge{display:inline-flex;align-items:center;gap:.5rem;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:white;padding:.35rem 1rem;border-radius:999px;font-size:.8rem;font-weight:500;margin-bottom:1.4rem}
+.hero h1{font-family:'Playfair Display',serif;font-size:clamp(2.4rem,4vw,3.4rem);line-height:1.13;color:white;margin-bottom:1.2rem}
+.hero h1 em{color:var(--s);font-style:italic}
+.hero p{color:rgba(255,255,255,.78);font-size:1rem;line-height:1.8;margin-bottom:2rem;max-width:460px}
+/* deco */
+.hero::before{content:'';position:absolute;top:-20%;right:-8%;width:480px;height:480px;border-radius:50%;background:rgba(0,0,0,.12);z-index:1}
+.hero::after{content:'';position:absolute;bottom:-30%;left:-5%;width:360px;height:360px;border-radius:50%;background:rgba(255,255,255,.06);z-index:1}
+.dot-grid{position:absolute;top:10%;left:44%;width:200px;height:200px;background-image:radial-gradient(circle,rgba(255,255,255,.25) 1.5px,transparent 1.5px);background-size:20px 20px;z-index:1}
+
+/* SEARCH BOX */
+.search-box{background:white;border-radius:1.2rem;padding:1.5rem;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.tabs{display:flex;background:var(--sl);border-radius:999px;padding:.25rem;margin-bottom:1.2rem;gap:.25rem}
+.tab{flex:1;padding:.5rem;border:none;background:transparent;border-radius:999px;font-size:.85rem;font-weight:500;cursor:pointer;color:var(--wg);font-family:inherit;transition:.2s}
+.tab.active{background:var(--t);color:white}
+.inputs{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.9rem}
+.inputs select,.inputs input{padding:.75rem 1rem;border:1.5px solid var(--s);border-radius:.75rem;background:var(--sl);font-size:.88rem;font-family:inherit;color:var(--wd);outline:none}
+.inputs select:focus,.inputs input:focus{border-color:var(--t)}
+.btn-search{width:100%;background:var(--t);color:white;border:none;padding:.85rem;border-radius:.75rem;font-size:.95rem;font-weight:600;cursor:pointer;font-family:inherit;transition:.2s}
+.btn-search:hover{background:var(--td)}
+
+/* HERO STATS */
+.hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);border-radius:1rem;overflow:hidden;margin-top:2rem}
+.stat{background:rgba(255,255,255,.08);padding:1rem;text-align:center}
+.stat-n{font-family:'Playfair Display',serif;font-size:1.9rem;font-weight:700;color:white}
+.stat-l{font-size:.75rem;color:rgba(255,255,255,.65);margin-top:.15rem}
+
+/* TRUST BAND */
+.trust{background:var(--s);padding:.9rem 5%;display:flex;align-items:center;justify-content:center;gap:3rem;flex-wrap:wrap}
+.trust-item{display:flex;align-items:center;gap:.5rem;font-size:.83rem;font-weight:500;color:var(--wb)}
+.trust-dot{width:6px;height:6px;border-radius:50%;background:var(--t)}
+
+/* LISTINGS */
+.listings{background:var(--cr);padding:4rem 5%}
+.listings-inner{max-width:1280px;margin:0 auto}
+.section-eyebrow{color:var(--t);font-size:.78rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.5rem}
+.section-h{font-family:'Playfair Display',serif;font-size:clamp(1.7rem,2.5vw,2.3rem);color:var(--wd);margin-bottom:1.5rem}
+.filters{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:2rem}
+.filter-btn{padding:.4rem 1.1rem;border-radius:999px;border:1.5px solid var(--s);background:white;color:var(--wg);font-size:.82rem;font-weight:500;cursor:pointer;font-family:inherit;transition:.2s}
+.filter-btn.active,.filter-btn:hover{border-color:var(--t);background:var(--t);color:white}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem}
+.card{background:white;border-radius:1.1rem;overflow:hidden;box-shadow:0 2px 16px rgba(122,75,42,.07);transition:.3s;cursor:pointer}
+.card:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(122,75,42,.14)}
+.card-img{height:160px;position:relative;display:flex;align-items:center;justify-content:center;font-size:3rem}
+.card-badge{position:absolute;top:10px;left:10px;padding:.2rem .65rem;border-radius:999px;font-size:.72rem;font-weight:600}
+.avail{background:rgba(255,255,255,.92);color:#2D7A44}
+.busy{background:rgba(0,0,0,.25);color:white}
+.card-price{position:absolute;bottom:10px;right:10px;background:white;border-radius:.6rem;padding:.2rem .7rem}
+.price-n{font-family:'Playfair Display',serif;font-weight:700;color:var(--t);font-size:.95rem}
+.price-u{color:var(--wg);font-size:.72rem}
+.card-body{padding:1rem 1.1rem}
+.card-title{font-family:'Playfair Display',serif;font-weight:600;color:var(--wd);font-size:1rem;margin-bottom:.25rem}
+.card-loc{color:var(--wg);font-size:.78rem;margin-bottom:.75rem}
+.tags{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.9rem}
+.tag{background:var(--sl);color:var(--wb);padding:.18rem .65rem;border-radius:999px;font-size:.74rem;font-weight:500}
+.btn-card{width:100%;background:transparent;border:1.5px solid var(--s);color:var(--t);padding:.55rem;border-radius:.6rem;font-size:.83rem;font-weight:600;cursor:pointer;font-family:inherit;transition:.2s}
+.btn-card:hover{border-color:var(--t);background:var(--sl)}
+.listings-cta{text-align:center;margin-top:2.5rem}
+
+/* COINQUILINI */
+.roommates{background:var(--s);padding:4rem 5%}
+.roommates-inner{max-width:1280px;margin:0 auto}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:1.1rem}
+.rm-card{background:white;border-radius:1.1rem;padding:1.4rem;box-shadow:0 2px 14px rgba(122,75,42,.06);transition:.3s;cursor:pointer}
+.rm-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(122,75,42,.12)}
+.rm-avatar{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin-bottom:.9rem}
+.rm-name{font-weight:600;color:var(--wd);font-size:.95rem}
+.rm-meta{color:var(--wg);font-size:.78rem;margin:.2rem 0 .75rem}
+.rm-quote{font-size:.82rem;color:var(--wg);line-height:1.65;margin-bottom:.9rem;font-style:italic}
+.match-bar{background:var(--sl);border-radius:999px;height:6px;overflow:hidden;margin-bottom:.3rem}
+.match-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--tl),var(--t))}
+.match-label{font-size:.72rem;color:var(--t);font-weight:600}
+
+/* HOW IT WORKS */
+.how{background:var(--t);padding:4rem 5%}
+.how-inner{max-width:1280px;margin:0 auto}
+.how .section-eyebrow{color:rgba(255,255,255,.6)}
+.how .section-h{color:white}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:1.25rem;margin-top:2rem}
+.step{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:1.1rem;padding:1.5rem}
+.step-num{font-family:'Playfair Display',serif;font-size:2.5rem;font-weight:700;color:rgba(255,255,255,.2);line-height:1;margin-bottom:.75rem}
+.step-icon{font-size:1.5rem;margin-bottom:.75rem;display:block}
+.step h3{color:white;font-size:1rem;font-weight:600;margin-bottom:.5rem}
+.step p{color:rgba(255,255,255,.7);font-size:.83rem;line-height:1.7}
+
+/* TESTIMONIALS */
+.testimonials{background:var(--wd);padding:4rem 5%}
+.testimonials-inner{max-width:1280px;margin:0 auto}
+.testimonials .section-eyebrow{color:var(--tl)}
+.testimonials .section-h{color:white}
+.grid-3-t{display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;margin-top:2rem}
+.t-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:1.1rem;padding:1.5rem}
+.stars{color:var(--tl);font-size:.85rem;margin-bottom:1rem;letter-spacing:.1em}
+.t-text{color:rgba(255,255,255,.75);font-size:.87rem;line-height:1.8;margin-bottom:1.2rem;font-style:italic}
+.t-author{display:flex;align-items:center;gap:.75rem}
+.t-av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.2rem}
+.t-name{color:white;font-weight:600;font-size:.88rem}
+.t-sub{color:rgba(255,255,255,.45);font-size:.75rem}
+
+/* CTA BANNER */
+.cta-banner{background:var(--s);padding:3.5rem 5%}
+.cta-inner{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:1fr auto;align-items:center;gap:2rem;background:var(--t);border-radius:1.4rem;padding:2.5rem 3rem;position:relative;overflow:hidden}
+.cta-inner::before{content:'';position:absolute;top:-40%;right:-5%;width:320px;height:320px;border-radius:50%;background:rgba(0,0,0,.1)}
+.cta-h{font-family:'Playfair Display',serif;font-size:clamp(1.4rem,2vw,2rem);color:white;margin-bottom:.5rem}
+.cta-p{color:rgba(255,255,255,.72);font-size:.9rem}
+.btn-cta{background:white;color:var(--t);border:none;padding:.9rem 2.2rem;border-radius:999px;font-size:.95rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;position:relative;z-index:2;transition:.2s;flex-shrink:0}
+.btn-cta:hover{background:var(--sl)}
+
+/* FOOTER */
+footer{background:#1A0E07;padding:3rem 5% 1.5rem}
+.footer-inner{max-width:1280px;margin:0 auto}
+.footer-grid{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:3rem;margin-bottom:2.5rem}
+.footer-logo{font-family:'Playfair Display',serif;font-size:1.5rem;color:white;margin-bottom:.75rem}
+.footer-logo span{color:var(--tl)}
+.footer-desc{color:rgba(255,255,255,.45);font-size:.82rem;line-height:1.8;margin-bottom:1.2rem}
+.socials{display:flex;gap:.5rem}
+.social-btn{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.55);cursor:pointer;font-size:.8rem;transition:.2s}
+.social-btn:hover{background:var(--t);color:white}
+.footer-col h4{color:white;font-size:.85rem;font-weight:600;margin-bottom:1rem;letter-spacing:.03em}
+.footer-col ul{list-style:none;display:flex;flex-direction:column;gap:.55rem}
+.footer-col a{color:rgba(255,255,255,.45);text-decoration:none;font-size:.82rem;transition:.2s}
+.footer-col a:hover{color:var(--tl)}
+.footer-bottom{border-top:1px solid rgba(255,255,255,.08);padding-top:1.5rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem}
+.footer-cr{color:rgba(255,255,255,.3);font-size:.78rem}
+.footer-links{display:flex;gap:1.5rem}
+.footer-links a{color:rgba(255,255,255,.3);font-size:.78rem;text-decoration:none}
+.footer-links a:hover{color:var(--tl)}
+
+@media(max-width:900px){
+  .hero-grid,.grid-3,.grid-4,.grid-3-t,.steps,.footer-grid{grid-template-columns:1fr 1fr}
+  .cta-inner{grid-template-columns:1fr;text-align:center}
+  .nav-links{display:none}
+}
+@media(max-width:600px){
+  .hero-grid,.grid-3,.grid-4,.grid-3-t,.steps,.footer-grid{grid-template-columns:1fr}
+  .inputs{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">Room<span>Date</span></div>
+  <div class="nav-links">
+    <a href="#">Home</a>
+    <a href="#">Trova Stanza</a>
+    <a href="#">Cerca Coinquilini</a>
+    <a href="#">Come Funziona</a>
+  </div>
+  <div class="nav-btns">
+    <button class="btn-ghost">Accedi</button>
+    <button class="btn-fill">Registrati Gratis</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="dot-grid"></div>
+  <div class="hero-grid">
+    <div>
+      <div class="hero-badge">🏡 Oltre 12.000 annunci attivi in Italia</div>
+      <h1 class="serif">Trova la tua stanza,<br/><em>trova casa.</em></h1>
+      <p>Migliaia di stanze e coinquilini selezionati nelle città italiane. Senza agenzie, senza commissioni.</p>
+      <div class="hero-stats">
+        <div class="stat"><div class="stat-n">12K+</div><div class="stat-l">Annunci attivi</div></div>
+        <div class="stat"><div class="stat-n">98%</div><div class="stat-l">Soddisfatti</div></div>
+        <div class="stat"><div class="stat-n">0€</div><div class="stat-l">Commissioni</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="search-box">
+        <div class="tabs">
+          <button class="tab active" onclick="this.parentNode.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));this.classList.add('active')">🔍 Cerca Stanza</button>
+          <button class="tab" onclick="this.parentNode.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));this.classList.add('active')">👥 Cerco Coinquilino</button>
+        </div>
+        <div class="inputs">
+          <select><option value="">📍 Città</option><option>Milano</option><option>Roma</option><option>Torino</option><option>Bologna</option><option>Firenze</option><option>Napoli</option></select>
+          <input type="number" placeholder="💶 Budget max €"/>
+          <select><option value="">🏠 Tipo stanza</option><option>Singola</option><option>Doppia</option><option>Posto letto</option></select>
+          <select><option value="">📅 Disponibile da</option><option>Subito</option><option>Questo mese</option><option>Prossimo mese</option></select>
+        </div>
+        <button class="btn-search">Cerca Stanze Disponibili →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST BAND -->
+<div class="trust">
+  <div class="trust-item"><div class="trust-dot"></div>Profili verificati</div>
+  <div class="trust-item"><div class="trust-dot"></div>Chat sicura integrata</div>
+  <div class="trust-item"><div class="trust-dot"></div>Zero commissioni agenzie</div>
+  <div class="trust-item"><div class="trust-dot"></div>4.9/5 · 2.400+ recensioni</div>
+  <div class="trust-item"><div class="trust-dot"></div>Annunci aggiornati in tempo reale</div>
+</div>
+
+<!-- LISTINGS -->
+<section class="listings">
+  <div class="listings-inner">
+    <div class="section-eyebrow">Annunci in evidenza</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem">
+      <h2 class="section-h serif" style="margin-bottom:0">Stanze selezionate per te</h2>
+      <div class="filters">
+        <button class="filter-btn active" onclick="setFilter(this,'Tutte')">Tutte</button>
+        <button class="filter-btn" onclick="setFilter(this,'Milano')">Milano</button>
+        <button class="filter-btn" onclick="setFilter(this,'Roma')">Roma</button>
+        <button class="filter-btn" onclick="setFilter(this,'Torino')">Torino</button>
+        <button class="filter-btn" onclick="setFilter(this,'Bologna')">Bologna</button>
+        <button class="filter-btn" onclick="setFilter(this,'Firenze')">Firenze</button>
+      </div>
+    </div>
+    <div class="grid-3" id="listings-grid">
+      <!-- cards injected by JS -->
+    </div>
+    <div class="listings-cta">
+      <button class="btn-fill" style="padding:.85rem 2.5rem;font-size:.95rem">Vedi tutti gli annunci →</button>
+    </div>
+  </div>
+</section>
+
+<!-- COINQUILINI -->
+<section class="roommates">
+  <div class="roommates-inner">
+    <div class="section-eyebrow">Profili coinquilini</div>
+    <h2 class="section-h serif">Chi cerca con te</h2>
+    <div class="grid-4">
+      <div class="rm-card">
+        <div class="rm-avatar" style="background:linear-gradient(135deg,#F5C29A,#C4603A)">👩</div>
+        <div class="rm-name">Giulia M.</div>
+        <div class="rm-meta">25 anni · Studentessa · Milano</div>
+        <div class="rm-quote">"Cerco stanza tranquilla, adoro i gatti e la musica jazz 🎷"</div>
+        <div class="tags"><span class="tag">Non fumatrice</span><span class="tag">Animali ok</span></div>
+        <div class="match-bar"><div class="match-fill" style="width:92%"></div></div>
+        <div class="match-label">92% compatibile</div>
+      </div>
+      <div class="rm-card">
+        <div class="rm-avatar" style="background:linear-gradient(135deg,#C4A882,#7A4B2A)">👨</div>
+        <div class="rm-name">Marco T.</div>
+        <div class="rm-meta">28 anni · Lavoratore · Roma</div>
+        <div class="rm-quote">"Software engineer, ordine e rispetto degli spazi comuni 💻"</div>
+        <div class="tags"><span class="tag">Fumatore</span><span class="tag">No animali</span></div>
+        <div class="match-bar"><div class="match-fill" style="width:78%"></div></div>
+        <div class="match-label">78% compatibile</div>
+      </div>
+      <div class="rm-card">
+        <div class="rm-avatar" style="background:linear-gradient(135deg,#E8C4A0,#D4835E)">👩‍🦱</div>
+        <div class="rm-name">Sara K.</div>
+        <div class="rm-meta">22 anni · Erasmus · Bologna</div>
+        <div class="rm-quote">"Italiana-tunisina, cerco appartamento vivace e multiculturale 🌍"</div>
+        <div class="tags"><span class="tag">Non fumatrice</span><span class="tag">Vegana</span></div>
+        <div class="match-bar"><div class="match-fill" style="width:85%"></div></div>
+        <div class="match-label">85% compatibile</div>
+      </div>
+      <div class="rm-card">
+        <div class="rm-avatar" style="background:linear-gradient(135deg,#D4B896,#9A4628)">👨‍🦲</div>
+        <div class="rm-name">Luca B.</div>
+        <div class="rm-meta">31 anni · Freelance · Torino</div>
+        <div class="rm-quote">"Designer, cerco spazio luminoso e coinquilini creativi 🎨"</div>
+        <div class="tags"><span class="tag">Non fumatore</span><span class="tag">Animali ok</span></div>
+        <div class="match-bar"><div class="match-fill" style="width:88%"></div></div>
+        <div class="match-label">88% compatibile</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how">
+  <div class="how-inner">
+    <div class="section-eyebrow">Come funziona</div>
+    <h2 class="section-h serif">Trovare casa in 4 passi</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <span class="step-icon">📝</span>
+        <h3>Crea il tuo profilo</h3>
+        <p>Raccontaci di te, del tuo stile di vita e delle tue preferenze. Più sei specifico, migliori i match.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <span class="step-icon">🔍</span>
+        <h3>Cerca e filtra</h3>
+        <p>Usa i filtri intelligenti per trovare stanze o coinquilini per budget, zona e compatibilità.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <span class="step-icon">💬</span>
+        <h3>Contatta direttamente</h3>
+        <p>Chatta con proprietari o coinquilini senza intermediari. Nessuna agenzia, zero costi nascosti.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">04</div>
+        <span class="step-icon">🏠</span>
+        <h3>Benvenuto a casa!</h3>
+        <p>Firma l'accordo, prendi le chiavi e inizia la tua nuova convivenza. Semplice come dev'essere.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="testimonials">
+  <div class="testimonials-inner">
+    <div class="section-eyebrow">Testimonianze</div>
+    <h2 class="section-h serif">Cosa dicono i nostri utenti</h2>
+    <div class="grid-3-t">
+      <div class="t-card">
+        <div class="stars">★★★★★</div>
+        <p class="t-text">"Ho trovato la stanza perfetta in meno di una settimana! Il sistema di filtri è comodissimo e la chat con il proprietario è stata subito aperta."</p>
+        <div class="t-author">
+          <div class="t-av" style="background:linear-gradient(135deg,#F5C29A,#C4603A)">👩</div>
+          <div><div class="t-name">Giulia M.</div><div class="t-sub">24 anni · Milano</div></div>
+        </div>
+      </div>
+      <div class="t-card">
+        <div class="stars">★★★★★</div>
+        <p class="t-text">"Ho trovato due coinquilini fantastici con cui condivido da 8 mesi. Zero agenzie, zero commissioni. RoomDate mi ha davvero sorpreso."</p>
+        <div class="t-author">
+          <div class="t-av" style="background:linear-gradient(135deg,#C4A882,#7A4B2A)">👨</div>
+          <div><div class="t-name">Lorenzo B.</div><div class="t-sub">28 anni · Roma</div></div>
+        </div>
+      </div>
+      <div class="t-card">
+        <div class="stars">★★★★★</div>
+        <p class="t-text">"Per una studentessa fuori sede è stato essenziale. Profili verificati, prezzi chiari e ho fatto un tour virtuale prima di visitare la stanza."</p>
+        <div class="t-author">
+          <div class="t-av" style="background:linear-gradient(135deg,#D4B896,#9A4628)">👩‍🎓</div>
+          <div><div class="t-name">Sara K.</div><div class="t-sub">22 anni · Bologna</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA BANNER -->
+<div class="cta-banner">
+  <div class="cta-inner">
+    <div style="position:relative;z-index:2">
+      <h2 class="cta-h serif">Pronto a trovare la tua prossima casa?</h2>
+      <p class="cta-p">Registrazione gratuita. Nessuna carta di credito richiesta.</p>
+    </div>
+    <button class="btn-cta">Inizia ora — è gratis 🚀</button>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-logo">Room<span>Date</span></div>
+        <p class="footer-desc">Il modo più semplice per trovare stanze e coinquilini in Italia. Senza agenzie, senza stress.</p>
+        <div class="socials">
+          <button class="social-btn">f</button>
+          <button class="social-btn">in</button>
+          <button class="social-btn">ig</button>
+          <button class="social-btn">tw</button>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h4>Servizi</h4>
+        <ul>
+          <li><a href="#">Cerca Stanza</a></li>
+          <li><a href="#">Pubblica Annuncio</a></li>
+          <li><a href="#">Trova Coinquilini</a></li>
+          <li><a href="#">Mappa Interattiva</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Supporto</h4>
+        <ul>
+          <li><a href="#">Come Funziona</a></li>
+          <li><a href="#">FAQ</a></li>
+          <li><a href="#">Sicurezza</a></li>
+          <li><a href="#">Contattaci</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Azienda</h4>
+        <ul>
+          <li><a href="#">Chi Siamo</a></li>
+          <li><a href="#">Blog</a></li>
+          <li><a href="#">Lavora con Noi</a></li>
+          <li><a href="#">Press Kit</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span class="footer-cr">© 2025 RoomDate. Tutti i diritti riservati.</span>
+      <div class="footer-links">
+        <a href="#">Privacy Policy</a>
+        <a href="#">Termini di Servizio</a>
+        <a href="#">Cookie</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+const listings=[
+  {title:'Doppia con bagno privato',city:'Milano',zone:'Porta Romana',price:750,tags:['Arredata','Bagno privato','Wi-Fi'],color:'#E8C4A0',emoji:'🏢',avail:true},
+  {title:'Singola luminosa',city:'Roma',zone:'Prati',price:620,tags:['Arredata','Terrazza','Palestra'],color:'#C4A882',emoji:'🌿',avail:true},
+  {title:'Posto letto in doppia',city:'Torino',zone:'San Salvario',price:380,tags:['Studenti','Animali ok','Bici'],color:'#D4B896',emoji:'🚲',avail:false},
+  {title:'Singola in attico',city:'Bologna',zone:'Centro',price:550,tags:['Arredata','Vista città','Wi-Fi'],color:'#B89878',emoji:'✨',avail:true},
+  {title:'Doppia uso singola',city:'Firenze',zone:'Oltrarno',price:690,tags:['Arredata','Storico','Cortile'],color:'#C4A07A',emoji:'🌺',avail:true},
+  {title:'Singola moderna',city:'Milano',zone:'Isola',price:820,tags:['Design','Palestra','Sicurezza'],color:'#D8B898',emoji:'🏙️',avail:true},
+];
+
+function renderListings(items){
+  const grid=document.getElementById('listings-grid');
+  grid.innerHTML=items.map(l=>`
+    <div class="card">
+      <div class="card-img" style="background:linear-gradient(135deg,${l.color},${l.color}88)">
+        ${l.emoji}
+        <span class="card-badge ${l.avail?'avail':'busy'}">${l.avail?'✅ Disponibile':'⏳ Occupata'}</span>
+        <div class="card-price"><span class="price-n">€${l.price}</span><span class="price-u">/mese</span></div>
+      </div>
+      <div class="card-body">
+        <div class="card-title">${l.title}</div>
+        <div class="card-loc">📍 ${l.zone}, ${l.city}</div>
+        <div class="tags">${l.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+        <button class="btn-card">Vedi dettagli</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function setFilter(btn,city){
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderListings(city==='Tutte'?listings:listings.filter(l=>l.city===city));
+}
+
+renderListings(listings);
+</script>
+</body>
+</html>
