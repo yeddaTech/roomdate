@@ -102,7 +102,6 @@ const QUICK_REPLIES = [
   '🚇 Linea metro vicina?',
 ];
 
-// ─── Componente principale ────────────────────────────────────────────────────
 export default function ChatPage() {
   const [conversations, setConversations] = useState(CONVERSATIONS);
   const [activeConvId, setActiveConvId] = useState(null);
@@ -111,19 +110,17 @@ export default function ChatPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('Tutti');
   const [showProfile, setShowProfile] = useState(false);
-  const [mobileView, setMobileView] = useState('list'); // 'list' | 'chat'
+  const [mobileView, setMobileView] = useState('list'); 
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
   const activeConv = conversations.find(c => c.id === activeConvId);
 
-  // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeConv?.messages]);
 
-  // Auto-resize textarea
   const handleTextareaChange = (e) => {
     setInputText(e.target.value);
     const ta = e.target;
@@ -134,11 +131,9 @@ export default function ChatPage() {
   const handleSelectConv = (conv) => {
     setActiveConvId(conv.id);
     setMobileView('chat');
-    // Azzeriamo gli unread
     setConversations(prev =>
       prev.map(c => c.id === conv.id ? { ...c, unread: 0 } : c)
     );
-    // Simula "typing" dell'altro utente ogni tanto
     if (conv.online) {
       setTimeout(() => {
         setIsTyping(true);
@@ -175,7 +170,6 @@ export default function ChatPage() {
       textareaRef.current.style.height = 'auto';
     }
 
-    // Simula risposta
     if (activeConv?.online) {
       setTimeout(() => {
         setIsTyping(true);
@@ -216,7 +210,6 @@ export default function ChatPage() {
     textareaRef.current?.focus();
   };
 
-  // Filtraggio conversazioni
   const filteredConvs = conversations.filter(c => {
     const matchSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.lastMsg.toLowerCase().includes(searchQuery.toLowerCase());
@@ -248,7 +241,7 @@ export default function ChatPage() {
       <div className="chat-layout">
 
         {/* ── SIDEBAR ── */}
-        <aside className={`chat-sidebar ${mobileView === 'chat' ? 'hidden' : ''}`}>
+        <aside className={`chat-sidebar ${mobileView === 'chat' ? 'mobile-hide' : ''}`}>
 
           <div className="sidebar-header">
             <div className="sidebar-top">
@@ -314,7 +307,7 @@ export default function ChatPage() {
         </aside>
 
         {/* ── CHAT MAIN ── */}
-        <main className={`chat-main ${mobileView === 'chat' ? 'visible' : ''}`}>
+        <main className={`chat-main ${mobileView === 'chat' ? 'mobile-show' : ''}`}>
 
           {!activeConv ? (
             <div className="chat-empty">
