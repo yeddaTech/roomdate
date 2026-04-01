@@ -32,8 +32,17 @@ func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// Prendiamo tutti gli utenti (massimo 8)
-	query := `SELECT id, first_name, occupation, bio, lifestyle_tags FROM roomdate_app.users LIMIT 8`
+	// LA SUPER QUERY: Postgres riempie i buchi (NULL) e formatta l'ID prima di darli a Go!
+	query := `
+		SELECT 
+			id::text, 
+			COALESCE(first_name, 'Utente'), 
+			COALESCE(occupation, 'Studente/Lavoratore'), 
+			COALESCE(bio, 'Ciao! Sto cercando una nuova casa e dei fantastici coinquilini.'), 
+			COALESCE(lifestyle_tags, 'Socievole, Ordinato') 
+		FROM roomdate_app.users 
+		LIMIT 8
+	`
 	rows, err := db.Query(query)
 	if err != nil {
 		http.Error(w, "Errore query", http.StatusInternalServerError)
@@ -48,31 +57,20 @@ func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		var rm Roommate
-		// Usiamo NullString per evitare crash se nel DB questi campi sono vuoti (NULL)
-		var job, quote, rawTags sql.NullString
+		var tagsStr string
 
-		if err := rows.Scan(&rm.ID, &rm.Name, &job, &quote, &rawTags); err != nil {
-			continue
+		// Ora la lettura (Scan) è semplicissima e a prova di bomba
+		if err := rows.Scan(&rm.ID, &rm.Name, &rm.Job, &rm.Quote, &tagsStr); err != nil {
+			// Se fallisce, non stiamo più in silenzio, ma facciamo crashare l'API per leggere l'errore vero!
+			http.Error(w, "Errore Scan: "+err.Error(), http.StatusInternalServerError)
+			return
 		}
 
-		// Se l'utente non ha compilato il profilo, mettiamo dati di default!
-		rm.Job = "Studente/Lavoratore"
-		if job.Valid && job.String != "" {
-			rm.Job = job.String
-		}
-
-		rm.Quote = "Ciao! Sto cercando una nuova casa e dei fantastici coinquilini."
-		if quote.Valid && quote.String != "" {
-			rm.Quote = quote.String
-		}
-
-		tagsStr := "Socievole, Ordinato"
-		if rawTags.Valid && rawTags.String != "" {
-			tagsStr = rawTags.String
-		}
+		// Dividiamo i tag
 		rm.Tags = strings.Split(tagsStr, ", ")
 
-		rm.Age = 22 + (i % 6) // Età finta per ora
+		// Dati grafici finti per riempire le card
+		rm.Age = 22 + (i % 6)
 		rm.City = "In Italia"
 		rm.Match = 85 + (i * 2)
 		rm.Color1 = colors[i%len(colors)][0]
