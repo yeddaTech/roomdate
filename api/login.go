@@ -17,8 +17,9 @@ type LoginRequest struct {
 }
 
 // Dati che manderemo indietro a React se il login ha successo
+// Dati che manderemo indietro a React se il login ha successo
 type UserData struct {
-	ID      int    `json:"id"`
+	ID      string `json:"id"` // <--- CAMBIA QUI: da int a string!
 	Nome    string `json:"nome"`
 	Cognome string `json:"cognome"`
 	Email   string `json:"email"`
