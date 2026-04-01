@@ -36,7 +36,40 @@ export default function ListingDetails() {
   const prevImage = () => {
     setCurrentIndex((prev) => (prev === 0 ? listing.images.length - 1 : prev - 1));
   };
+  // --- FUNZIONE PER INIZIARE LA CHAT ---
+  const handleContact = async () => {
+    // 1. Controlla se l'utente è loggato
+    const savedUser = localStorage.getItem('roomdate_user');
+    if (!savedUser) {
+      alert("Devi accedere o registrarti per contattare il proprietario!");
+      navigate('/accedi');
+      return;
+    }
+    
+    const user = JSON.parse(savedUser);
 
+    try {
+      // 2. Chiama l'API per creare/trovare la chat nel Database
+      const res = await fetch('/api/start_chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listingId: parseInt(id),
+          tenantId: user.id
+        })
+      });
+
+      if (res.ok) {
+        // 3. Tutto andato bene! Ti sposta nella pagina chat
+        navigate('/chat');
+      } else {
+        alert("Errore nell'avvio della chat.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Errore di connessione.");
+    }
+  };
   if (loading) {
     return (
       <div className="details-page" style={{display:'flex', justifyContent:'center', alignItems:'center'}}>
@@ -137,13 +170,14 @@ export default function ListingDetails() {
               {listing.landlord.role} su RoomDate
             </p>
 
-            <Link 
-              to="/chat" 
+            {/* SOSTITUISCI IL VECCHIO LINK CON QUESTO BOTTONE */}
+            <button 
+              onClick={handleContact} 
               className="btn-fill" 
-              style={{display:'block', textDecoration:'none', marginBottom: '1rem', padding: '1rem'}}
+              style={{width: '100%', marginBottom: '1rem', padding: '1rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '1rem'}}
             >
               Contatta in Chat
-            </Link>
+            </button>
             
             <button className="btn-ghost" style={{width:'100%', padding: '0.9rem'}}>
               Salva tra i preferiti
