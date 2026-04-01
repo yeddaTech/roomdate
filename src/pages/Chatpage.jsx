@@ -139,13 +139,14 @@ export default function ChatPage() {
   return (
     <div className="chat-page" style={{ backgroundColor: '#FEFAF4', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
-      {/* ── NAVBAR MIGLIORATA (Stessa della Home e Ricerca) ── */}
+      {/* ── NAVBAR UNIFICATA ── */}
       <nav style={{ flexShrink: 0 }}>
         <div className="logo">Room<span>Date</span></div>
         <div className="nav-links">
           <Link to="/">Home</Link>
           <Link to="/ricerca">Cerca Stanza</Link>
           <Link to="/chat">Chat</Link>
+          <Link to="/dashboard">Profilo</Link>
           <Link to="/impostazioni">Impostazioni</Link>
         </div>
         <div className="nav-btns">
@@ -154,7 +155,6 @@ export default function ChatPage() {
               <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginRight: '0.5rem' }}>
                 Ciao, <strong>{user.nome}</strong>!
               </span>
-              <Link to="/dashboard" className="btn-ghost">Area Riservata</Link>
               <button onClick={handleLogout} className="btn-fill" style={{ background: '#E24B4A' }}>Esci</button>
             </>
           ) : (
