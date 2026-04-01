@@ -48,10 +48,11 @@ export default function Home() {
       <nav>
         <div className="logo">Room<span>Date</span></div>
         <div className="nav-links">
-          {/* NUOVI LINK DI NAVIGAZIONE */}
           <Link to="/">Home</Link>
           <Link to="/ricerca">Cerca Stanza</Link>
           <Link to="/chat">Chat</Link>
+          {/* Sostituito Area Riservata con Profilo nei link (punta alla dashboard o alla pagina profilo che preferisci) */}
+          <Link to="/dashboard">Profilo</Link>
           <Link to="/impostazioni">Impostazioni</Link>
         </div>
         <div className="nav-btns">
@@ -60,7 +61,7 @@ export default function Home() {
               <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginRight: '0.5rem' }}>
                 Ciao, <strong>{user.nome}</strong>!
               </span>
-              <Link to="/dashboard" className="btn-ghost">Area Riservata</Link>
+              {/* Rimosso il tasto Area Riservata da qui */}
               <button onClick={handleLogout} className="btn-fill" style={{ background: '#E24B4A' }}>Esci</button>
             </>
           ) : (
@@ -112,13 +113,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- TRUST BAND --- */}
-      <div className="trust">
-        <div className="trust-item"><div className="trust-dot"></div>Profili verificati</div>
-        <div className="trust-item"><div className="trust-dot"></div>Chat sicura integrata</div>
-        <div className="trust-item"><div className="trust-dot"></div>Zero commissioni agenzie</div>
-        <div className="trust-item"><div className="trust-dot"></div>4.9/5 · 2.400+ recensioni</div>
-      </div>
+      {/* Rimosso il blocco TRUST BAND con le scritte bianche illeggibili */}
 
       {/* --- STANZE IN EVIDENZA (CAROUSEL) --- */}
       <section className="listings" id="trova">
