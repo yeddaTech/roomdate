@@ -1,22 +1,29 @@
 import React from 'react';
-import Navbar from './components/Navbar';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+// Importiamo le pagine
+import Home from './pages/Home';
+import Login from './pages/Login';
+import Register from './pages/Register';
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
-      {/* Richiamiamo la Navbar appena creata */}
-      <Navbar />
+    <BrowserRouter>
+      <Routes>
+        {/* Home Page */}
+        <Route path="/" element={<Home />} />
+        
+        {/* Pagina Accedi */}
+        <Route path="/accedi" element={<Login />} />
+        
+        {/* Pagina Registrazione (gestiamo entrambi i nomi per sicurezza) */}
+        <Route path="/registrati" element={<Register />} />
+        <Route path="/register" element={<Register />} />
 
-      {/* Qui sotto andremo ad aggiungere il resto della pagina in futuro */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-4xl font-bold text-gray-800 text-center mt-10">
-          Benvenuto su RoomDate!
-        </h1>
-        <p className="text-center text-gray-600 mt-4 text-lg">
-          La tua nuova Navbar è pronta e funzionante.
-        </p>
-      </main>
-    </div>
+        {/* Rotta di emergenza: se l'utente scrive un URL a caso, torna alla Home */}
+        <Route path="*" element={<Home />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

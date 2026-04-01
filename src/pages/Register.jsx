@@ -53,11 +53,45 @@ export default function Register() {
   
   const currentStrength = strengthLevels[score];
 
-  // --- SUBMIT ---
-  const handleSubmit = (e) => {
+// --- SUBMIT ---
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Dati pronti per essere inviati al backend Go:", { ...formData, tipo: userType });
-    // Qui in futuro faremo la chiamata `fetch('/api/register', ...)`
+    
+    // Disabilitiamo il bottone e cambiamo il testo per dare feedback all'utente
+    const btn = e.target.querySelector('.btn-submit');
+    const originalText = btn.innerText;
+    btn.innerText = 'Registrazione in corso...';
+    btn.disabled = true;
+
+    try {
+      // Facciamo la chiamata POST al nostro nuovo backend in Go
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nome: formData.nome,
+          cognome: formData.cognome,
+          email: formData.email,
+          password: formData.password
+        }),
+      });
+
+      if (response.ok) {
+        alert('🎉 Registrazione completata con successo!');
+        // Se vuoi, dopo l'alert puoi svuotare il form o reindirizzare al login
+      } else {
+        const errorMsg = await response.text();
+        alert('❌ Errore: ' + errorMsg);
+      }
+    } catch (error) {
+      alert('⚠️ Si è verificato un errore di connessione con il server.');
+    } finally {
+      // Riattiviamo il bottone
+      btn.innerText = originalText;
+      btn.disabled = false;
+    }
   };
 
   return (
