@@ -56,7 +56,10 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Email non trovata", http.StatusUnauthorized)
 			return
 		}
-		http.Error(w, "Errore del server", http.StatusInternalServerError)
+		// PRIMA ERA COSÌ: http.Error(w, "Errore del server", http.StatusInternalServerError)
+
+		// ORA LO CAMBIAMO COSÌ PER VEDERE IL VERO ERRORE:
+		http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
