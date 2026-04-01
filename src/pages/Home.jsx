@@ -15,12 +15,29 @@ export default function Home() {
   const [listings, setListings] = useState([]); 
   const [roommates, setRoommates] = useState([]);
 
-  // Appena la Home si carica, controlliamo se qualcuno ha fatto il login
+// Appena la Home si carica, scarichiamo tutto!
   useEffect(() => {
+    // 1. Controlla il Login
     const savedUser = localStorage.getItem('roomdate_user');
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
+
+    // 2. Scarica gli Annunci dal Database
+    fetch('/api/get_listings')
+      .then(res => res.json())
+      .then(data => {
+        if (data) setListings(data);
+      })
+      .catch(err => console.error("Errore caricamento stanze:", err));
+
+    // 3. Scarica i Coinquilini dal Database
+    fetch('/api/get_roommates')
+      .then(res => res.json())
+      .then(data => {
+        if (data) setRoommates(data);
+      })
+      .catch(err => console.error("Errore caricamento coinquilini:", err));
   }, []);
 
   // Funzione per fare il logout

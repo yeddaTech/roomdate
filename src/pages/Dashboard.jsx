@@ -24,17 +24,71 @@ export default function Dashboard() {
     navigate('/');
   };
 
-  // Finti salvataggi (in futuro chiameranno le API Go)
-  const handleSaveProfile = (e) => {
+// --- SALVA PROFILO ---
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    alert("Profilo aggiornato con successo! (Da collegare al DB)");
-    setActiveView('overview');
+    const formData = new FormData(e.target);
+    
+    // Raccogliamo i tag selezionati
+    const tags = Array.from(e.target.querySelectorAll('.tag-checkbox:checked'))
+      .map(cb => cb.nextElementSibling.innerText)
+      .join(', ');
+
+    const data = {
+      userId: user.id, // L'ID dell'utente loggato
+      occupation: formData.get('occupation'),
+      birthdate: formData.get('birthdate'),
+      bio: formData.get('bio'),
+      tags: tags
+    };
+
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        alert("✅ Profilo aggiornato con successo!");
+        setActiveView('overview');
+      } else {
+        alert("❌ Errore durante il salvataggio.");
+      }
+    } catch (err) {
+      alert("Errore di connessione al server.");
+    }
   };
 
-  const handleSaveListing = (e) => {
+  // --- PUBBLICA ANNUNCIO ---
+  const handleSaveListing = async (e) => {
     e.preventDefault();
-    alert("Annuncio pubblicato! (Da collegare al DB)");
-    setActiveView('overview');
+    const formData = new FormData(e.target);
+    
+    const data = {
+      userId: user.id,
+      title: formData.get('title'),
+      city: formData.get('city'),
+      zone: formData.get('zone'),
+      roomType: formData.get('roomType'),
+      price: formData.get('price'),
+      description: formData.get('description')
+    };
+
+    try {
+      const res = await fetch('/api/create_listing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        alert("🎉 Annuncio pubblicato! Ora è visibile sulla Home.");
+        setActiveView('overview');
+      } else {
+        alert("❌ Errore durante la pubblicazione.");
+      }
+    } catch (err) {
+      alert("Errore di connessione al server.");
+    }
   };
 
   if (!user) return null;
