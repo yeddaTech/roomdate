@@ -9,28 +9,21 @@ export default function ListingDetails() {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
-    // Sostituisci questo blocco con la chiamata fetch reale al tuo database
-    // Esempio: fetch(`/api/annunci/${id}`).then(...)
-    
-    setTimeout(() => {
-      setListing({
-        title: "Stanza Singola Premium",
-        city: "Milano",
-        zone: "Porta Venezia",
-        price: 720,
-        type: "Singola",
-        description: "Ampia stanza luminosa situata in un appartamento storico appena ristrutturato. La zona è centralissima, servita da metro e locali, perfetta per studenti o giovani professionisti.",
-        features: ["Wi-Fi 1Gbps", "Aria Condizionata", "Lavatrice", "Scrivania XL", "Pulizie incluse"],
-        images: [
-          "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80",
-          "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80",
-          "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80"
-        ],
-        landlord: { name: "Giulia R.", role: "Proprietaria", emoji: "👩‍💼" }
-      });
-      setLoading(false);
-    }, 500);
-  }, [id]);
+      // CHIAMATA REALE AL DATABASE
+      fetch(`/api/get_listing?id=${id}`)
+        .then(res => {
+          if (!res.ok) throw new Error('Annuncio non trovato');
+          return res.json();
+        })
+        .then(data => {
+          setListing(data);
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error("Errore nel caricamento dei dati veri:", err);
+          setLoading(false);
+        });
+    }, [id]);
 
   // Logica navigazione immagini
   const nextImage = () => {
