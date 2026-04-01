@@ -8,7 +8,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Search from './pages/Search';
 import Chatpage from './pages/Chatpage';
-import ListingDetails from './pages/ListingDetails'; // Aggiungi l'import
+import ListingDetails from './pages/ListingDetails';
 
 function App() {
   return (
@@ -17,19 +17,22 @@ function App() {
         {/* Home Page */}
         <Route path="/" element={<Home />} />
         
-        {/* Pagina Accedi */}
+        {/* Pagine di Autenticazione */}
         <Route path="/accedi" element={<Login />} />
-        
-        {/* Pagina Registrazione (gestiamo entrambi i nomi per sicurezza) */}
         <Route path="/registrati" element={<Register />} />
         <Route path="/register" element={<Register />} />
 
-        {/* Rotta di emergenza: se l'utente scrive un URL a caso, torna alla Home */}
-        <Route path="*" element={<Home />} />
+        {/* Pagine dell'App */}
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/ricerca" element={<Search />} />
         <Route path="/chat" element={<Chatpage />} />
-        <Route path="/listing/:id" element={<ListingDetails />} />      </Routes>
+        
+        {/* ECCO LA ROTTA CORRETTA: deve essere "dettagli", come nel Link! */}
+        <Route path="/dettagli/:id" element={<ListingDetails />} />
+
+        {/* Rotta di emergenza (Catch-all): DEVE STARE SEMPRE IN FONDO ALLA LISTA */}
+        <Route path="*" element={<Home />} />
+      </Routes>
     </BrowserRouter>
   );
 }
