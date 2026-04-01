@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import './Chatpage.css';
 
@@ -73,7 +72,7 @@ export default function ChatPage() {
       setMobileView('chat');
     }
   }, [conversations, location.state]);
-  
+
   const handleTextareaChange = (e) => {
     setInputText(e.target.value);
     const ta = e.target;
