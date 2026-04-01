@@ -58,10 +58,11 @@ export default function ListingDetails() {
           tenantId: user.id
         })
       });
-
       if (res.ok) {
-        // 3. Tutto andato bene! Ti sposta nella pagina chat
-        navigate('/chat');
+        // PRENDE L'ID DELLA CHAT DAL DATABASE
+        const data = await res.json(); 
+        // PASSA L'ID ALLA PAGINA DELLA CHAT!
+        navigate('/chat', { state: { openChatId: data.conversationId } });
       } else {
         alert("Errore nell'avvio della chat.");
       }
