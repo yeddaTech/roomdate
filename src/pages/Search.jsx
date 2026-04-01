@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import './Home.css'; 
 
 export default function Search() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const intent = searchParams.get('intent') || 'stanza'; // 'stanza' o 'coinquilino'
   const cityParam = searchParams.get('citta');
@@ -11,10 +12,20 @@ export default function Search() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   
+  // Stato per l'utente loggato (serve per la navbar)
+  const [user, setUser] = useState(null);
+  
   // Filtri
   const [cityFilter, setCityFilter] = useState(cityParam || '');
   const [maxPrice, setMaxPrice] = useState(budgetParam || '');
 
+  // Recupero utente per la navbar
+  useEffect(() => {
+    const savedUser = localStorage.getItem('roomdate_user');
+    if (savedUser) setUser(JSON.parse(savedUser));
+  }, []);
+
+  // Fetch dei dati in base alla ricerca
   useEffect(() => {
     setLoading(true);
     
@@ -33,6 +44,13 @@ export default function Search() {
       });
   }, [intent]); // Ricarica se l'utente cambia da "Stanza" a "Coinquilino"
 
+  // Gestione Logout
+  const handleLogout = () => {
+    localStorage.removeItem('roomdate_user');
+    setUser(null);
+    navigate('/');
+  };
+
   // Logica di Filtraggio in tempo reale
   const filteredResults = results.filter(item => {
     let match = true;
@@ -48,12 +66,32 @@ export default function Search() {
 
   return (
     <div style={{ backgroundColor: '#FEFAF4', minHeight: '100vh', fontFamily: "'DM Sans', sans-serif" }}>
-      {/* NAVBAR */}
-      <nav style={{ background: '#2C1A0E', padding: '1rem 5%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Link to="/" className="logo" style={{ color: 'white', textDecoration: 'none', fontSize: '1.5rem', fontFamily: "'Playfair Display', serif" }}>
-          Room<span style={{ color: '#D4835E' }}>Date</span>
-        </Link>
-        <Link to="/" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: '500' }}>← Torna alla Home</Link>
+      
+      {/* --- NAVBAR MIGLIORATA (Stessa della Home) --- */}
+      <nav>
+        <div className="logo">Room<span>Date</span></div>
+        <div className="nav-links">
+          <Link to="/">Home</Link>
+          <Link to="/ricerca">Cerca Stanza</Link>
+          <Link to="/chat">Chat</Link>
+          <Link to="/impostazioni">Impostazioni</Link>
+        </div>
+        <div className="nav-btns">
+          {user ? (
+            <>
+              <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginRight: '0.5rem' }}>
+                Ciao, <strong>{user.nome}</strong>!
+              </span>
+              <Link to="/dashboard" className="btn-ghost">Area Riservata</Link>
+              <button onClick={handleLogout} className="btn-fill" style={{ background: '#E24B4A' }}>Esci</button>
+            </>
+          ) : (
+            <>
+              <Link to="/accedi" className="btn-ghost">Accedi</Link>
+              <Link to="/registrati" className="btn-fill">Registrati Gratis</Link>
+            </>
+          )}
+        </div>
       </nav>
 
       <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '3rem 5%', display: 'grid', gridTemplateColumns: '280px 1fr', gap: '3rem' }}>
@@ -154,7 +192,7 @@ export default function Search() {
                       <div className="rm-avatar" style={{ background: `linear-gradient(135deg, ${item.color1}, ${item.color2})` }}>{item.emoji}</div>
                       <div className="rm-name">{item.name}</div>
                       <div className="rm-meta">{item.age} anni · {item.job}</div>
-                      <div className="rm-quote" style={{ fontSize: '0.8rem', fontStyle: 'italic', margin: '0.5rem 0', color: 'var(--wg)' }}>"{item.quote}"</div>
+                      <div className="rm-quote" style={{ fontSize: '0.8rem', fontStyle: 'italic', margin: '0.5rem 0', color: 'var(--wg)' }}>&quot;{item.quote}&quot;</div>
                       <div className="tags" style={{ marginBottom: '1rem' }}>
                         {item.tags.map(t => <span className="tag" key={t}>{t}</span>)}
                       </div>
