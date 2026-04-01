@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+// 1. HO AGGIUNTO useNavigate QUI SOTTO
+import { useParams, Link, useNavigate } from 'react-router-dom'; 
 import './ListingDetails.css';
 
 export default function ListingDetails() {
   const { id } = useParams();
+  const navigate = useNavigate(); // 2. HO ATTIVATO IL NAVIGATORE QUI
+  
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -49,11 +52,20 @@ export default function ListingDetails() {
       {/* TESTATA COLORATA */}
       <section className="details-hero">
         <div className="dot-grid"></div>
-        <div className="breadcrumb">
-          <Link to="/">Home</Link> / <span>{listing.city}</span> / <span>{listing.type}</span>
+        
+        {/* 3. HO AGGIUNTO IL BOTTONE INDIETRO QUI, ASSIEME AL BREADCRUMB */}
+        <div className="details-nav-bar">
+          <button onClick={() => navigate(-1)} className="btn-back">
+            ← Torna indietro
+          </button>
+          
+          <div className="breadcrumb">
+            <Link to="/">Home</Link> / <span>{listing.city}</span> / <span>{listing.type}</span>
+          </div>
         </div>
+
         <h1 className="serif" style={{fontSize: '2.8rem'}}>{listing.title}</h1>
-        <p className="serif" style={{fontSize: '1.2rem', opacity: 0.9}}>
+        <p className="serif location-sub" style={{fontSize: '1.2rem', opacity: 0.9}}>
           📍 {listing.zone}, {listing.city}
         </p>
       </section>
