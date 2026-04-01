@@ -796,7 +796,9 @@
     transform: translateX(0);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  .chat-sidebar.hidden {
+  
+  /* ---> MODIFICATO QUI DA .hidden A .mobile-hide <--- */
+  .chat-sidebar.mobile-hide {
     transform: translateX(-100%);
   }
 
@@ -808,7 +810,9 @@
     transform: translateX(100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  .chat-main.visible {
+  
+  /* ---> MODIFICATO QUI DA .visible A .mobile-show <--- */
+  .chat-main.mobile-show {
     transform: translateX(0);
   }
 
