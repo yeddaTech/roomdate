@@ -7,7 +7,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Search from './pages/Search';
-import Search from './pages/Chatpage';
+import Chatpage from './pages/Chatpage';
 
 function App() {
   return (
@@ -27,8 +27,7 @@ function App() {
         <Route path="*" element={<Home />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/ricerca" element={<Search />} />
-        <Route path="/chat" element={<Chatpage />} />
-      </Routes>
+        <Route path="/chat" element={<Chatpage />} />      </Routes>
     </BrowserRouter>
   );
 }
