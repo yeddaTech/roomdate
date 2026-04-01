@@ -32,17 +32,8 @@ func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// Cerchiamo utenti che hanno compilato la bio (quindi sono attivi)
-	query := `
-		SELECT 
-			id, 
-			first_name, 
-			COALESCE(occupation, 'Studente/Lavoratore'), 
-			COALESCE(bio, 'Ciao! Sto cercando una nuova casa e dei fantastici coinquilini.'), 
-			COALESCE(lifestyle_tags, 'Socievole, Ordinato') 
-		FROM roomdate_app.users 
-		LIMIT 6
-	`
+	// Prendiamo tutti gli utenti (massimo 8)
+	query := `SELECT id, first_name, occupation, bio, lifestyle_tags FROM roomdate_app.users LIMIT 8`
 	rows, err := db.Query(query)
 	if err != nil {
 		http.Error(w, "Errore query", http.StatusInternalServerError)
@@ -57,25 +48,36 @@ func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		var rm Roommate
-		var rawTags string
-		if err := rows.Scan(&rm.ID, &rm.Name, &rm.Job, &rm.Quote, &rawTags); err != nil {
+		// Usiamo NullString per evitare crash se nel DB questi campi sono vuoti (NULL)
+		var job, quote, rawTags sql.NullString
+
+		if err := rows.Scan(&rm.ID, &rm.Name, &job, &quote, &rawTags); err != nil {
 			continue
 		}
 
-		// Dati estetici / Finti per riempire la grafica
-		rm.Age = 24 + i // Finto per ora
+		// Se l'utente non ha compilato il profilo, mettiamo dati di default!
+		rm.Job = "Studente/Lavoratore"
+		if job.Valid && job.String != "" {
+			rm.Job = job.String
+		}
+
+		rm.Quote = "Ciao! Sto cercando una nuova casa e dei fantastici coinquilini."
+		if quote.Valid && quote.String != "" {
+			rm.Quote = quote.String
+		}
+
+		tagsStr := "Socievole, Ordinato"
+		if rawTags.Valid && rawTags.String != "" {
+			tagsStr = rawTags.String
+		}
+		rm.Tags = strings.Split(tagsStr, ", ")
+
+		rm.Age = 22 + (i % 6) // Età finta per ora
 		rm.City = "In Italia"
-		rm.Match = 85 + (i * 3)
+		rm.Match = 85 + (i * 2)
 		rm.Color1 = colors[i%len(colors)][0]
 		rm.Color2 = colors[i%len(colors)][1]
 		rm.Emoji = emojis[i%len(emojis)]
-
-		// Dividiamo la stringa dei tag in un array
-		if rawTags != "" {
-			rm.Tags = strings.Split(rawTags, ", ")
-		} else {
-			rm.Tags = []string{"Nuovo utente"}
-		}
 
 		roommates = append(roommates, rm)
 		i++
