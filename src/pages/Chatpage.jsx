@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import './ChatPage.css';
+import './Chatpage.css';
 
 // ─── Dati mock ───────────────────────────────────────────────────────────────
 const CONVERSATIONS = [
