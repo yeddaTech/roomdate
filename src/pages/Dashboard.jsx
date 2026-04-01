@@ -7,9 +7,8 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   
   // STATI DI NAVIGAZIONE E DATI
-  const [intent, setIntent] = useState('cerca'); 
-  const [activeView, setActiveView] = useState('overview'); 
-  const [myListings, setMyListings] = useState([]); // <-- Stato per i tuoi annunci
+  const [activeView, setActiveView] = useState('myListings'); 
+  const [myListings, setMyListings] = useState([]);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('roomdate_user');
@@ -25,7 +24,7 @@ export default function Dashboard() {
     navigate('/');
   };
 
-  // --- FUNZIONE PER SCARICARE I TUOI ANNUNCI DAL DB ---
+  // --- SCARICA I TUOI ANNUNCI DAL DB ---
   const fetchMyListings = async () => {
     if (!user) return;
     try {
@@ -37,21 +36,20 @@ export default function Dashboard() {
     }
   };
 
-  // Carichiamo i tuoi annunci solo se selezioni "Offro" e se c'è un utente
   useEffect(() => {
-    if (intent === 'offro' && user) {
+    if (user) {
       fetchMyListings();
     }
-  }, [intent, user]);
+  }, [user]);
 
-  // --- FUNZIONE PER ELIMINARE UN ANNUNCIO ---
+  // --- ELIMINA ANNUNCIO ---
   const handleDeleteListing = async (id) => {
-    if (window.confirm("Sei sicuro di voler eliminare questo annuncio? Questa azione è irreversibile!")) {
+    if (window.confirm("Sei sicuro di voler eliminare questo annuncio? L'azione è irreversibile!")) {
       try {
         const res = await fetch(`/api/delete_listing?id=${id}`, { method: 'DELETE' });
         if (res.ok) {
           alert("✅ Annuncio eliminato con successo.");
-          fetchMyListings(); // Ricarichiamo la lista aggiornata
+          fetchMyListings();
         } else {
           alert("❌ Errore durante l'eliminazione.");
         }
@@ -86,7 +84,7 @@ export default function Dashboard() {
       });
       if (res.ok) {
         alert("✅ Profilo aggiornato con successo!");
-        setActiveView('overview');
+        setActiveView('myListings');
       } else {
         const errorMsg = await res.text();
         alert("❌ Errore: " + errorMsg);
@@ -119,8 +117,8 @@ export default function Dashboard() {
       });
       if (res.ok) {
         alert("🎉 Annuncio pubblicato! Ora è visibile sulla Home.");
-        fetchMyListings(); // Ricarichiamo la lista appena lo salvi!
-        setActiveView('overview');
+        fetchMyListings(); 
+        setActiveView('myListings');
       } else {
         const errorMsg = await res.text();
         alert("❌ Errore: " + errorMsg);
@@ -132,8 +130,21 @@ export default function Dashboard() {
 
   if (!user) return null;
 
+  // Stili per le Tab
+  const getTabStyle = (tabName) => ({
+    padding: '0.8rem 1.5rem',
+    borderRadius: '2rem',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    transition: '0.2s',
+    backgroundColor: activeView === tabName ? '#C4603A' : '#EAE0D5',
+    color: activeView === tabName ? 'white' : '#7A4B2A',
+  });
+
   return (
-    <>
+    <div style={{ backgroundColor: '#FEFAF4', minHeight: '100vh', fontFamily: "'DM Sans', sans-serif" }}>
+      
       {/* --- NAVBAR UNIFICATA --- */}
       <nav>
         <div className="logo">Room<span>Date</span></div>
@@ -161,202 +172,211 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      <div className="dash-container">
-        <div className="dash-inner">
+      <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 5%' }}>
+        
+        {/* --- HEADER PROFILO (Ispirato allo screenshot) --- */}
+        <div style={{ background: '#2C1A0E', borderRadius: '1rem', padding: '3rem 2rem', textAlign: 'center', color: 'white', position: 'relative' }}>
           
-          {/* COLONNA SINISTRA: PROFILO PERSONALE */}
-          <aside className="dash-sidebar">
-            <div className="avatar-large">
-              {user.nome.charAt(0).toUpperCase()}
-            </div>
-            <h1 className="dash-name">{user.nome} {user.cognome}</h1>
-            <p className="dash-email">{user.email}</p>
+          <div style={{ 
+            width: '120px', height: '120px', borderRadius: '50%', 
+            background: 'linear-gradient(135deg, #F5C29A, #C4603A)', 
+            margin: '0 auto 1.5rem', display: 'flex', justifyContent: 'center', 
+            alignItems: 'center', fontSize: '3.5rem', color: 'white', border: '4px solid #1E1008'
+          }}>
+            {user.nome.charAt(0).toUpperCase()}
+          </div>
+          
+          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: '2.5rem', margin: '0 0 0.5rem 0' }}>
+            {user.nome} {user.cognome}
+          </h1>
+          <p style={{ color: '#D4835E', margin: '0 0 1rem 0', fontSize: '1.1rem' }}>
+            @{user.nome.toLowerCase()}{user.id?.substring(0,4)}
+          </p>
+          
+          <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.1)', padding: '0.5rem 1.5rem', borderRadius: '2rem', fontSize: '0.85rem' }}>
+            🎓 Profilo da completare
+          </div>
+        </div>
 
-            <div className="profile-section">
-              <h4>La tua Bio</h4>
-              <div className="bio-text">
-                Non hai ancora inserito una descrizione. Racconta chi sei!
+        {/* --- STAT BAR --- */}
+        <div style={{ 
+          display: 'flex', justifyContent: 'space-around', background: 'white', 
+          padding: '1.5rem', borderRadius: '1rem', marginTop: '-2.5rem', 
+          marginLeft: '2rem', marginRight: '2rem', boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+          position: 'relative', border: '1px solid #F5E3CC'
+        }}>
+          <div style={{ textAlign: 'center', flex: 1, borderRight: '1px solid #F5E3CC' }}>
+            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#C4603A' }}>{myListings.length}</div>
+            <div style={{ fontSize: '0.75rem', color: '#8A7B6E', letterSpacing: '1px', fontWeight: 'bold' }}>ANNUNCI PUBBLICATI</div>
+          </div>
+          <div style={{ textAlign: 'center', flex: 1, borderRight: '1px solid #F5E3CC' }}>
+            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#C4603A' }}>0</div>
+            <div style={{ fontSize: '0.75rem', color: '#8A7B6E', letterSpacing: '1px', fontWeight: 'bold' }}>STANZE SALVATE</div>
+          </div>
+          <div style={{ textAlign: 'center', flex: 1 }}>
+            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#C4603A' }}>0</div>
+            <div style={{ fontSize: '0.75rem', color: '#8A7B6E', letterSpacing: '1px', fontWeight: 'bold' }}>CHAT ATTIVE</div>
+          </div>
+        </div>
+
+        {/* --- TABS --- */}
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '3rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button style={getTabStyle('myListings')} onClick={() => setActiveView('myListings')}>
+            📄 I Miei Annunci
+          </button>
+          <button style={getTabStyle('savedRooms')} onClick={() => setActiveView('savedRooms')}>
+            ❤️ Salvati
+          </button>
+          <button style={getTabStyle('editProfile')} onClick={() => setActiveView('editProfile')}>
+            ⚙️ Modifica Profilo
+          </button>
+          <button style={getTabStyle('createListing')} onClick={() => setActiveView('createListing')}>
+            ➕ Pubblica Annuncio
+          </button>
+        </div>
+
+        {/* --- CONTENUTO DELLE TAB --- */}
+        <div style={{ marginTop: '2rem' }}>
+          
+          {/* TAB: I MIEI ANNUNCI */}
+          {activeView === 'myListings' && (
+            <div className="dash-card" style={{ background: 'white', padding: '2rem', borderRadius: '1rem', border: '1px solid #F5E3CC' }}>
+              <h2 style={{ marginBottom: '1.5rem' }}>Annunci Attivi</h2>
+              {myListings.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--wg)' }}>
+                  <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🛋️</div>
+                  <p>Non hai ancora nessun annuncio attivo.</p>
+                  <button onClick={() => setActiveView('createListing')} className="btn-ghost" style={{ marginTop: '1rem' }}>Crea il tuo primo annuncio</button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {myListings.map(l => (
+                    <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem', background: '#FEFAF4', borderRadius: '0.75rem', border: '1px solid #F5E3CC' }}>
+                      <div>
+                        <div style={{ fontWeight: 'bold', color: '#2C1A0E', fontSize: '1.2rem', marginBottom: '0.3rem' }}>{l.title}</div>
+                        <div style={{ fontSize: '0.9rem', color: '#8A7B6E' }}>📍 {l.city} · 🏠 {l.roomType} · <strong style={{color: '#C4603A'}}>€{l.price}/mese</strong></div>
+                      </div>
+                      <button 
+                        onClick={() => handleDeleteListing(l.id)}
+                        style={{ background: '#E24B4A', color: 'white', border: 'none', padding: '0.8rem 1.2rem', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: 'bold', transition: '0.2s' }}
+                      >
+                        Elimina
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: SALVATI */}
+          {activeView === 'savedRooms' && (
+            <div className="dash-card" style={{ background: 'white', padding: '2rem', borderRadius: '1rem', border: '1px solid #F5E3CC' }}>
+              <h2 style={{ marginBottom: '1.5rem' }}>Le tue Stanze Preferite</h2>
+              <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--wg)' }}>
+                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>💔</div>
+                <p>Non hai ancora salvato nessuna stanza.</p>
+                <Link to="/ricerca" className="btn-ghost" style={{ display: 'inline-block', marginTop: '1rem' }}>Esplora gli annunci</Link>
               </div>
-              <button className="btn-edit" onClick={() => setActiveView('editProfile')}>
-                ✏️ Modifica Profilo Personale
-              </button>
             </div>
-          </aside>
+          )}
 
-          {/* COLONNA DESTRA */}
-          <main className="dash-main">
-            
-            {/* VISTA 1: OVERVIEW STANDARD */}
-            {activeView === 'overview' && (
-              <>
-                <div className="dash-card">
-                  <h2>Cosa stai cercando su RoomDate?</h2>
-                  <div className="intent-grid">
-                    <button className={`intent-btn ${intent === 'cerca' ? 'active' : ''}`} onClick={() => setIntent('cerca')}>
-                      <span className="intent-icon">🔍</span>
-                      <span className="intent-title">Cerco una stanza</span>
-                      <span className="intent-desc">Voglio sfogliare gli annunci e contattare i proprietari.</span>
-                    </button>
-                    <button className={`intent-btn ${intent === 'offro' ? 'active' : ''}`} onClick={() => setIntent('offro')}>
-                      <span className="intent-icon">🏠</span>
-                      <span className="intent-title">Offro una stanza</span>
-                      <span className="intent-desc">Ho un posto libero e voglio trovare coinquilini.</span>
-                    </button>
+          {/* TAB: MODIFICA PROFILO */}
+          {activeView === 'editProfile' && (
+            <div className="dash-card" style={{ background: 'white', padding: '2rem', borderRadius: '1rem', border: '1px solid #F5E3CC' }}>
+              <h2 style={{ marginBottom: '1.5rem' }}>Informazioni Personali</h2>
+              <form className="dash-form" onSubmit={handleSaveProfile}>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Occupazione</label>
+                    <select name="occupation" required>
+                      <option value="">Seleziona...</option>
+                      <option value="studente">Studente</option>
+                      <option value="lavoratore">Lavoratore</option>
+                      <option value="misto">Studente / Lavoratore</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Data di Nascita</label>
+                    <input name="birthdate" type="date" required />
                   </div>
                 </div>
 
-                {intent === 'cerca' ? (
-                  <div className="dash-card" style={{ borderTop: '4px solid var(--t)' }}>
-                    <h2>Le tue stanze salvate</h2>
-                    <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--wg)' }}>
-                      <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💔</div>
-                      Non hai ancora salvato nessuna stanza. <br/><br/>
-                      <Link to="/" className="btn-fill">Vai alla mappa</Link>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="dash-card" style={{ borderTop: '4px solid #4CAF50' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                      <h2>I tuoi Annunci</h2>
-                      <button 
-                        className="btn-fill" 
-                        style={{ background: '#4CAF50', padding: '0.5rem 1rem', fontSize: '0.8rem' }}
-                        onClick={() => setActiveView('createListing')}
-                      >
-                        + Nuovo Annuncio
-                      </button>
-                    </div>
+                <div className="form-group">
+                  <label>Bio (Parlaci di te)</label>
+                  <textarea name="bio" placeholder="Ciao! Mi chiamo..." rows="4" required></textarea>
+                </div>
 
-                    {/* --- QUI MOSTRIAMO I TUOI ANNUNCI REALI --- */}
-                    {myListings.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--wg)' }}>
-                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛋️</div>
-                        Non hai ancora nessun annuncio attivo.
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        {myListings.map(l => (
-                          <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem', background: 'var(--sl)', borderRadius: '0.75rem', border: '1px solid var(--s)' }}>
-                            <div>
-                              <div style={{ fontWeight: 'bold', color: 'var(--wd)', fontSize: '1.1rem', marginBottom: '0.3rem' }}>{l.title}</div>
-                              <div style={{ fontSize: '0.9rem', color: 'var(--wg)' }}>📍 {l.city} · 🏠 {l.roomType} · <strong style={{color: 'var(--t)'}}>€{l.price}/mese</strong></div>
-                            </div>
-                            <button 
-                              onClick={() => handleDeleteListing(l.id)}
-                              style={{ background: '#E24B4A', color: 'white', border: 'none', padding: '0.6rem 1rem', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', transition: '0.2s' }}
-                              onMouseOver={(e) => e.target.style.background = '#C9302C'}
-                              onMouseOut={(e) => e.target.style.background = '#E24B4A'}
-                            >
-                              Rimuovi
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                <div className="form-group">
+                  <label>Il tuo Stile di Vita</label>
+                  <div className="tag-grid">
+                    <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🚬 Fumatore</span></label>
+                    <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🚭 Non Fumatore</span></label>
+                    <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🐶 Ho animali</span></label>
+                    <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🧹 Ordinato/a</span></label>
+                    <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🎉 Socievole</span></label>
+                    <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🥦 Vegano/Vegetariano</span></label>
                   </div>
-                )}
-              </>
-            )}
+                </div>
 
-            {/* VISTA 2: MODIFICA PROFILO PERSONALE */}
-            {activeView === 'editProfile' && (
-              <div className="dash-card">
-                <h2>Modifica Profilo Personale</h2>
-                <form className="dash-form" onSubmit={handleSaveProfile}>
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Occupazione</label>
-                      <select name="occupation" required>
-                        <option value="">Seleziona...</option>
-                        <option value="studente">Studente</option>
-                        <option value="lavoratore">Lavoratore</option>
-                        <option value="misto">Studente Lavoratore</option>
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Data di Nascita</label>
-                      <input name="birthdate" type="date" required />
-                    </div>
-                  </div>
+                <div className="form-actions" style={{ marginTop: '2rem' }}>
+                  <button type="submit" className="btn-save" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}>Aggiorna Profilo</button>
+                </div>
+              </form>
+            </div>
+          )}
 
+          {/* TAB: CREA ANNUNCIO */}
+          {activeView === 'createListing' && (
+            <div className="dash-card" style={{ background: 'white', padding: '2rem', borderRadius: '1rem', border: '1px solid #F5E3CC' }}>
+              <h2 style={{ marginBottom: '1.5rem' }}>Inserisci una Stanza</h2>
+              <form className="dash-form" onSubmit={handleSaveListing}>
+                <div className="form-group">
+                  <label>Titolo Annuncio</label>
+                  <input name="title" type="text" placeholder="Es: Ampia camera singola in centro..." required />
+                </div>
+
+                <div className="form-row">
                   <div className="form-group">
-                    <label>Bio (Parlaci di te)</label>
-                    <textarea name="bio" placeholder="Ciao! Mi chiamo..." required></textarea>
+                    <label>Città</label>
+                    <input name="city" type="text" placeholder="Es: Milano" required />
                   </div>
-
                   <div className="form-group">
-                    <label>Il tuo Stile di Vita</label>
-                    <div className="tag-grid">
-                      <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🚬 Fumatore</span></label>
-                      <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🚭 Non Fumatore</span></label>
-                      <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🐶 Ho un animale</span></label>
-                      <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🧹 Ordinato/a</span></label>
-                      <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🎉 Socievole</span></label>
-                      <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🥦 Vegano/Vegetariano</span></label>
-                    </div>
+                    <label>Indirizzo o Zona</label>
+                    <input name="zone" type="text" placeholder="Es: Navigli" required />
                   </div>
+                </div>
 
-                  <div className="form-actions">
-                    <button type="button" className="btn-cancel" onClick={() => setActiveView('overview')}>Annulla</button>
-                    <button type="submit" className="btn-save">Salva Profilo</button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* VISTA 3: CREA ANNUNCIO DELLA CASA */}
-            {activeView === 'createListing' && (
-              <div className="dash-card">
-                <h2>Dettagli della Stanza</h2>
-                <form className="dash-form" onSubmit={handleSaveListing}>
+                <div className="form-row">
                   <div className="form-group">
-                    <label>Titolo Annuncio</label>
-                    <input name="title" type="text" placeholder="Es: Ampia singola..." required />
+                    <label>Tipo di Stanza</label>
+                    <select name="roomType" required>
+                      <option value="">Seleziona...</option>
+                      <option value="singola">Camera Singola</option>
+                      <option value="doppia">Posto in Doppia</option>
+                      <option value="intera">Casa intera</option>
+                    </select>
                   </div>
-
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Città</label>
-                      <input name="city" type="text" placeholder="Es: Milano" required />
-                    </div>
-                    <div className="form-group">
-                      <label>Indirizzo o Zona</label>
-                      <input name="zone" type="text" placeholder="Es: Via Torino" required />
-                    </div>
-                  </div>
-
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Tipo di Stanza</label>
-                      <select name="roomType" required>
-                        <option value="">Seleziona...</option>
-                        <option value="singola">Singola</option>
-                        <option value="doppia">Doppia (Posto letto)</option>
-                        <option value="intera">Casa intera</option>
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Prezzo Mensile (€)</label>
-                      <input name="price" type="number" placeholder="Es: 500" required />
-                    </div>
-                  </div>
-
                   <div className="form-group">
-                    <label>Descrizione della casa</label>
-                    <textarea name="description" placeholder="Descrivi la casa..." required></textarea>
+                    <label>Prezzo Mensile (€)</label>
+                    <input name="price" type="number" placeholder="Es: 600" required />
                   </div>
+                </div>
 
-                  <div className="form-actions">
-                    <button type="button" className="btn-cancel" onClick={() => setActiveView('overview')}>Annulla</button>
-                    <button type="submit" className="btn-save" style={{ background: '#4CAF50' }}>Pubblica Annuncio</button>
-                  </div>
-                </form>
-              </div>
-            )}
+                <div className="form-group">
+                  <label>Descrizione della casa e dei coinquilini</label>
+                  <textarea name="description" placeholder="Descrivi l'ambiente, la casa e chi ci vive..." rows="5" required></textarea>
+                </div>
 
-          </main>
+                <div className="form-actions" style={{ marginTop: '2rem' }}>
+                  <button type="submit" className="btn-save" style={{ background: '#4CAF50', width: '100%', padding: '1rem', fontSize: '1.1rem' }}>Pubblica Subito</button>
+                </div>
+              </form>
+            </div>
+          )}
+
         </div>
       </div>
-    </>
+    </div>
   );
 }
