@@ -9,6 +9,7 @@ const QUICK_REPLIES = [
   '📝 Contratto breve termine?',
   '🚇 Linea metro vicina?',
 ];
+
 export default function ChatPage() {
   const navigate = useNavigate();
   const location = useLocation(); // <--- AGGIUNGI QUESTA!
@@ -36,6 +37,13 @@ export default function ChatPage() {
       setUser(JSON.parse(savedUser));
     }
   }, [navigate]);
+
+  // Gestione Logout per la navbar
+  const handleLogout = () => {
+    localStorage.removeItem('roomdate_user');
+    setUser(null);
+    navigate('/');
+  };
 
   // 2. IL MOTORE DELLA CHAT: Scarica dal DB ogni 3 secondi!
   const fetchChats = async () => {
@@ -129,17 +137,37 @@ export default function ChatPage() {
   });
 
   return (
-    <div className="chat-page">
-      {/* ── NAV ── */}
-      <nav className="chat-nav">
-        <Link to="/" className="logo">Room<span>Date</span></Link>
-        <div className="nav-chat-actions">
-          <Link to="/dashboard" className="btn-ghost">Area Riservata</Link>
+    <div className="chat-page" style={{ backgroundColor: '#FEFAF4', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      
+      {/* ── NAVBAR MIGLIORATA (Stessa della Home e Ricerca) ── */}
+      <nav style={{ flexShrink: 0 }}>
+        <div className="logo">Room<span>Date</span></div>
+        <div className="nav-links">
+          <Link to="/">Home</Link>
+          <Link to="/ricerca">Cerca Stanza</Link>
+          <Link to="/chat">Chat</Link>
+          <Link to="/impostazioni">Impostazioni</Link>
+        </div>
+        <div className="nav-btns">
+          {user ? (
+            <>
+              <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginRight: '0.5rem' }}>
+                Ciao, <strong>{user.nome}</strong>!
+              </span>
+              <Link to="/dashboard" className="btn-ghost">Area Riservata</Link>
+              <button onClick={handleLogout} className="btn-fill" style={{ background: '#E24B4A' }}>Esci</button>
+            </>
+          ) : (
+            <>
+              <Link to="/accedi" className="btn-ghost">Accedi</Link>
+              <Link to="/registrati" className="btn-fill">Registrati Gratis</Link>
+            </>
+          )}
         </div>
       </nav>
 
-      {/* ── LAYOUT ── */}
-      <div className="chat-layout">
+      {/* ── LAYOUT CHAT ── */}
+      <div className="chat-layout" style={{ flexGrow: 1, overflow: 'hidden' }}>
 
         {/* ── SIDEBAR ── */}
         <aside className={`chat-sidebar ${mobileView === 'chat' ? 'mobile-hide' : ''}`}>
@@ -276,7 +304,7 @@ export default function ChatPage() {
               <div className="pp-name">{activeConv.name}</div>
             </div>
             <div className="pp-section">
-              <h4>Annuncio d'interesse</h4>
+              <h4>Annuncio d&apos;interesse</h4>
               <div className="pp-listing">
                 <span className="pl-emoji">{activeConv.listing.emoji}</span>
                 <div className="pl-title">{activeConv.listing.title}</div>
