@@ -17,8 +17,15 @@ export default function Home() {
     const savedUser = localStorage.getItem('roomdate_user');
     if (savedUser) setUser(JSON.parse(savedUser));
 
-    fetch('/api/get_listings').then(res => res.json()).then(data => { if (data) setListings(data); });
-    fetch('/api/get_roommates').then(res => res.json()).then(data => { if (data) setRoommates(data); });
+    fetch('/api/get_listings')
+      .then(res => res.json())
+      .then(data => { if (data) setListings(data); })
+      .catch(() => setListings([]));
+
+    fetch('/api/get_roommates')
+      .then(res => res.json())
+      .then(data => { if (data) setRoommates(data); })
+      .catch(() => setRoommates([]));
   }, []);
 
   const handleLogout = () => {
@@ -27,20 +34,17 @@ export default function Home() {
     navigate('/');
   };
 
-  // --- FUNZIONE CHE ESEGUE LA RICERCA ---
   const handleSearch = () => {
-    // Creiamo un URL con i filtri, es: /ricerca?intent=stanza&citta=Milano&budget=500
     const params = new URLSearchParams();
     params.append('intent', searchIntent);
     if (searchCity) params.append('citta', searchCity);
     if (searchBudget) params.append('budget', searchBudget);
-    
-    // Ti teletrasporta alla nuova pagina
     navigate(`/ricerca?${params.toString()}`);
   };
 
   return (
     <>
+      {/* --- NAV --- */}
       <nav>
         <div className="logo">Room<span>Date</span></div>
         <div className="nav-links">
@@ -66,6 +70,7 @@ export default function Home() {
         </div>
       </nav>
 
+      {/* --- HERO --- */}
       <section className="hero">
         <div className="dot-grid"></div>
         <div className="hero-grid">
@@ -79,8 +84,6 @@ export default function Home() {
             <p>Migliaia di stanze e coinquilini selezionati nelle città italiane. Senza agenzie, senza commissioni.</p>
           </div>
           <div>
-            
-            {/* --- BOX DI RICERCA AGGIORNATO --- */}
             <div className="search-box">
               <div className="tabs">
                 <button className={`tab ${searchIntent === 'stanza' ? 'active' : ''}`} onClick={() => setSearchIntent('stanza')}>🔍 Cerca Stanza</button>
@@ -103,19 +106,26 @@ export default function Home() {
               </div>
               <button className="btn-search" onClick={handleSearch}>Cerca Subito →</button>
             </div>
-
           </div>
         </div>
       </section>
 
-      {/* --- STANZE IN EVIDENZA (ORA SCORREVOLI) --- */}
+      {/* --- TRUST BAND --- */}
+      <div className="trust">
+        <div className="trust-item"><div className="trust-dot"></div>Profili verificati</div>
+        <div className="trust-item"><div className="trust-dot"></div>Chat sicura integrata</div>
+        <div className="trust-item"><div className="trust-dot"></div>Zero commissioni agenzie</div>
+        <div className="trust-item"><div className="trust-dot"></div>4.9/5 · 2.400+ recensioni</div>
+      </div>
+
+      {/* --- STANZE IN EVIDENZA (CAROUSEL) --- */}
       <section className="listings" id="trova">
         <div className="listings-inner">
           <div className="section-eyebrow">Annunci in evidenza</div>
           <h2 className="section-h serif">Stanze selezionate per te</h2>
           
           <div className="carousel">
-            {listings.length === 0 ? <p>Caricamento stanze...</p> : listings.map(l => (
+            {listings.length === 0 ? <p style={{color: 'var(--wg)'}}>Nessuna stanza caricata al momento.</p> : listings.map(l => (
               <div className="card" key={l.id}>
                 <div className="card-img" style={{ background: `linear-gradient(135deg, ${l.color}, ${l.color}88)` }}>
                   {l.emoji}
@@ -134,14 +144,14 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- COINQUILINI IN EVIDENZA (ORA SCORREVOLI) --- */}
+      {/* --- COINQUILINI IN EVIDENZA (CAROUSEL) --- */}
       <section className="roommates" id="coinquilini">
         <div className="roommates-inner">
           <div className="section-eyebrow">Profili in evidenza</div>
           <h2 className="section-h serif">Chi cerca con te</h2>
           
           <div className="carousel">
-            {roommates.length === 0 ? <p>Caricamento profili...</p> : roommates.map(rm => (
+            {roommates.length === 0 ? <p style={{color: 'var(--wg)'}}>Nessun profilo caricato al momento.</p> : roommates.map(rm => (
               <div className="rm-card" key={rm.id}>
                 <div className="rm-avatar" style={{ background: `linear-gradient(135deg, ${rm.color1}, ${rm.color2})` }}>{rm.emoji}</div>
                 <div className="rm-name">{rm.name}</div>
@@ -156,6 +166,83 @@ export default function Home() {
         </div>
       </section>
 
+      {/* --- HOW IT WORKS --- */}
+      <section className="how" id="come-funziona">
+        <div className="how-inner">
+          <div className="section-eyebrow">Come funziona</div>
+          <h2 className="section-h serif">Trovare casa in 4 passi</h2>
+          <div className="steps">
+            <div className="step">
+              <div className="step-num">01</div>
+              <span className="step-icon">📝</span>
+              <h3>Crea il tuo profilo</h3>
+              <p>Raccontaci di te, del tuo stile di vita e delle tue preferenze. Più sei specifico, migliori i match.</p>
+            </div>
+            <div className="step">
+              <div className="step-num">02</div>
+              <span className="step-icon">🔍</span>
+              <h3>Cerca e filtra</h3>
+              <p>Usa i filtri intelligenti per trovare stanze o coinquilini per budget, zona e compatibilità.</p>
+            </div>
+            <div className="step">
+              <div className="step-num">03</div>
+              <span className="step-icon">💬</span>
+              <h3>Contatta direttamente</h3>
+              <p>Chatta con proprietari o coinquilini senza intermediari. Nessuna agenzia, zero costi nascosti.</p>
+            </div>
+            <div className="step">
+              <div className="step-num">04</div>
+              <span className="step-icon">🏠</span>
+              <h3>Benvenuto a casa!</h3>
+              <p>Firma l'accordo, prendi le chiavi e inizia la tua nuova convivenza. Semplice come dev'essere.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* --- FOOTER --- */}
+      <footer>
+        <div className="footer-inner">
+          <div className="footer-grid">
+            <div>
+              <div className="footer-logo">Room<span>Date</span></div>
+              <p className="footer-desc">Il modo più semplice per trovare stanze e coinquilini in Italia. Senza agenzie, senza stress.</p>
+            </div>
+            <div className="footer-col">
+              <h4>Servizi</h4>
+              <ul>
+                <li><a href="#trova">Cerca Stanza</a></li>
+                <li><Link to="/accedi">Pubblica Annuncio</Link></li>
+                <li><a href="#coinquilini">Trova Coinquilini</a></li>
+              </ul>
+            </div>
+            <div className="footer-col">
+              <h4>Supporto</h4>
+              <ul>
+                <li><a href="#come-funziona">Come Funziona</a></li>
+                <li><a href="#">FAQ</a></li>
+                <li><a href="#">Sicurezza</a></li>
+              </ul>
+            </div>
+            <div className="footer-col">
+              <h4>Azienda</h4>
+              <ul>
+                <li><a href="#">Chi Siamo</a></li>
+                <li><a href="#">Blog</a></li>
+                <li><a href="#">Lavora con Noi</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="footer-bottom">
+            <span className="footer-cr">© 2025 RoomDate. Tutti i diritti riservati.</span>
+            <div className="footer-links">
+              <a href="#">Privacy Policy</a>
+              <a href="#">Termini di Servizio</a>
+              <a href="#">Cookie</a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </>
   );
 }
