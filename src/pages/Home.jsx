@@ -136,8 +136,19 @@ export default function Home() {
                   <div className="card-title">{l.title}</div>
                   <div className="card-loc">📍 {l.zone}, {l.city}</div>
                   <div className="tags">{l.tags.map(t => <span className="tag" key={t}>{t}</span>)}</div>
-                  <button className="btn-card">Vedi dettagli</button>
-                </div>
+                    <Link 
+                      to={`/dettagli/${l.id}`} 
+                      className="btn-card"
+                      style={{ 
+                        display: 'block', 
+                        textAlign: 'center', 
+                        textDecoration: 'none',
+                        boxSizing: 'border-box',
+                        marginTop: '1rem'
+                      }}
+                    >
+                      Vedi dettagli
+                    </Link>                </div>
               </div>
             ))}
           </div>
