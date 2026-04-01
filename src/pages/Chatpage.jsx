@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import './Chatpage.css';
 
 const QUICK_REPLIES = [
@@ -9,9 +10,9 @@ const QUICK_REPLIES = [
   '📝 Contratto breve termine?',
   '🚇 Linea metro vicina?',
 ];
-
 export default function ChatPage() {
   const navigate = useNavigate();
+  const location = useLocation(); // <--- AGGIUNGI QUESTA!
   const [user, setUser] = useState(null);
   
   // STATI DINAMICI VERI
@@ -66,6 +67,13 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeConv?.messages]);
 
+  useEffect(() => {
+    if (location.state?.openChatId && conversations.length > 0) {
+      setActiveConvId(location.state.openChatId);
+      setMobileView('chat');
+    }
+  }, [conversations, location.state]);
+  
   const handleTextareaChange = (e) => {
     setInputText(e.target.value);
     const ta = e.target;
