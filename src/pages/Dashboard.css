@@ -168,3 +168,141 @@
   .dash-inner { grid-template-columns: 1fr; }
   .intent-grid { grid-template-columns: 1fr; }
 }
+
+/* --- NUOVI STILI PER I FORM DELLA DASHBOARD --- */
+
+.dash-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--wb);
+}
+
+.form-group input, 
+.form-group select, 
+.form-group textarea {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border: 1.5px solid var(--s);
+  border-radius: 0.75rem;
+  background: var(--sl);
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--wd);
+  outline: none;
+  transition: 0.2s;
+  box-sizing: border-box;
+}
+
+.form-group input:focus, 
+.form-group select:focus, 
+.form-group textarea:focus {
+  border-color: var(--t);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(196, 96, 58, 0.1);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+/* Stile per i tag selezionabili (Fumatore, Animali, ecc.) */
+.tag-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.tag-checkbox {
+  display: none; /* Nascondiamo la spunta vera e propria */
+}
+
+.tag-label {
+  padding: 0.6rem 1.2rem;
+  background: white;
+  border: 1.5px solid var(--s);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--wg);
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.tag-checkbox:checked + .tag-label {
+  background: var(--t);
+  border-color: var(--t);
+  color: white;
+}
+
+/* Finto box per caricare le foto */
+.photo-dropzone {
+  border: 2px dashed var(--s);
+  border-radius: 1rem;
+  padding: 3rem 2rem;
+  text-align: center;
+  background: rgba(245, 227, 204, 0.2);
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.photo-dropzone:hover {
+  border-color: var(--t);
+  background: rgba(245, 227, 204, 0.5);
+}
+
+.photo-dropzone span {
+  display: block;
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--s);
+}
+
+.btn-cancel {
+  padding: 0.8rem 1.5rem;
+  background: transparent;
+  color: var(--wg);
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 0.75rem;
+}
+.btn-cancel:hover { background: var(--sl); color: var(--wd); }
+
+.btn-save {
+  padding: 0.8rem 2rem;
+  background: var(--t);
+  color: white;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 0.75rem;
+  transition: 0.2s;
+}
+.btn-save:hover { background: var(--td); }
