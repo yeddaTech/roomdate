@@ -155,3 +155,21 @@ footer { background: #1A0E07; padding: 3rem 5% 1.5rem; }
   .hero-grid, .grid-3, .grid-4, .grid-3-t, .steps, .footer-grid { grid-template-columns: 1fr; }
   .inputs { grid-template-columns: 1fr; }
 }
+/* --- CAROSELLO SCORREVOLE --- */
+.carousel {
+  display: flex;
+  gap: 1.5rem;
+  overflow-x: auto;
+  padding: 0.5rem 0 2rem 0;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none; /* Firefox */
+}
+.carousel::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/Edge */
+}
+.carousel > * {
+  min-width: 320px;
+  max-width: 320px;
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}

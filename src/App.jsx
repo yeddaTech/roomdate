@@ -6,6 +6,7 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import Search from './pages/Search';
 function App() {
   return (
     <BrowserRouter>
@@ -23,6 +24,7 @@ function App() {
         {/* Rotta di emergenza: se l'utente scrive un URL a caso, torna alla Home */}
         <Route path="*" element={<Home />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/ricerca" element={<Search />} />
       </Routes>
     </BrowserRouter>
   );
