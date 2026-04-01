@@ -33,7 +33,16 @@ func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	// Cerchiamo utenti che hanno compilato la bio (quindi sono attivi)
-	query := `SELECT id, first_name, occupation, bio, lifestyle_tags FROM roomdate_app.users WHERE bio IS NOT NULL LIMIT 4`
+	query := `
+		SELECT 
+			id, 
+			first_name, 
+			COALESCE(occupation, 'Studente/Lavoratore'), 
+			COALESCE(bio, 'Ciao! Sto cercando una nuova casa e dei fantastici coinquilini.'), 
+			COALESCE(lifestyle_tags, 'Socievole, Ordinato') 
+		FROM roomdate_app.users 
+		LIMIT 6
+	`
 	rows, err := db.Query(query)
 	if err != nil {
 		http.Error(w, "Errore query", http.StatusInternalServerError)
