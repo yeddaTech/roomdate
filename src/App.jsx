@@ -8,6 +8,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Search from './pages/Search';
 import Chatpage from './pages/Chatpage';
+import ListingDetails from './pages/ListingDetails'; // Aggiungi l'import
 
 function App() {
   return (
@@ -27,7 +28,8 @@ function App() {
         <Route path="*" element={<Home />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/ricerca" element={<Search />} />
-        <Route path="/chat" element={<Chatpage />} />      </Routes>
+        <Route path="/chat" element={<Chatpage />} />
+        <Route path="/listing/:id" element={<ListingDetails />} />      </Routes>
     </BrowserRouter>
   );
 }
