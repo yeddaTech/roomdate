@@ -67,13 +67,14 @@ export default function Search() {
   return (
     <div style={{ backgroundColor: '#FEFAF4', minHeight: '100vh', fontFamily: "'DM Sans', sans-serif" }}>
       
-      {/* --- NAVBAR MIGLIORATA (Stessa della Home) --- */}
+      {/* --- NAVBAR UNIFICATA --- */}
       <nav>
         <div className="logo">Room<span>Date</span></div>
         <div className="nav-links">
           <Link to="/">Home</Link>
           <Link to="/ricerca">Cerca Stanza</Link>
           <Link to="/chat">Chat</Link>
+          <Link to="/dashboard">Profilo</Link>
           <Link to="/impostazioni">Impostazioni</Link>
         </div>
         <div className="nav-btns">
@@ -82,7 +83,6 @@ export default function Search() {
               <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginRight: '0.5rem' }}>
                 Ciao, <strong>{user.nome}</strong>!
               </span>
-              <Link to="/dashboard" className="btn-ghost">Area Riservata</Link>
               <button onClick={handleLogout} className="btn-fill" style={{ background: '#E24B4A' }}>Esci</button>
             </>
           ) : (
