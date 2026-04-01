@@ -15,34 +15,51 @@ export default function Login() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- LOGICA DI LOGIN ---
-  const handleLogin = (e) => {
-    e.preventDefault(); // Previene il ricaricamento della pagina se fosse in un <form>
+
+// --- LOGICA DI LOGIN VERA ---
+  const handleLogin = async (e) => {
+    e.preventDefault(); 
     
     let isValid = true;
     const newErrors = { email: false, password: false };
 
-    // Validazione base
-    if (!email || !/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = true;
-      isValid = false;
-    }
-    if (!password || password.length < 6) {
-      newErrors.password = true;
-      isValid = false;
-    }
+    if (!email || !/\S+@\S+\.\S+/.test(email)) { newErrors.email = true; isValid = false; }
+    if (!password || password.length < 6) { newErrors.password = true; isValid = false; }
 
     setErrors(newErrors);
 
-    // Se tutto è valido, simuliamo l'accesso (qui poi chiamerai la tua API in Go)
     if (isValid) {
-      setIsSuccess(true);
       setIsSubmitting(true);
       
-      // Simuliamo un tempo di caricamento del server e poi torniamo alla home
-      setTimeout(() => {
-        navigate('/');
-      }, 1800);
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setIsSuccess(true);
+          
+          // Salviamo i dati dell'utente nel browser in modo sicuro
+          localStorage.setItem('roomdate_user', JSON.stringify(data.user));
+
+          // Aspettiamo 1.5s per far vedere il banner verde, poi andiamo all'area riservata
+          setTimeout(() => {
+            navigate('/dashboard'); // <-- Nuova rotta!
+          }, 1500);
+
+        } else {
+          // Se la password è sbagliata o l'email non esiste
+          const errorMsg = await response.text();
+          alert('❌ Errore di accesso: ' + errorMsg);
+        }
+      } catch (error) {
+        alert('Errore di connessione al server.');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
