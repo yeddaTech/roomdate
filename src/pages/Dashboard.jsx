@@ -52,7 +52,9 @@ export default function Dashboard() {
         alert("✅ Profilo aggiornato con successo!");
         setActiveView('overview');
       } else {
-        alert("❌ Errore durante il salvataggio.");
+        // ORA LEGGIAMO L'ERRORE VERO!
+        const errorMsg = await res.text();
+        alert("❌ Errore: " + errorMsg);
       }
     } catch (err) {
       alert("Errore di connessione al server.");
@@ -183,6 +185,7 @@ export default function Dashboard() {
             )}
 
             {/* VISTA 2: MODIFICA PROFILO PERSONALE */}
+{/* VISTA 2: MODIFICA PROFILO PERSONALE */}
             {activeView === 'editProfile' && (
               <div className="dash-card">
                 <h2>Modifica Profilo Personale</h2>
@@ -192,7 +195,8 @@ export default function Dashboard() {
                   <div className="form-row">
                     <div className="form-group">
                       <label>Occupazione</label>
-                      <select required>
+                      {/* 👉 AGGIUNTO: name="occupation" */}
+                      <select name="occupation" required>
                         <option value="">Seleziona...</option>
                         <option value="studente">Studente</option>
                         <option value="lavoratore">Lavoratore</option>
@@ -201,18 +205,21 @@ export default function Dashboard() {
                     </div>
                     <div className="form-group">
                       <label>Data di Nascita</label>
-                      <input type="date" required />
+                      {/* 👉 AGGIUNTO: name="birthdate" */}
+                      <input name="birthdate" type="date" required />
                     </div>
                   </div>
 
                   <div className="form-group">
                     <label>Bio (Parlaci di te)</label>
-                    <textarea placeholder="Ciao! Mi chiamo... e mi piace..." required></textarea>
+                    {/* 👉 AGGIUNTO: name="bio" */}
+                    <textarea name="bio" placeholder="Ciao! Mi chiamo... e mi piace..." required></textarea>
                   </div>
 
                   <div className="form-group">
                     <label>Il tuo Stile di Vita (Seleziona tutto ciò che si applica)</label>
                     <div className="tag-grid">
+                      {/* I tag vanno bene così, li leggiamo tramite Javascript! */}
                       <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🚬 Fumatore</span></label>
                       <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🚭 Non Fumatore</span></label>
                       <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🐶 Ho un animale</span></label>
@@ -230,7 +237,7 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* VISTA 3: CREA ANNUNCIO DELLA CASA */}
+{/* VISTA 3: CREA ANNUNCIO DELLA CASA */}
             {activeView === 'createListing' && (
               <div className="dash-card">
                 <h2>Dettagli della Stanza</h2>
@@ -239,24 +246,28 @@ export default function Dashboard() {
                 <form className="dash-form" onSubmit={handleSaveListing}>
                   <div className="form-group">
                     <label>Titolo Annuncio</label>
-                    <input type="text" placeholder="Es: Ampia singola luminosa in zona Navigli" required />
+                    {/* 👉 AGGIUNTO: name="title" */}
+                    <input name="title" type="text" placeholder="Es: Ampia singola luminosa in zona Navigli" required />
                   </div>
 
                   <div className="form-row">
                     <div className="form-group">
                       <label>Città</label>
-                      <input type="text" placeholder="Es: Milano" required />
+                      {/* 👉 AGGIUNTO: name="city" */}
+                      <input name="city" type="text" placeholder="Es: Milano" required />
                     </div>
                     <div className="form-group">
                       <label>Indirizzo o Zona</label>
-                      <input type="text" placeholder="Es: Via Torino" required />
+                      {/* 👉 AGGIUNTO: name="zone" */}
+                      <input name="zone" type="text" placeholder="Es: Via Torino" required />
                     </div>
                   </div>
 
                   <div className="form-row">
                     <div className="form-group">
                       <label>Tipo di Stanza</label>
-                      <select required>
+                      {/* 👉 AGGIUNTO: name="roomType" */}
+                      <select name="roomType" required>
                         <option value="">Seleziona...</option>
                         <option value="singola">Singola</option>
                         <option value="doppia">Doppia (Posto letto)</option>
@@ -265,13 +276,15 @@ export default function Dashboard() {
                     </div>
                     <div className="form-group">
                       <label>Prezzo Mensile (€)</label>
-                      <input type="number" placeholder="Es: 500" required />
+                      {/* 👉 AGGIUNTO: name="price" */}
+                      <input name="price" type="number" placeholder="Es: 500" required />
                     </div>
                   </div>
 
                   <div className="form-group">
                     <label>Descrizione della casa</label>
-                    <textarea placeholder="Descrivi la casa, chi ci vive attualmente, i servizi vicini..." required></textarea>
+                    {/* 👉 AGGIUNTO: name="description" */}
+                    <textarea name="description" placeholder="Descrivi la casa, chi ci vive attualmente, i servizi vicini..." required></textarea>
                   </div>
 
                   <div className="form-group">
