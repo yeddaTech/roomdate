@@ -6,9 +6,10 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   
-  // STATI DI NAVIGAZIONE INTERNA
+  // STATI DI NAVIGAZIONE E DATI
   const [intent, setIntent] = useState('cerca'); 
-  const [activeView, setActiveView] = useState('overview'); // 'overview', 'editProfile', 'createListing'
+  const [activeView, setActiveView] = useState('overview'); 
+  const [myListings, setMyListings] = useState([]); // <-- Stato per i tuoi annunci
 
   useEffect(() => {
     const savedUser = localStorage.getItem('roomdate_user');
@@ -24,18 +25,53 @@ export default function Dashboard() {
     navigate('/');
   };
 
-// --- SALVA PROFILO ---
+  // --- FUNZIONE PER SCARICARE I TUOI ANNUNCI DAL DB ---
+  const fetchMyListings = async () => {
+    if (!user) return;
+    try {
+      const res = await fetch(`/api/get_my_listings?userId=${user.id}`);
+      const data = await res.json();
+      if (data) setMyListings(data);
+    } catch (err) {
+      console.error("Errore caricamento miei annunci", err);
+    }
+  };
+
+  // Carichiamo i tuoi annunci solo se selezioni "Offro" e se c'è un utente
+  useEffect(() => {
+    if (intent === 'offro' && user) {
+      fetchMyListings();
+    }
+  }, [intent, user]);
+
+  // --- FUNZIONE PER ELIMINARE UN ANNUNCIO ---
+  const handleDeleteListing = async (id) => {
+    if (window.confirm("Sei sicuro di voler eliminare questo annuncio? Questa azione è irreversibile!")) {
+      try {
+        const res = await fetch(`/api/delete_listing?id=${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          alert("✅ Annuncio eliminato con successo.");
+          fetchMyListings(); // Ricarichiamo la lista aggiornata
+        } else {
+          alert("❌ Errore durante l'eliminazione.");
+        }
+      } catch (err) {
+        alert("Errore di connessione.");
+      }
+    }
+  };
+
+  // --- SALVA PROFILO ---
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     
-    // Raccogliamo i tag selezionati
     const tags = Array.from(e.target.querySelectorAll('.tag-checkbox:checked'))
       .map(cb => cb.nextElementSibling.innerText)
       .join(', ');
 
     const data = {
-      userId: user.id, // L'ID dell'utente loggato
+      userId: user.id,
       occupation: formData.get('occupation'),
       birthdate: formData.get('birthdate'),
       bio: formData.get('bio'),
@@ -52,7 +88,6 @@ export default function Dashboard() {
         alert("✅ Profilo aggiornato con successo!");
         setActiveView('overview');
       } else {
-        // ORA LEGGIAMO L'ERRORE VERO!
         const errorMsg = await res.text();
         alert("❌ Errore: " + errorMsg);
       }
@@ -84,9 +119,11 @@ export default function Dashboard() {
       });
       if (res.ok) {
         alert("🎉 Annuncio pubblicato! Ora è visibile sulla Home.");
+        fetchMyListings(); // Ricarichiamo la lista appena lo salvi!
         setActiveView('overview');
       } else {
-        alert("❌ Errore durante la pubblicazione.");
+        const errorMsg = await res.text();
+        alert("❌ Errore: " + errorMsg);
       }
     } catch (err) {
       alert("Errore di connessione al server.");
@@ -108,7 +145,7 @@ export default function Dashboard() {
       <div className="dash-container">
         <div className="dash-inner">
           
-          {/* COLONNA SINISTRA: PROFILO PERSONALE (Sempre visibile) */}
+          {/* COLONNA SINISTRA: PROFILO PERSONALE */}
           <aside className="dash-sidebar">
             <div className="avatar-large">
               {user.nome.charAt(0).toUpperCase()}
@@ -121,17 +158,13 @@ export default function Dashboard() {
               <div className="bio-text">
                 Non hai ancora inserito una descrizione. Racconta chi sei!
               </div>
-              
-              <button 
-                className="btn-edit" 
-                onClick={() => setActiveView('editProfile')}
-              >
+              <button className="btn-edit" onClick={() => setActiveView('editProfile')}>
                 ✏️ Modifica Profilo Personale
               </button>
             </div>
           </aside>
 
-          {/* COLONNA DESTRA: DINAMICA IN BASE ALLA VISTA */}
+          {/* COLONNA DESTRA */}
           <main className="dash-main">
             
             {/* VISTA 1: OVERVIEW STANDARD */}
@@ -139,15 +172,12 @@ export default function Dashboard() {
               <>
                 <div className="dash-card">
                   <h2>Cosa stai cercando su RoomDate?</h2>
-                  <p>Seleziona il tuo obiettivo attuale.</p>
-                  
                   <div className="intent-grid">
                     <button className={`intent-btn ${intent === 'cerca' ? 'active' : ''}`} onClick={() => setIntent('cerca')}>
                       <span className="intent-icon">🔍</span>
                       <span className="intent-title">Cerco una stanza</span>
                       <span className="intent-desc">Voglio sfogliare gli annunci e contattare i proprietari.</span>
                     </button>
-                    
                     <button className={`intent-btn ${intent === 'offro' ? 'active' : ''}`} onClick={() => setIntent('offro')}>
                       <span className="intent-icon">🏠</span>
                       <span className="intent-title">Offro una stanza</span>
@@ -167,35 +197,56 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   <div className="dash-card" style={{ borderTop: '4px solid #4CAF50' }}>
-                    <h2>I tuoi Annunci</h2>
-                    <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--wg)' }}>
-                      <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛋️</div>
-                      Non hai ancora nessun annuncio attivo. <br/><br/>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                      <h2>I tuoi Annunci</h2>
                       <button 
                         className="btn-fill" 
-                        style={{ background: '#4CAF50' }}
+                        style={{ background: '#4CAF50', padding: '0.5rem 1rem', fontSize: '0.8rem' }}
                         onClick={() => setActiveView('createListing')}
                       >
-                        + Pubblica il tuo primo annuncio
+                        + Nuovo Annuncio
                       </button>
                     </div>
+
+                    {/* --- QUI MOSTRIAMO I TUOI ANNUNCI REALI --- */}
+                    {myListings.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--wg)' }}>
+                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛋️</div>
+                        Non hai ancora nessun annuncio attivo.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {myListings.map(l => (
+                          <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem', background: 'var(--sl)', borderRadius: '0.75rem', border: '1px solid var(--s)' }}>
+                            <div>
+                              <div style={{ fontWeight: 'bold', color: 'var(--wd)', fontSize: '1.1rem', marginBottom: '0.3rem' }}>{l.title}</div>
+                              <div style={{ fontSize: '0.9rem', color: 'var(--wg)' }}>📍 {l.city} · 🏠 {l.roomType} · <strong style={{color: 'var(--t)'}}>€{l.price}/mese</strong></div>
+                            </div>
+                            <button 
+                              onClick={() => handleDeleteListing(l.id)}
+                              style={{ background: '#E24B4A', color: 'white', border: 'none', padding: '0.6rem 1rem', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', transition: '0.2s' }}
+                              onMouseOver={(e) => e.target.style.background = '#C9302C'}
+                              onMouseOut={(e) => e.target.style.background = '#E24B4A'}
+                            >
+                              Rimuovi
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </>
             )}
 
             {/* VISTA 2: MODIFICA PROFILO PERSONALE */}
-{/* VISTA 2: MODIFICA PROFILO PERSONALE */}
             {activeView === 'editProfile' && (
               <div className="dash-card">
                 <h2>Modifica Profilo Personale</h2>
-                <p>Queste informazioni aiuteranno gli altri a capire se siete compatibili.</p>
-                
                 <form className="dash-form" onSubmit={handleSaveProfile}>
                   <div className="form-row">
                     <div className="form-group">
                       <label>Occupazione</label>
-                      {/* 👉 AGGIUNTO: name="occupation" */}
                       <select name="occupation" required>
                         <option value="">Seleziona...</option>
                         <option value="studente">Studente</option>
@@ -205,21 +256,18 @@ export default function Dashboard() {
                     </div>
                     <div className="form-group">
                       <label>Data di Nascita</label>
-                      {/* 👉 AGGIUNTO: name="birthdate" */}
                       <input name="birthdate" type="date" required />
                     </div>
                   </div>
 
                   <div className="form-group">
                     <label>Bio (Parlaci di te)</label>
-                    {/* 👉 AGGIUNTO: name="bio" */}
-                    <textarea name="bio" placeholder="Ciao! Mi chiamo... e mi piace..." required></textarea>
+                    <textarea name="bio" placeholder="Ciao! Mi chiamo..." required></textarea>
                   </div>
 
                   <div className="form-group">
-                    <label>Il tuo Stile di Vita (Seleziona tutto ciò che si applica)</label>
+                    <label>Il tuo Stile di Vita</label>
                     <div className="tag-grid">
-                      {/* I tag vanno bene così, li leggiamo tramite Javascript! */}
                       <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🚬 Fumatore</span></label>
                       <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🚭 Non Fumatore</span></label>
                       <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🐶 Ho un animale</span></label>
@@ -237,28 +285,23 @@ export default function Dashboard() {
               </div>
             )}
 
-{/* VISTA 3: CREA ANNUNCIO DELLA CASA */}
+            {/* VISTA 3: CREA ANNUNCIO DELLA CASA */}
             {activeView === 'createListing' && (
               <div className="dash-card">
                 <h2>Dettagli della Stanza</h2>
-                <p>Inserisci i dati della stanza che vuoi affittare.</p>
-                
                 <form className="dash-form" onSubmit={handleSaveListing}>
                   <div className="form-group">
                     <label>Titolo Annuncio</label>
-                    {/* 👉 AGGIUNTO: name="title" */}
-                    <input name="title" type="text" placeholder="Es: Ampia singola luminosa in zona Navigli" required />
+                    <input name="title" type="text" placeholder="Es: Ampia singola..." required />
                   </div>
 
                   <div className="form-row">
                     <div className="form-group">
                       <label>Città</label>
-                      {/* 👉 AGGIUNTO: name="city" */}
                       <input name="city" type="text" placeholder="Es: Milano" required />
                     </div>
                     <div className="form-group">
                       <label>Indirizzo o Zona</label>
-                      {/* 👉 AGGIUNTO: name="zone" */}
                       <input name="zone" type="text" placeholder="Es: Via Torino" required />
                     </div>
                   </div>
@@ -266,7 +309,6 @@ export default function Dashboard() {
                   <div className="form-row">
                     <div className="form-group">
                       <label>Tipo di Stanza</label>
-                      {/* 👉 AGGIUNTO: name="roomType" */}
                       <select name="roomType" required>
                         <option value="">Seleziona...</option>
                         <option value="singola">Singola</option>
@@ -276,24 +318,13 @@ export default function Dashboard() {
                     </div>
                     <div className="form-group">
                       <label>Prezzo Mensile (€)</label>
-                      {/* 👉 AGGIUNTO: name="price" */}
                       <input name="price" type="number" placeholder="Es: 500" required />
                     </div>
                   </div>
 
                   <div className="form-group">
                     <label>Descrizione della casa</label>
-                    {/* 👉 AGGIUNTO: name="description" */}
-                    <textarea name="description" placeholder="Descrivi la casa, chi ci vive attualmente, i servizi vicini..." required></textarea>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Foto della Stanza</label>
-                    <div className="photo-dropzone">
-                      <span>📸</span>
-                      <p>Clicca qui o trascina le foto della stanza per caricarle</p>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--wg)', marginTop: '0.5rem' }}>Massimo 5 foto (JPG, PNG)</p>
-                    </div>
+                    <textarea name="description" placeholder="Descrivi la casa..." required></textarea>
                   </div>
 
                   <div className="form-actions">
