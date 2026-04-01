@@ -133,8 +133,18 @@ export default function Search() {
                       <div className="card-body">
                         <div className="card-title">{item.title}</div>
                         <div className="card-loc">📍 {item.zone}, {item.city}</div>
-                        <button className="btn-card" style={{ marginTop: '1rem' }}>Vedi dettagli</button>
-                      </div>
+                          <Link 
+                              to={`/dettagli/${item.id}`} 
+                              className="btn-card" 
+                              style={{ 
+                                marginTop: '1rem', 
+                                display: 'block', 
+                                textAlign: 'center', 
+                                textDecoration: 'none' 
+                              }}
+                            >
+                          Vedi dettagli
+                            </Link>                      </div>
                     </div>
                   );
                 } else {
@@ -148,8 +158,20 @@ export default function Search() {
                       <div className="tags" style={{ marginBottom: '1rem' }}>
                         {item.tags.map(t => <span className="tag" key={t}>{t}</span>)}
                       </div>
-                      <button className="btn-fill" style={{ width: '100%', padding: '0.5rem' }}>Contatta</button>
-                    </div>
+                            <Link 
+                              to="/chat" 
+                              className="btn-fill" 
+                              style={{ 
+                                width: '100%', 
+                                padding: '0.5rem', 
+                                display: 'block', 
+                                textAlign: 'center', 
+                                textDecoration: 'none',
+                                boxSizing: 'border-box'
+                              }}
+                            >
+                              Contatta
+                            </Link>                    </div>
                   );
                 }
 
