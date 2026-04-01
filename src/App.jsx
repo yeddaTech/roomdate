@@ -5,7 +5,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
-
+import Dashboard from './pages/Dashboard';
 function App() {
   return (
     <BrowserRouter>
@@ -22,6 +22,7 @@ function App() {
 
         {/* Rotta di emergenza: se l'utente scrive un URL a caso, torna alla Home */}
         <Route path="*" element={<Home />} />
+        <Route path="/dashboard" element={<Dashboard />} />
       </Routes>
     </BrowserRouter>
   );
