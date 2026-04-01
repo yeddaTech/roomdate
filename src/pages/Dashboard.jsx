@@ -134,11 +134,30 @@ export default function Dashboard() {
 
   return (
     <>
+      {/* --- NAVBAR UNIFICATA --- */}
       <nav>
-        <Link to="/" className="logo">Room<span>Date</span></Link>
-        <div className="nav-btns" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <Link to="/" className="btn-ghost">Torna alla Home</Link>
-          <button onClick={handleLogout} className="btn-fill" style={{ background: '#E24B4A' }}>Esci</button>
+        <div className="logo">Room<span>Date</span></div>
+        <div className="nav-links">
+          <Link to="/">Home</Link>
+          <Link to="/ricerca">Cerca Stanza</Link>
+          <Link to="/chat">Chat</Link>
+          <Link to="/dashboard">Profilo</Link>
+          <Link to="/impostazioni">Impostazioni</Link>
+        </div>
+        <div className="nav-btns">
+          {user ? (
+            <>
+              <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginRight: '0.5rem' }}>
+                Ciao, <strong>{user.nome}</strong>!
+              </span>
+              <button onClick={handleLogout} className="btn-fill" style={{ background: '#E24B4A' }}>Esci</button>
+            </>
+          ) : (
+            <>
+              <Link to="/accedi" className="btn-ghost">Accedi</Link>
+              <Link to="/registrati" className="btn-fill">Registrati Gratis</Link>
+            </>
+          )}
         </div>
       </nav>
 
