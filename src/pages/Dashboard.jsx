@@ -6,8 +6,9 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   
-  // STATO FONDAMENTALE: Capire cosa vuole fare l'utente
-  const [intent, setIntent] = useState('cerca'); // Può essere 'cerca' o 'offro'
+  // STATI DI NAVIGAZIONE INTERNA
+  const [intent, setIntent] = useState('cerca'); 
+  const [activeView, setActiveView] = useState('overview'); // 'overview', 'editProfile', 'createListing'
 
   useEffect(() => {
     const savedUser = localStorage.getItem('roomdate_user');
@@ -23,11 +24,23 @@ export default function Dashboard() {
     navigate('/');
   };
 
+  // Finti salvataggi (in futuro chiameranno le API Go)
+  const handleSaveProfile = (e) => {
+    e.preventDefault();
+    alert("Profilo aggiornato con successo! (Da collegare al DB)");
+    setActiveView('overview');
+  };
+
+  const handleSaveListing = (e) => {
+    e.preventDefault();
+    alert("Annuncio pubblicato! (Da collegare al DB)");
+    setActiveView('overview');
+  };
+
   if (!user) return null;
 
   return (
     <>
-      {/* NAVBAR MINIMALE PER LA DASHBOARD */}
       <nav>
         <Link to="/" className="logo">Room<span>Date</span></Link>
         <div className="nav-btns" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -39,7 +52,7 @@ export default function Dashboard() {
       <div className="dash-container">
         <div className="dash-inner">
           
-          {/* COLONNA SINISTRA: PROFILO PERSONALE */}
+          {/* COLONNA SINISTRA: PROFILO PERSONALE (Sempre visibile) */}
           <aside className="dash-sidebar">
             <div className="avatar-large">
               {user.nome.charAt(0).toUpperCase()}
@@ -50,67 +63,177 @@ export default function Dashboard() {
             <div className="profile-section">
               <h4>La tua Bio</h4>
               <div className="bio-text">
-                Non hai ancora inserito una descrizione. Racconta chi sei, cosa studi o che lavoro fai per trovare il coinquilino perfetto!
+                Non hai ancora inserito una descrizione. Racconta chi sei!
               </div>
               
-              <h4>Il tuo Stile di vita</h4>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-                <span style={{ background: '#FBF3E8', color: '#7A4B2A', padding: '0.3rem 0.8rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: '500' }}>In attesa di dati...</span>
-              </div>
-
-              <button className="btn-edit">✏️ Modifica Profilo</button>
+              <button 
+                className="btn-edit" 
+                onClick={() => setActiveView('editProfile')}
+              >
+                ✏️ Modifica Profilo Personale
+              </button>
             </div>
           </aside>
 
-          {/* COLONNA DESTRA: OBIETTIVO E AZIONI */}
+          {/* COLONNA DESTRA: DINAMICA IN BASE ALLA VISTA */}
           <main className="dash-main">
             
-            {/* BOX 1: LA SCELTA DELL'OBIETTIVO */}
-            <div className="dash-card">
-              <h2>Cosa stai cercando su RoomDate?</h2>
-              <p>Seleziona il tuo obiettivo attuale per personalizzare la tua esperienza.</p>
-              
-              <div className="intent-grid">
-                <button 
-                  className={`intent-btn ${intent === 'cerca' ? 'active' : ''}`}
-                  onClick={() => setIntent('cerca')}
-                >
-                  <span className="intent-icon">🔍</span>
-                  <span className="intent-title">Cerco una stanza</span>
-                  <span className="intent-desc">Voglio sfogliare gli annunci, salvare i miei preferiti e contattare i proprietari.</span>
-                </button>
-                
-                <button 
-                  className={`intent-btn ${intent === 'offro' ? 'active' : ''}`}
-                  onClick={() => setIntent('offro')}
-                >
-                  <span className="intent-icon">🏠</span>
-                  <span className="intent-title">Offro una stanza</span>
-                  <span className="intent-desc">Ho un posto libero in casa e voglio pubblicare un annuncio per trovare coinquilini.</span>
-                </button>
-              </div>
-            </div>
+            {/* VISTA 1: OVERVIEW STANDARD */}
+            {activeView === 'overview' && (
+              <>
+                <div className="dash-card">
+                  <h2>Cosa stai cercando su RoomDate?</h2>
+                  <p>Seleziona il tuo obiettivo attuale.</p>
+                  
+                  <div className="intent-grid">
+                    <button className={`intent-btn ${intent === 'cerca' ? 'active' : ''}`} onClick={() => setIntent('cerca')}>
+                      <span className="intent-icon">🔍</span>
+                      <span className="intent-title">Cerco una stanza</span>
+                      <span className="intent-desc">Voglio sfogliare gli annunci e contattare i proprietari.</span>
+                    </button>
+                    
+                    <button className={`intent-btn ${intent === 'offro' ? 'active' : ''}`} onClick={() => setIntent('offro')}>
+                      <span className="intent-icon">🏠</span>
+                      <span className="intent-title">Offro una stanza</span>
+                      <span className="intent-desc">Ho un posto libero e voglio trovare coinquilini.</span>
+                    </button>
+                  </div>
+                </div>
 
-            {/* BOX 2: CONTENUTO DINAMICO IN BASE ALLA SCELTA */}
-            {intent === 'cerca' ? (
-              <div className="dash-card" style={{ borderTop: '4px solid var(--t)' }}>
-                <h2>Le tue stanze salvate</h2>
-                <p>Qui appariranno gli annunci che hai aggiunto ai preferiti.</p>
-                <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--wg)' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💔</div>
-                  Non hai ancora salvato nessuna stanza. <br/><br/>
-                  <Link to="/" className="btn-fill">Vai alla mappa</Link>
-                </div>
+                {intent === 'cerca' ? (
+                  <div className="dash-card" style={{ borderTop: '4px solid var(--t)' }}>
+                    <h2>Le tue stanze salvate</h2>
+                    <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--wg)' }}>
+                      <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💔</div>
+                      Non hai ancora salvato nessuna stanza. <br/><br/>
+                      <Link to="/" className="btn-fill">Vai alla mappa</Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="dash-card" style={{ borderTop: '4px solid #4CAF50' }}>
+                    <h2>I tuoi Annunci</h2>
+                    <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--wg)' }}>
+                      <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛋️</div>
+                      Non hai ancora nessun annuncio attivo. <br/><br/>
+                      <button 
+                        className="btn-fill" 
+                        style={{ background: '#4CAF50' }}
+                        onClick={() => setActiveView('createListing')}
+                      >
+                        + Pubblica il tuo primo annuncio
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* VISTA 2: MODIFICA PROFILO PERSONALE */}
+            {activeView === 'editProfile' && (
+              <div className="dash-card">
+                <h2>Modifica Profilo Personale</h2>
+                <p>Queste informazioni aiuteranno gli altri a capire se siete compatibili.</p>
+                
+                <form className="dash-form" onSubmit={handleSaveProfile}>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Occupazione</label>
+                      <select required>
+                        <option value="">Seleziona...</option>
+                        <option value="studente">Studente</option>
+                        <option value="lavoratore">Lavoratore</option>
+                        <option value="misto">Studente Lavoratore</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Data di Nascita</label>
+                      <input type="date" required />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Bio (Parlaci di te)</label>
+                    <textarea placeholder="Ciao! Mi chiamo... e mi piace..." required></textarea>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Il tuo Stile di Vita (Seleziona tutto ciò che si applica)</label>
+                    <div className="tag-grid">
+                      <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🚬 Fumatore</span></label>
+                      <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🚭 Non Fumatore</span></label>
+                      <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🐶 Ho un animale</span></label>
+                      <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🧹 Ordinato/a</span></label>
+                      <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🎉 Socievole</span></label>
+                      <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🥦 Vegano/Vegetariano</span></label>
+                    </div>
+                  </div>
+
+                  <div className="form-actions">
+                    <button type="button" className="btn-cancel" onClick={() => setActiveView('overview')}>Annulla</button>
+                    <button type="submit" className="btn-save">Salva Profilo</button>
+                  </div>
+                </form>
               </div>
-            ) : (
-              <div className="dash-card" style={{ borderTop: '4px solid #4CAF50' }}>
-                <h2>Il profilo della tua Casa</h2>
-                <p>Crea o modifica l'annuncio della tua stanza per renderlo visibile a migliaia di utenti.</p>
-                <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--wg)' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛋️</div>
-                  Non hai ancora nessun annuncio attivo. <br/><br/>
-                  <button className="btn-fill" style={{ background: '#4CAF50' }}>+ Pubblica il tuo primo annuncio</button>
-                </div>
+            )}
+
+            {/* VISTA 3: CREA ANNUNCIO DELLA CASA */}
+            {activeView === 'createListing' && (
+              <div className="dash-card">
+                <h2>Dettagli della Stanza</h2>
+                <p>Inserisci i dati della stanza che vuoi affittare.</p>
+                
+                <form className="dash-form" onSubmit={handleSaveListing}>
+                  <div className="form-group">
+                    <label>Titolo Annuncio</label>
+                    <input type="text" placeholder="Es: Ampia singola luminosa in zona Navigli" required />
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Città</label>
+                      <input type="text" placeholder="Es: Milano" required />
+                    </div>
+                    <div className="form-group">
+                      <label>Indirizzo o Zona</label>
+                      <input type="text" placeholder="Es: Via Torino" required />
+                    </div>
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Tipo di Stanza</label>
+                      <select required>
+                        <option value="">Seleziona...</option>
+                        <option value="singola">Singola</option>
+                        <option value="doppia">Doppia (Posto letto)</option>
+                        <option value="intera">Casa intera</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Prezzo Mensile (€)</label>
+                      <input type="number" placeholder="Es: 500" required />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Descrizione della casa</label>
+                    <textarea placeholder="Descrivi la casa, chi ci vive attualmente, i servizi vicini..." required></textarea>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Foto della Stanza</label>
+                    <div className="photo-dropzone">
+                      <span>📸</span>
+                      <p>Clicca qui o trascina le foto della stanza per caricarle</p>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--wg)', marginTop: '0.5rem' }}>Massimo 5 foto (JPG, PNG)</p>
+                    </div>
+                  </div>
+
+                  <div className="form-actions">
+                    <button type="button" className="btn-cancel" onClick={() => setActiveView('overview')}>Annulla</button>
+                    <button type="submit" className="btn-save" style={{ background: '#4CAF50' }}>Pubblica Annuncio</button>
+                  </div>
+                </form>
               </div>
             )}
 
