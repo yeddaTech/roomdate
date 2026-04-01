@@ -1,50 +1,122 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import './Dashboard.css';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  
+  // STATO FONDAMENTALE: Capire cosa vuole fare l'utente
+  const [intent, setIntent] = useState('cerca'); // Può essere 'cerca' o 'offro'
 
   useEffect(() => {
-    // Appena la pagina carica, controlliamo se c'è un utente salvato
     const savedUser = localStorage.getItem('roomdate_user');
-    
     if (!savedUser) {
-      // Se non c'è, è un intruso! Lo cacciamo alla pagina di login
       navigate('/accedi');
     } else {
-      // Altrimenti carichiamo i suoi dati
       setUser(JSON.parse(savedUser));
     }
   }, [navigate]);
 
   const handleLogout = () => {
     localStorage.removeItem('roomdate_user');
-    navigate('/accedi');
+    navigate('/');
   };
 
-  // Finché non carica l'utente, mostriamo bianco
-  if (!user) return null; 
+  if (!user) return null;
 
   return (
-    <div style={{ backgroundColor: '#FEFAF4', minHeight: '100vh', padding: '2rem', fontFamily: "'DM Sans', sans-serif" }}>
-      <div style={{ maxWidth: '800px', margin: '0 auto', background: 'white', padding: '3rem', borderRadius: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
-        <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: '2.5rem', color: '#2C1A0E', marginBottom: '1rem' }}>
-          Benvenuto, {user.nome}! 👋
-        </h1>
-        <p style={{ color: '#8A7B6E', marginBottom: '2rem' }}>
-          Questa è la tua area riservata. La tua email registrata è: <strong>{user.email}</strong>
-        </p>
+    <>
+      {/* NAVBAR MINIMALE PER LA DASHBOARD */}
+      <nav>
+        <Link to="/" className="logo">Room<span>Date</span></Link>
+        <div className="nav-btns" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <Link to="/" className="btn-ghost">Torna alla Home</Link>
+          <button onClick={handleLogout} className="btn-fill" style={{ background: '#E24B4A' }}>Esci</button>
+        </div>
+      </nav>
 
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <Link to="/" style={{ padding: '0.8rem 1.5rem', background: '#F5E3CC', color: '#7A4B2A', textDecoration: 'none', borderRadius: '0.5rem', fontWeight: '600' }}>
-            Torna alla Home
-          </Link>
-          <button onClick={handleLogout} style={{ padding: '0.8rem 1.5rem', background: '#E24B4A', color: 'white', border: 'none', borderRadius: '0.5rem', fontWeight: '600', cursor: 'pointer' }}>
-            Esci (Logout)
-          </button>
+      <div className="dash-container">
+        <div className="dash-inner">
+          
+          {/* COLONNA SINISTRA: PROFILO PERSONALE */}
+          <aside className="dash-sidebar">
+            <div className="avatar-large">
+              {user.nome.charAt(0).toUpperCase()}
+            </div>
+            <h1 className="dash-name">{user.nome} {user.cognome}</h1>
+            <p className="dash-email">{user.email}</p>
+
+            <div className="profile-section">
+              <h4>La tua Bio</h4>
+              <div className="bio-text">
+                Non hai ancora inserito una descrizione. Racconta chi sei, cosa studi o che lavoro fai per trovare il coinquilino perfetto!
+              </div>
+              
+              <h4>Il tuo Stile di vita</h4>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+                <span style={{ background: '#FBF3E8', color: '#7A4B2A', padding: '0.3rem 0.8rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: '500' }}>In attesa di dati...</span>
+              </div>
+
+              <button className="btn-edit">✏️ Modifica Profilo</button>
+            </div>
+          </aside>
+
+          {/* COLONNA DESTRA: OBIETTIVO E AZIONI */}
+          <main className="dash-main">
+            
+            {/* BOX 1: LA SCELTA DELL'OBIETTIVO */}
+            <div className="dash-card">
+              <h2>Cosa stai cercando su RoomDate?</h2>
+              <p>Seleziona il tuo obiettivo attuale per personalizzare la tua esperienza.</p>
+              
+              <div className="intent-grid">
+                <button 
+                  className={`intent-btn ${intent === 'cerca' ? 'active' : ''}`}
+                  onClick={() => setIntent('cerca')}
+                >
+                  <span className="intent-icon">🔍</span>
+                  <span className="intent-title">Cerco una stanza</span>
+                  <span className="intent-desc">Voglio sfogliare gli annunci, salvare i miei preferiti e contattare i proprietari.</span>
+                </button>
+                
+                <button 
+                  className={`intent-btn ${intent === 'offro' ? 'active' : ''}`}
+                  onClick={() => setIntent('offro')}
+                >
+                  <span className="intent-icon">🏠</span>
+                  <span className="intent-title">Offro una stanza</span>
+                  <span className="intent-desc">Ho un posto libero in casa e voglio pubblicare un annuncio per trovare coinquilini.</span>
+                </button>
+              </div>
+            </div>
+
+            {/* BOX 2: CONTENUTO DINAMICO IN BASE ALLA SCELTA */}
+            {intent === 'cerca' ? (
+              <div className="dash-card" style={{ borderTop: '4px solid var(--t)' }}>
+                <h2>Le tue stanze salvate</h2>
+                <p>Qui appariranno gli annunci che hai aggiunto ai preferiti.</p>
+                <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--wg)' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💔</div>
+                  Non hai ancora salvato nessuna stanza. <br/><br/>
+                  <Link to="/" className="btn-fill">Vai alla mappa</Link>
+                </div>
+              </div>
+            ) : (
+              <div className="dash-card" style={{ borderTop: '4px solid #4CAF50' }}>
+                <h2>Il profilo della tua Casa</h2>
+                <p>Crea o modifica l'annuncio della tua stanza per renderlo visibile a migliaia di utenti.</p>
+                <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--wg)' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛋️</div>
+                  Non hai ancora nessun annuncio attivo. <br/><br/>
+                  <button className="btn-fill" style={{ background: '#4CAF50' }}>+ Pubblica il tuo primo annuncio</button>
+                </div>
+              </div>
+            )}
+
+          </main>
         </div>
       </div>
-    </div>
+    </>
   );
 }
