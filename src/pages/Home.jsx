@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import './Home.css';
 
 export default function Home() {
@@ -7,10 +7,28 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('stanza');
   const [activeFilter, setActiveFilter] = useState('Tutte');
   
-  // Questi stati partiranno vuoti. Quando farai le API in Go, 
-  // userai un useEffect per riempirli con i dati del database Neon.
+  // STATI PER L'AUTENTICAZIONE (Aggiunti!)
+  const [user, setUser] = useState(null);
+  const navigate = useNavigate();
+  
+  // Dati finti che poi sostituiremo col database
   const [listings, setListings] = useState([]); 
   const [roommates, setRoommates] = useState([]);
+
+  // Appena la Home si carica, controlliamo se qualcuno ha fatto il login
+  useEffect(() => {
+    const savedUser = localStorage.getItem('roomdate_user');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+  }, []);
+
+  // Funzione per fare il logout
+  const handleLogout = () => {
+    localStorage.removeItem('roomdate_user');
+    setUser(null);
+    navigate('/');
+  };
 
   // Logica di filtro (quando avrai i dati)
   const filteredListings = activeFilter === 'Tutte' 
@@ -28,9 +46,25 @@ export default function Home() {
           <a href="#coinquilini">Cerca Coinquilini</a>
           <a href="#come-funziona">Come Funziona</a>
         </div>
+        
+        {/* BOTTONI NAV MODIFICATI PER IL LOGIN */}
         <div className="nav-btns">
-          <Link to="/accedi" className="btn-ghost">Accedi</Link>
-          <Link to="/registrati" className="btn-fill">Registrati Gratis</Link>
+          {user ? (
+            <>
+              <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginRight: '0.5rem' }}>
+                Ciao, <strong>{user.nome}</strong>!
+              </span>
+              <Link to="/dashboard" className="btn-ghost">Area Riservata</Link>
+              <button onClick={handleLogout} className="btn-fill" style={{ background: '#E24B4A' }}>
+                Esci
+              </button>
+            </>
+          ) : (
+            <>
+              <Link to="/accedi" className="btn-ghost">Accedi</Link>
+              <Link to="/registrati" className="btn-fill">Registrati Gratis</Link>
+            </>
+          )}
         </div>
       </nav>
 
@@ -39,7 +73,16 @@ export default function Home() {
         <div className="dot-grid"></div>
         <div className="hero-grid">
           <div>
-            <div className="hero-badge">🏡 Oltre 12.000 annunci attivi in Italia</div>
+            
+            {/* BADGE HERO MODIFICATO PER IL LOGIN */}
+            {user ? (
+              <div className="hero-badge" style={{ background: 'rgba(45, 122, 68, 0.9)', borderColor: '#4CAF50' }}>
+                ✅ Sei loggato! Ora puoi usare l'app tranquillamente.
+              </div>
+            ) : (
+              <div className="hero-badge">🏡 Oltre 12.000 annunci attivi in Italia</div>
+            )}
+
             <h1 className="serif">Trova la tua stanza,<br/><em>trova casa.</em></h1>
             <p>Migliaia di stanze e coinquilini selezionati nelle città italiane. Senza agenzie, senza commissioni.</p>
             <div className="hero-stats">
@@ -194,7 +237,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* TESTIMONIALS (Questi di solito sono statici e scritti a mano per il marketing) */}
+      {/* TESTIMONIALS */}
       <section className="testimonials">
         <div className="testimonials-inner">
           <div className="section-eyebrow">Testimonianze</div>
