@@ -1,98 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import './Chatpage.css';
-
-// ─── Dati mock ───────────────────────────────────────────────────────────────
-const CONVERSATIONS = [
-  {
-    id: 1,
-    name: 'Giulia M.',
-    emoji: '👩',
-    color1: '#F5C29A', color2: '#C4603A',
-    city: 'Milano',
-    job: 'Designer',
-    age: 26,
-    listing: { emoji: '🏠', title: 'Singola Navigli – Bilocale', price: 520, city: 'Milano', zone: 'Via Corsico' },
-    online: true,
-    lastMsg: 'Certo! Possiamo vederci domani mattina.',
-    time: '10:32',
-    unread: 2,
-    tags: ['🚭 Non fumatore', '🧹 Ordinato', '🎉 Socievole'],
-    messages: [
-      { id: 1, type: 'received', text: 'Ciao! Ho visto il tuo annuncio per la singola ai Navigli. È ancora disponibile?', time: '10:15' },
-      { id: 2, type: 'sent', text: 'Ciao Giulia! Sì, è ancora libera 😊 Vuoi sapere qualcosa di più sulla stanza?', time: '10:18' },
-      { id: 3, type: 'received', text: 'Sì! Vorrei sapere se include le spese e se c\'è posto per la bici.', time: '10:22' },
-      { id: 4, type: 'sent', text: 'Le spese sono incluse fino a 80€/mese. Per la bici abbiamo un piccolo locale al piano terra, perfetto!', time: '10:25' },
-      { id: 5, type: 'listing', listing: { emoji: '🏠', title: 'Singola Navigli – Bilocale', price: 520, city: 'Milano', zone: 'Via Corsico' }, time: '10:26' },
-      { id: 6, type: 'received', text: 'Ottimo! Potremmo organizzare una visita questa settimana?', time: '10:29' },
-      { id: 7, type: 'sent', text: 'Certo! Sono disponibile giovedì pomeriggio o venerdì mattina. Quale preferisci?', time: '10:31' },
-      { id: 8, type: 'received', text: 'Certo! Possiamo vederci domani mattina.', time: '10:32' },
-    ]
-  },
-  {
-    id: 2,
-    name: 'Marco T.',
-    emoji: '👨',
-    color1: '#A8D8EA', color2: '#4A90D9',
-    city: 'Bologna',
-    job: 'Ingegnere',
-    age: 29,
-    listing: { emoji: '🏢', title: 'Doppia Bologna Centro', price: 380, city: 'Bologna', zone: 'Zona Universitaria' },
-    online: false,
-    lastMsg: 'Ti mando i dettagli sul contratto.',
-    time: 'Ieri',
-    unread: 0,
-    tags: ['📚 Studente-lav.', '🚭 Non fumatore', '🐱 Ho un gatto'],
-    messages: [
-      { id: 1, type: 'received', text: 'Buongiorno! Ho visto che stai cercando un posto a Bologna.', time: 'Ieri 09:00' },
-      { id: 2, type: 'sent', text: 'Sì esatto! La tua stanza mi sembra perfetta per il periodo del master.', time: 'Ieri 09:05' },
-      { id: 3, type: 'received', text: 'Ti mando i dettagli sul contratto.', time: 'Ieri 09:30' },
-    ]
-  },
-  {
-    id: 3,
-    name: 'Sara V.',
-    emoji: '👱‍♀️',
-    color1: '#C8E6C9', color2: '#2D7A44',
-    city: 'Torino',
-    job: 'Studentessa',
-    age: 23,
-    listing: { emoji: '🛋️', title: 'Posto letto doppia – Poli', price: 280, city: 'Torino', zone: 'Corso Duca' },
-    online: true,
-    lastMsg: 'Perfetto, ci vediamo alle 18!',
-    time: 'Mer',
-    unread: 0,
-    tags: ['🎓 Studentessa', '🥦 Vegana', '🎵 Musicista'],
-    messages: [
-      { id: 1, type: 'sent', text: 'Ciao Sara! Sono interessata al posto letto nella doppia.', time: 'Mer 16:00' },
-      { id: 2, type: 'received', text: 'Ciao! Sì, è disponibile da novembre. Vuoi fare una videochiamata?', time: 'Mer 16:15' },
-      { id: 3, type: 'sent', text: 'Certo! Sono libera oggi pomeriggio dalle 17 in poi.', time: 'Mer 16:20' },
-      { id: 4, type: 'received', text: 'Perfetto, ci vediamo alle 18!', time: 'Mer 16:22' },
-    ]
-  },
-  {
-    id: 4,
-    name: 'Luca B.',
-    emoji: '🧔',
-    color1: '#FFD3B6', color2: '#E67E22',
-    city: 'Roma',
-    job: 'Freelancer',
-    age: 31,
-    listing: { emoji: '🏡', title: 'Monolocale – Trastevere', price: 750, city: 'Roma', zone: 'Trastevere' },
-    online: false,
-    lastMsg: 'Grazie per l\'interesse! A presto.',
-    time: 'Lun',
-    unread: 0,
-    tags: ['💻 Remote', '🚭 Non fumatore', '🏋️ Sportivo'],
-    messages: [
-      { id: 1, type: 'received', text: 'Buonasera! Ho visto che sei interessato al monolocale.', time: 'Lun 20:00' },
-      { id: 2, type: 'sent', text: 'Sì, è in una zona fantastica! Quando è libero?', time: 'Lun 20:10' },
-      { id: 3, type: 'received', text: 'Da fine ottobre. Posso mandarti qualche foto in più se vuoi.', time: 'Lun 20:12' },
-      { id: 4, type: 'sent', text: 'Sì please! Specialmente del bagno e della cucina.', time: 'Lun 20:15' },
-      { id: 5, type: 'received', text: 'Grazie per l\'interesse! A presto.', time: 'Lun 20:30' },
-    ]
-  },
-];
 
 const QUICK_REPLIES = [
   '📅 Quando sei disponibile?',
@@ -103,10 +11,14 @@ const QUICK_REPLIES = [
 ];
 
 export default function ChatPage() {
-  const [conversations, setConversations] = useState(CONVERSATIONS);
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  
+  // STATI DINAMICI VERI
+  const [conversations, setConversations] = useState([]);
   const [activeConvId, setActiveConvId] = useState(null);
   const [inputText, setInputText] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('Tutti');
   const [showProfile, setShowProfile] = useState(false);
@@ -115,8 +27,41 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
+  // 1. RECUPERA L'UTENTE LOGGATO
+  useEffect(() => {
+    const savedUser = localStorage.getItem('roomdate_user');
+    if (!savedUser) {
+      navigate('/accedi');
+    } else {
+      setUser(JSON.parse(savedUser));
+    }
+  }, [navigate]);
+
+  // 2. IL MOTORE DELLA CHAT: Scarica dal DB ogni 3 secondi!
+  const fetchChats = async () => {
+    if (!user) return;
+    try {
+      const res = await fetch(`/api/get_chats?userId=${user.id}`);
+      const data = await res.json();
+      if (data) {
+        setConversations(data);
+      }
+    } catch (err) {
+      console.error("Errore caricamento chat:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchChats(); // Scarica subito all'apertura
+      const interval = setInterval(fetchChats, 3000); // Continua a scaricare ogni 3s
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
   const activeConv = conversations.find(c => c.id === activeConvId);
 
+  // Scroll automatico in basso
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeConv?.messages]);
@@ -131,70 +76,29 @@ export default function ChatPage() {
   const handleSelectConv = (conv) => {
     setActiveConvId(conv.id);
     setMobileView('chat');
-    setConversations(prev =>
-      prev.map(c => c.id === conv.id ? { ...c, unread: 0 } : c)
-    );
-    if (conv.online) {
-      setTimeout(() => {
-        setIsTyping(true);
-        setTimeout(() => setIsTyping(false), 2800);
-      }, 2000);
-    }
   };
 
-  const handleSend = () => {
-    if (!inputText.trim() || !activeConvId) return;
-    const now = new Date();
-    const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+  // 3. INVIA IL MESSAGGIO AL VERO DATABASE
+  const handleSend = async () => {
+    if (!inputText.trim() || !activeConvId || !user) return;
+    
+    const textToSend = inputText.trim();
+    setInputText(''); 
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
-    const newMsg = {
-      id: Date.now(),
-      type: 'sent',
-      text: inputText.trim(),
-      time: timeStr,
-    };
-
-    setConversations(prev =>
-      prev.map(c => {
-        if (c.id !== activeConvId) return c;
-        return {
-          ...c,
-          messages: [...c.messages, newMsg],
-          lastMsg: inputText.trim(),
-          time: timeStr,
-        };
-      })
-    );
-    setInputText('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
-
-    if (activeConv?.online) {
-      setTimeout(() => {
-        setIsTyping(true);
-        setTimeout(() => {
-          setIsTyping(false);
-          const replies = [
-            'Capito, grazie per le info! 😊',
-            'Ok perfetto! Ti scrivo domani per confermare.',
-            'Ottimo, mi sembra tutto chiaro.',
-            'Va bene! Ci aggiorniamo presto.',
-          ];
-          const replyMsg = {
-            id: Date.now() + 1,
-            type: 'received',
-            text: replies[Math.floor(Math.random() * replies.length)],
-            time: timeStr,
-          };
-          setConversations(prev =>
-            prev.map(c => c.id === activeConvId
-              ? { ...c, messages: [...c.messages, replyMsg], lastMsg: replyMsg.text, time: timeStr }
-              : c
-            )
-          );
-        }, 2500);
-      }, 800);
+    try {
+      await fetch('/api/send_message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId: activeConvId,
+          senderId: user.id,
+          text: textToSend
+        })
+      });
+      fetchChats(); // Aggiorna subito la chat per farti vedere il messaggio inviato
+    } catch (err) {
+      alert("Errore nell'invio del messaggio");
     }
   };
 
@@ -211,27 +115,17 @@ export default function ChatPage() {
   };
 
   const filteredConvs = conversations.filter(c => {
+    const lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1].text : '';
     const matchSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.lastMsg.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchFilter =
-      activeFilter === 'Tutti' ? true :
-      activeFilter === 'Non letti' ? c.unread > 0 :
-      activeFilter === 'Online' ? c.online : true;
-    return matchSearch && matchFilter;
+      lastMsg.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchSearch;
   });
-
-  const totalUnread = conversations.reduce((sum, c) => sum + c.unread, 0);
 
   return (
     <div className="chat-page">
-
       {/* ── NAV ── */}
       <nav className="chat-nav">
         <Link to="/" className="logo">Room<span>Date</span></Link>
-        <div className="nav-chat-title">
-          <span></span>
-          {conversations.filter(c => c.online).length} contatti online
-        </div>
         <div className="nav-chat-actions">
           <Link to="/dashboard" className="btn-ghost">Area Riservata</Link>
         </div>
@@ -242,11 +136,9 @@ export default function ChatPage() {
 
         {/* ── SIDEBAR ── */}
         <aside className={`chat-sidebar ${mobileView === 'chat' ? 'mobile-hide' : ''}`}>
-
           <div className="sidebar-header">
             <div className="sidebar-top">
               <h2>Messaggi</h2>
-              {totalUnread > 0 && <span className="badge">{totalUnread} nuovi</span>}
             </div>
             <div className="search-convs">
               <span className="search-icon">🔍</span>
@@ -259,165 +151,83 @@ export default function ChatPage() {
             </div>
           </div>
 
-          <div className="sidebar-filter">
-            {['Tutti', 'Non letti', 'Online'].map(f => (
-              <button
-                key={f}
-                className={`filter-pill ${activeFilter === f ? 'active' : ''}`}
-                onClick={() => setActiveFilter(f)}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-
           <div className="conv-list">
             {filteredConvs.length === 0 ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--wg)', fontSize: '0.85rem' }}>
-                Nessuna conversazione trovata
+              <div style={{ padding: '3rem 2rem', textAlign: 'center', color: 'var(--wg)' }}>
+                <div style={{fontSize: '3rem', marginBottom: '1rem'}}>📭</div>
+                Non hai ancora nessuna conversazione attiva.
               </div>
-            ) : filteredConvs.map(conv => (
-              <div
-                key={conv.id}
-                className={`conv-item ${conv.id === activeConvId ? 'active' : ''} ${conv.unread > 0 ? 'unread' : ''}`}
-                onClick={() => handleSelectConv(conv)}
-              >
+            ) : filteredConvs.map(conv => {
+              const lastMsg = conv.messages && conv.messages.length > 0 ? conv.messages[conv.messages.length - 1].text : 'Nessun messaggio';
+              
+              return (
                 <div
-                  className="conv-avatar"
-                  style={{ background: `linear-gradient(135deg, ${conv.color1}, ${conv.color2})` }}
+                  key={conv.id}
+                  className={`conv-item ${conv.id === activeConvId ? 'active' : ''}`}
+                  onClick={() => handleSelectConv(conv)}
                 >
-                  {conv.emoji}
-                  {conv.online && <span className="online-dot"></span>}
-                </div>
-                <div className="conv-info">
-                  <div className="conv-name">{conv.name}</div>
-                  <div className="conv-preview">
-                    {conv.id === activeConvId && isTyping ? '⌨️ sta scrivendo...' : conv.lastMsg}
+                  <div className="conv-avatar" style={{ background: `linear-gradient(135deg, ${conv.color1}, ${conv.color2})` }}>
+                    {conv.emoji}
+                  </div>
+                  <div className="conv-info">
+                    <div className="conv-name">{conv.name}</div>
+                    <div className="conv-preview">{lastMsg}</div>
                   </div>
                 </div>
-                <div className="conv-meta">
-                  <span className="conv-time">{conv.time}</span>
-                  {conv.unread > 0 && (
-                    <span className="conv-unread-badge">{conv.unread}</span>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </aside>
 
         {/* ── CHAT MAIN ── */}
         <main className={`chat-main ${mobileView === 'chat' ? 'mobile-show' : ''}`}>
-
           {!activeConv ? (
             <div className="chat-empty">
               <div className="empty-icon">💬</div>
               <h3>Nessuna chat selezionata</h3>
-              <p>Scegli una conversazione dalla lista per iniziare a chattare con proprietari o coinquilini.</p>
+              <p>Scegli una conversazione dalla lista a sinistra per iniziare a chattare.</p>
             </div>
           ) : (
             <>
               {/* Header */}
               <div className="chat-header">
-                <button
-                  className="back-btn-mobile"
-                  onClick={() => setMobileView('list')}
-                >
-                  ←
-                </button>
-                <div
-                  className="chat-header-avatar"
-                  style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}
-                >
+                <button className="back-btn-mobile" onClick={() => setMobileView('list')}>←</button>
+                <div className="chat-header-avatar" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
                   {activeConv.emoji}
-                  {activeConv.online && <span className="online-dot"></span>}
                 </div>
                 <div className="chat-header-info">
                   <h3>{activeConv.name}</h3>
-                  <p>
-                    {activeConv.online
-                      ? <span className="status-online">● Online ora</span>
-                      : `${activeConv.age} anni · ${activeConv.job} · ${activeConv.city}`
-                    }
-                  </p>
+                  <p>Inquilino/Proprietario</p>
                 </div>
                 <span className="listing-pill">
-                  {activeConv.listing.emoji} {activeConv.listing.title}
+                  {activeConv.listing.emoji} {activeConv.listing.title} - €{activeConv.listing.price}
                 </span>
                 <div className="chat-header-actions">
-                  <button
-                    className="icon-btn"
-                    title="Info profilo"
-                    onClick={() => setShowProfile(!showProfile)}
-                  >
-                    👤
-                  </button>
-                  <button className="icon-btn" title="Chiama">📞</button>
+                  <button className="icon-btn" onClick={() => setShowProfile(!showProfile)}>👤</button>
                 </div>
               </div>
 
               {/* Messages */}
               <div className="messages-area">
-                <div className="date-sep"><span>Oggi</span></div>
-
-                {activeConv.messages.map(msg => {
-                  if (msg.type === 'listing') {
-                    return (
-                      <div key={msg.id} className="msg received">
-                        <div
-                          className="msg-avatar"
-                          style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}
-                        >
-                          {activeConv.emoji}
-                        </div>
-                        <div>
-                          <div className="listing-card-msg">
-                            <span className="lc-emoji">{msg.listing.emoji}</span>
-                            <div className="lc-title">{msg.listing.title}</div>
-                            <div className="lc-price">€{msg.listing.price}/mese</div>
-                            <div className="lc-loc">📍 {msg.listing.zone}, {msg.listing.city}</div>
-                          </div>
-                          <div className="msg-time">{msg.time}</div>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
+                {!activeConv.messages || activeConv.messages.length === 0 ? (
+                  <div style={{textAlign: 'center', padding: '2rem', color: 'var(--wg)'}}>Invia il primo messaggio per iniziare la conversazione!</div>
+                ) : (
+                  activeConv.messages.map(msg => (
                     <div key={msg.id} className={`msg ${msg.type}`}>
                       {msg.type === 'received' && (
-                        <div
-                          className="msg-avatar"
-                          style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}
-                        >
+                        <div className="msg-avatar" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
                           {activeConv.emoji}
                         </div>
                       )}
                       <div>
                         <div className="msg-bubble">
                           {msg.text}
-                          {msg.type === 'sent' && <span className="msg-status"> ✓✓</span>}
                         </div>
                         <div className="msg-time">{msg.time}</div>
                       </div>
                     </div>
-                  );
-                })}
-
-                {isTyping && (
-                  <div className="msg received typing-indicator">
-                    <div
-                      className="msg-avatar"
-                      style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}
-                    >
-                      {activeConv.emoji}
-                    </div>
-                    <div className="typing-dots">
-                      <span></span><span></span><span></span>
-                    </div>
-                  </div>
+                  ))
                 )}
-
                 <div ref={messagesEndRef} />
               </div>
 
@@ -432,10 +242,6 @@ export default function ChatPage() {
 
               {/* Input */}
               <div className="chat-input-area">
-                <div className="input-actions-left">
-                  <button className="attach-btn" title="Allega foto">📷</button>
-                  <button className="attach-btn" title="Manda annuncio">🏠</button>
-                </div>
                 <div className="input-wrapper">
                   <textarea
                     ref={textareaRef}
@@ -447,14 +253,7 @@ export default function ChatPage() {
                     rows={1}
                   />
                 </div>
-                <button
-                  className="send-btn"
-                  onClick={handleSend}
-                  disabled={!inputText.trim()}
-                  title="Invia"
-                >
-                  ➤
-                </button>
+                <button className="send-btn" onClick={handleSend} disabled={!inputText.trim()}>➤</button>
               </div>
             </>
           )}
@@ -464,48 +263,18 @@ export default function ChatPage() {
         {activeConv && showProfile && (
           <aside className="profile-panel visible">
             <div className="pp-header">
-              <div
-                className="pp-avatar"
-                style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}
-              >
+              <div className="pp-avatar" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
                 {activeConv.emoji}
               </div>
               <div className="pp-name">{activeConv.name}</div>
-              <div className="pp-sub">{activeConv.age} anni · {activeConv.job}</div>
             </div>
-
             <div className="pp-section">
-              <h4>Dettagli</h4>
-              <div className="pp-stat"><span>Città</span><strong>{activeConv.city}</strong></div>
-              <div className="pp-stat"><span>Professione</span><strong>{activeConv.job}</strong></div>
-              <div className="pp-stat">
-                <span>Stato</span>
-                <strong style={{ color: activeConv.online ? '#4CAF50' : 'var(--wg)' }}>
-                  {activeConv.online ? '● Online' : 'Offline'}
-                </strong>
-              </div>
-            </div>
-
-            <div className="pp-section">
-              <h4>Annuncio</h4>
+              <h4>Annuncio d'interesse</h4>
               <div className="pp-listing">
                 <span className="pl-emoji">{activeConv.listing.emoji}</span>
                 <div className="pl-title">{activeConv.listing.title}</div>
                 <div className="pl-price">€{activeConv.listing.price}/mese</div>
               </div>
-            </div>
-
-            <div className="pp-section">
-              <h4>Stile di vita</h4>
-              <div className="pp-tags">
-                {activeConv.tags.map(t => (
-                  <span key={t} className="pp-tag">{t}</span>
-                ))}
-              </div>
-            </div>
-
-            <div className="pp-section">
-              <button className="btn-report">🚩 Segnala profilo</button>
             </div>
           </aside>
         )}
