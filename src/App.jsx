@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import Search from './pages/Search';
 import Chatpage from './pages/Chatpage';
 import ListingDetails from './pages/ListingDetails';
+import Impostazioni from './pages/Impostazioni';
 
 function App() {
   return (
@@ -26,6 +27,9 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/ricerca" element={<Search />} />
         <Route path="/chat" element={<Chatpage />} />
+        
+        {/* --- ROTTA IMPOSTAZIONI AGGIUNTA QUI --- */}
+        <Route path="/impostazioni" element={<Impostazioni />} />
         
         {/* ECCO LA ROTTA CORRETTA: deve essere "dettagli", come nel Link! */}
         <Route path="/dettagli/:id" element={<ListingDetails />} />
