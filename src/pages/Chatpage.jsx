@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import Pusher from 'pusher-js'; // <--- AGGIUNGI QUESTO!
+import Pusher from 'pusher-js'; 
 import './Chatpage.css';
 
 const QUICK_REPLIES = [
@@ -13,9 +13,10 @@ const QUICK_REPLIES = [
 
 export default function ChatPage() {
   const navigate = useNavigate();
-  const location = useLocation(); // <--- AGGIUNGI QUESTA!
+  const location = useLocation(); 
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  
   // STATI DINAMICI VERI
   const [conversations, setConversations] = useState([]);
   const [activeConvId, setActiveConvId] = useState(null);
@@ -46,7 +47,7 @@ export default function ChatPage() {
     navigate('/');
   };
 
-  // 2. IL MOTORE DELLA CHAT: Scarica dal DB ogni 3 secondi!
+  // 2. IL MOTORE DELLA CHAT: Scarica dal DB
   const fetchChats = async () => {
       if (!user) return;
       try {
@@ -58,7 +59,7 @@ export default function ChatPage() {
       } catch (err) {
         console.error("Errore caricamento chat:", err);
       } finally {
-        setIsLoading(false); // <--- Spegne gli skeleton quando arrivano i dati!
+        setIsLoading(false); // Spegne gli skeleton quando arrivano i dati!
       }
     };
 
@@ -114,7 +115,7 @@ export default function ChatPage() {
     setMobileView('chat');
   };
 
-// 3. INVIA IL MESSAGGIO (CON UI OTTIMISTICA!)
+  // 3. INVIA IL MESSAGGIO (CON UI OTTIMISTICA!)
   const handleSend = async () => {
     if (!inputText.trim() || !activeConvId || !user) return;
     
@@ -177,7 +178,7 @@ export default function ChatPage() {
   return (
     <div className="chat-page" style={{ backgroundColor: '#FEFAF4', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
-      {/* ── NAVBAR UNIFICATA ── */}
+      {/* ── NAVBAR TOP (Desktop e Mobile header) ── */}
       <nav style={{ flexShrink: 0 }}>
         <div className="logo">Room<span>Date</span></div>
         <div className="nav-links">
@@ -190,15 +191,15 @@ export default function ChatPage() {
         <div className="nav-btns">
           {user ? (
             <>
-              <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginRight: '0.5rem' }}>
+              <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginRight: '0.5rem' }} className="mobile-hide">
                 Ciao, <strong>{user.nome}</strong>!
               </span>
               <button onClick={handleLogout} className="btn-fill" style={{ background: '#E24B4A' }}>Esci</button>
             </>
           ) : (
             <>
-              <Link to="/accedi" className="btn-ghost">Accedi</Link>
-              <Link to="/registrati" className="btn-fill">Registrati Gratis</Link>
+              <Link to="/accedi" className="btn-ghost mobile-hide">Accedi</Link>
+              <Link to="/registrati" className="btn-fill">Registrati</Link>
             </>
           )}
         </div>
@@ -259,11 +260,10 @@ export default function ChatPage() {
                     <div className="conv-info">
                     <div className="conv-name">{conv.name}</div>
                     
-                      {/* 👇 AGGIUNTA: Mostra il nome della stanza in piccolo! 👇 */}
+                      {/* 👇 Mostra il nome della stanza in piccolo! 👇 */}
                       <div style={{ fontSize: '0.7rem', color: 'var(--t)', fontWeight: 'bold', marginBottom: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         🏠 {conv.listing.title}
                       </div>
-                      {/* 👆 FINE AGGIUNTA 👆 */}
 
                     <div className="conv-preview">{lastMsg}</div>
                   </div>
@@ -363,7 +363,7 @@ export default function ChatPage() {
               <div className="pp-name">{activeConv.name}</div>
             </div>
             <div className="pp-section">
-              <h4>Annuncio d&apos;interesse</h4>
+              <h4>Annuncio d'interesse</h4>
               <div className="pp-listing">
                 <span className="pl-emoji">{activeConv.listing.emoji}</span>
                 <div className="pl-title">{activeConv.listing.title}</div>
@@ -373,6 +373,29 @@ export default function ChatPage() {
           </aside>
         )}
       </div>
+
+      {/* ── BOTTOM NAV (Mobile) ── */}
+      <nav className="bottom-nav">
+        <div className="bottom-nav__inner">
+          <Link to="/" className="bottom-nav__item">
+            <span className="bottom-nav__icon">🏠</span>
+            <span className="bottom-nav__label">Home</span>
+          </Link>
+          <Link to="/ricerca" className="bottom-nav__item">
+            <span className="bottom-nav__icon">🔍</span>
+            <span className="bottom-nav__label">Cerca</span>
+          </Link>
+          <Link to="/chat" className="bottom-nav__item active">
+            <span className="bottom-nav__icon">💬</span>
+            <span className="bottom-nav__label">Chat</span>
+          </Link>
+          <Link to="/dashboard" className="bottom-nav__item">
+            <span className="bottom-nav__icon">👤</span>
+            <span className="bottom-nav__label">Profilo</span>
+          </Link>
+        </div>
+      </nav>
+
     </div>
   );
 }
