@@ -170,8 +170,24 @@ export default function Search() {
             Trovati {filteredResults.length} risultati {currentCity && `a ${currentCity}`}
           </p>
 
-          {loading ? (
-            <p>Ricerca in corso...</p>
+            {loading ? (
+            /* GRIGLIA DEGLI SKELETON (Mostra 6 finte card che lampeggiano) */
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <div className="card" key={n} style={{ height: '360px', display: 'flex', flexDirection: 'column' }}>
+                  {/* Finta Immagine/Header */}
+                  <div className="skeleton-box" style={{ height: '180px', width: '100%', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}></div>
+                  <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', flexGrow: 1 }}>
+                    {/* Finto Titolo */}
+                    <div className="skeleton-box" style={{ height: '24px', width: '80%' }}></div>
+                    {/* Finta Posizione/Sottotitolo */}
+                    <div className="skeleton-box" style={{ height: '16px', width: '50%' }}></div>
+                    {/* Finto Bottone */}
+                    <div className="skeleton-box" style={{ height: '40px', width: '100%', marginTop: 'auto', borderRadius: '2rem' }}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : filteredResults.length === 0 ? (
             <div style={{ padding: '3rem', textAlign: 'center', background: 'white', borderRadius: '1rem', border: '1px dashed #C4603A' }}>
               <span style={{ fontSize: '3rem' }}>🏜️</span>
