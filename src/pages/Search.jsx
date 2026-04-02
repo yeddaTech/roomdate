@@ -26,7 +26,36 @@ export default function Search() {
     setUser(null);
     navigate('/');
   };
+  // --- NUOVA FUNZIONE: CONTATTA COINQUILINO ---
+  const handleDirectContact = async (targetUserId) => {
+    if (!user) {
+      alert("Devi accedere o registrarti per chattare!");
+      navigate('/accedi');
+      return;
+    }
 
+    try {
+      // Chiama start_chat passando l'ID dell'altra persona, SENZA stanza
+      const res = await fetch('/api/start_chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: user.id,
+          targetId: targetUserId
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        navigate('/chat', { state: { openChatId: data.conversationId } });
+      } else {
+        alert("Errore nell'avvio della chat.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Errore di connessione.");
+    }
+  };
   // Fetch dei dati ogni volta che l'intento cambia
   useEffect(() => {
     setLoading(true);
@@ -198,20 +227,14 @@ export default function Search() {
                       <div className="tags" style={{ marginBottom: '1rem' }}>
                         {item.tags.map(t => <span className="tag" key={t}>{t}</span>)}
                       </div>
-                            <Link 
-                              to="/chat" 
-                              className="btn-fill" 
-                              style={{ 
-                                width: '100%', 
-                                padding: '0.5rem', 
-                                display: 'block', 
-                                textAlign: 'center', 
-                                textDecoration: 'none',
-                                boxSizing: 'border-box'
-                              }}
-                            >
-                              Contatta
-                            </Link>                    </div>
+                      {/* SOSTITUISCI IL VECCHIO LINK CON QUESTO BOTTONE */}
+                      <button 
+                        onClick={() => handleDirectContact(item.id)} 
+                        className="btn-fill" 
+                        style={{ width: '100%', padding: '0.6rem', display: 'block', textAlign: 'center', border: 'none', cursor: 'pointer', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                      >
+                        Contatta
+                      </button>                 </div>
                   );
                 }
 
