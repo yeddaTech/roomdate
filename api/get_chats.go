@@ -47,28 +47,29 @@ func GetChatsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// Query riscritta per gestire i nomi in modo assoluto
+	// MAGIA SQL: Usa LEFT JOIN così non va in crash se la chat è senza stanza
 	queryChats := `
 		SELECT 
 			c.id, 
-			l.title, 
-			l.price,
-			-- Se chi richiede la chat (userId) è l'inquilino, prendi il nome del proprietario
-			-- Altrimenti (se è il proprietario), prendi il nome dell'inquilino
+			COALESCE(l.title, 'Chat Diretta') as title, 
+			COALESCE(l.price, 0) as price,
 			CASE 
-				WHEN c.tenant_id::text = $1 THEN owner.first_name
-				ELSE tenant.first_name
+				WHEN c.listing_id IS NOT NULL THEN
+					CASE WHEN c.tenant_id::text = $1 THEN owner.first_name ELSE tenant.first_name END
+				ELSE
+					CASE WHEN c.tenant_id::text = $1 THEN u2.first_name ELSE tenant.first_name END
 			END as other_user_name
 		FROM roomdate_app.conversations c
-		JOIN roomdate_app.listings l ON c.listing_id = l.id
-		JOIN roomdate_app.users owner ON l.user_id = owner.id
-		JOIN roomdate_app.users tenant ON c.tenant_id = tenant.id
-		WHERE c.tenant_id::text = $1 OR l.user_id::text = $1
+		LEFT JOIN roomdate_app.listings l ON c.listing_id = l.id
+		LEFT JOIN roomdate_app.users owner ON l.user_id = owner.id
+		LEFT JOIN roomdate_app.users tenant ON c.tenant_id = tenant.id
+		LEFT JOIN roomdate_app.users u2 ON c.user2_id = u2.id
+		WHERE c.tenant_id::text = $1 OR l.user_id::text = $1 OR c.user2_id::text = $1
 	`
 
 	rows, err := db.Query(queryChats, userId)
 	if err != nil {
-		http.Error(w, "Errore query chat: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Errore query chat", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -87,7 +88,12 @@ func GetChatsHandler(w http.ResponseWriter, r *http.Request) {
 		chat.Emoji = "👤"
 		chat.Color1 = colors[i%len(colors)][0]
 		chat.Color2 = colors[i%len(colors)][1]
-		chat.Listing.Emoji = "🏠"
+
+		if chat.Listing.Price == 0 {
+			chat.Listing.Emoji = "💬" // Icona diversa per le chat dirette
+		} else {
+			chat.Listing.Emoji = "🏠"
+		}
 
 		if name.Valid && name.String != "" {
 			chat.Name = name.String
@@ -109,7 +115,6 @@ func GetChatsHandler(w http.ResponseWriter, r *http.Request) {
 				msg.Type = "received"
 			}
 			msg.Time = createdAt.Format("15:04")
-
 			chat.Messages = append(chat.Messages, msg)
 		}
 		msgRows.Close()
