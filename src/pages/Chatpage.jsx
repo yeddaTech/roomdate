@@ -15,7 +15,7 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const location = useLocation(); // <--- AGGIUNGI QUESTA!
   const [user, setUser] = useState(null);
-  
+  const [isLoading, setIsLoading] = useState(true);
   // STATI DINAMICI VERI
   const [conversations, setConversations] = useState([]);
   const [activeConvId, setActiveConvId] = useState(null);
@@ -48,17 +48,19 @@ export default function ChatPage() {
 
   // 2. IL MOTORE DELLA CHAT: Scarica dal DB ogni 3 secondi!
   const fetchChats = async () => {
-    if (!user) return;
-    try {
-      const res = await fetch(`/api/get_chats?userId=${user.id}`);
-      const data = await res.json();
-      if (data) {
-        setConversations(data);
+      if (!user) return;
+      try {
+        const res = await fetch(`/api/get_chats?userId=${user.id}`);
+        const data = await res.json();
+        if (data) {
+          setConversations(data);
+        }
+      } catch (err) {
+        console.error("Errore caricamento chat:", err);
+      } finally {
+        setIsLoading(false); // <--- Spegne gli skeleton quando arrivano i dati!
       }
-    } catch (err) {
-      console.error("Errore caricamento chat:", err);
-    }
-  };
+    };
 
   // MOTORE DELLA CHAT: REAL-TIME CON PUSHER!
   useEffect(() => {
@@ -221,9 +223,23 @@ export default function ChatPage() {
               />
             </div>
           </div>
-
-          <div className="conv-list">
-            {filteredConvs.length === 0 ? (
+            <div className="conv-list">
+            {isLoading ? (
+              /* SKELETON LOADERS PER LE CHAT */
+              [1, 2, 3, 4, 5].map(n => (
+                <div key={n} className="conv-item" style={{ pointerEvents: 'none' }}>
+                  {/* Finto Avatar */}
+                  <div className="skeleton-box" style={{ width: '48px', height: '48px', borderRadius: '50%', flexShrink: 0 }}></div>
+                  
+                  {/* Finti Testi */}
+                  <div className="conv-info" style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                    <div className="skeleton-box" style={{ height: '16px', width: '60%' }}></div>
+                    <div className="skeleton-box" style={{ height: '12px', width: '40%' }}></div>
+                    <div className="skeleton-box" style={{ height: '14px', width: '90%' }}></div>
+                  </div>
+                </div>
+              ))
+            ) : filteredConvs.length === 0 ? (
               <div style={{ padding: '3rem 2rem', textAlign: 'center', color: 'var(--wg)' }}>
                 <div style={{fontSize: '3rem', marginBottom: '1rem'}}>📭</div>
                 Non hai ancora nessuna conversazione attiva.
