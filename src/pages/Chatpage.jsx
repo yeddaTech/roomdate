@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import './Chatpage.css';
+import Pusher from 'pusher-js'; // <--- AGGIUNGI QUESTO!
 
 const QUICK_REPLIES = [
   '📅 Quando sei disponibile?',
@@ -51,11 +51,29 @@ export default function ChatPage() {
     }
   };
 
+  // MOTORE DELLA CHAT: REAL-TIME CON PUSHER!
   useEffect(() => {
     if (user) {
-      fetchChats(); // Scarica subito all'apertura
-      const interval = setInterval(fetchChats, 3000); // Continua a scaricare ogni 3s
-      return () => clearInterval(interval);
+      // 1. Scarica le chat all'apertura
+      fetchChats(); 
+
+      // 2. Si connette a Pusher per ascoltare i messaggi in arrivo
+      const pusher = new Pusher('29ac9eeeb3352ae5b069', {
+        cluster: 'eu'
+      });
+
+      const channel = pusher.subscribe('roomdate-channel');
+      
+      // 3. Quando Pusher dice "nuovo-messaggio", React riscarica i messaggi all'istante
+      channel.bind('nuovo-messaggio', function(data) {
+        fetchChats();
+      });
+
+      // Pulisce la connessione se cambi pagina
+      return () => {
+        channel.unbind_all();
+        channel.unsubscribe();
+      };
     }
   }, [user]);
 
@@ -103,7 +121,6 @@ export default function ChatPage() {
           text: textToSend
         })
       });
-      fetchChats(); // Aggiorna subito la chat per farti vedere il messaggio inviato
     } catch (err) {
       alert("Errore nell'invio del messaggio");
     }
