@@ -8,11 +8,6 @@ export default function Home() {
   const [listings, setListings] = useState([]); 
   const [roommates, setRoommates] = useState([]);
 
-  // --- STATI PER LA RICERCA ---
-  const [searchIntent, setSearchIntent] = useState('stanza');
-  const [searchCity, setSearchCity] = useState('');
-  const [searchBudget, setSearchBudget] = useState('');
-
   useEffect(() => {
     const savedUser = localStorage.getItem('roomdate_user');
     if (savedUser) setUser(JSON.parse(savedUser));
@@ -28,20 +23,6 @@ export default function Home() {
       .catch(() => setRoommates([]));
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('roomdate_user');
-    setUser(null);
-    navigate('/');
-  };
-
-  const handleSearch = () => {
-    const params = new URLSearchParams();
-    params.append('intent', searchIntent);
-    if (searchCity) params.append('citta', searchCity);
-    if (searchBudget) params.append('budget', searchBudget);
-    navigate(`/ricerca?${params.toString()}`);
-  };
-
   return (
     <>
       {/* --- NAV --- */}
@@ -49,18 +30,16 @@ export default function Home() {
         <div className="logo">Room<span>Date</span></div>
         <div className="nav-links">
           <Link to="/">Home</Link>
-          <a href="#trova">Trova Stanza</a>
-          <a href="#coinquilini">Cerca Coinquilini</a>
+          <Link to="/ricerca">Cerca Stanza</Link>
+          <Link to="/chat">Chat</Link>
+          <Link to="/dashboard">Profilo</Link>
+          <Link to="/impostazioni">Impostazioni</Link>
         </div>
         <div className="nav-btns">
           {user ? (
-            <>
-              <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginRight: '0.5rem' }}>
-                Ciao, <strong>{user.nome}</strong>!
-              </span>
-              <Link to="/dashboard" className="btn-ghost">Area Riservata</Link>
-              <button onClick={handleLogout} className="btn-fill" style={{ background: '#E24B4A' }}>Esci</button>
-            </>
+            <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginRight: '0.5rem' }}>
+              Ciao, <strong>{user.nome}</strong>!
+            </span>
           ) : (
             <>
               <Link to="/accedi" className="btn-ghost">Accedi</Link>
@@ -73,50 +52,18 @@ export default function Home() {
       {/* --- HERO --- */}
       <section className="hero">
         <div className="dot-grid"></div>
-        <div className="hero-grid">
-          <div>
-            {user ? (
-              <div className="hero-badge" style={{ background: 'rgba(45, 122, 68, 0.9)', borderColor: '#4CAF50' }}>✅ Sei loggato! Ora puoi usare l'app tranquillamente.</div>
-            ) : (
-              <div className="hero-badge">🏡 Oltre 12.000 annunci attivi in Italia</div>
-            )}
+        <div className="hero-grid" style={{ gridTemplateColumns: '1fr', textAlign: 'center' }}>
+          {/* Centrato e allargato visto che non c'è più il box laterale */}
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <div className="hero-badge" style={{ display: 'inline-block' }}>🏡 Oltre 12.000 annunci attivi in Italia</div>
             <h1 className="serif">Trova la tua stanza,<br/><em>trova casa.</em></h1>
-            <p>Migliaia di stanze e coinquilini selezionati nelle città italiane. Senza agenzie, senza commissioni.</p>
-          </div>
-          <div>
-            <div className="search-box">
-              <div className="tabs">
-                <button className={`tab ${searchIntent === 'stanza' ? 'active' : ''}`} onClick={() => setSearchIntent('stanza')}>🔍 Cerca Stanza</button>
-                <button className={`tab ${searchIntent === 'coinquilino' ? 'active' : ''}`} onClick={() => setSearchIntent('coinquilino')}>👥 Cerco Coinquilino</button>
-              </div>
-              <div className="inputs">
-                <select value={searchCity} onChange={(e) => setSearchCity(e.target.value)}>
-                  <option value="">📍 Città (Tutte)</option>
-                  <option value="Milano">Milano</option>
-                  <option value="Roma">Roma</option>
-                  <option value="Bologna">Bologna</option>
-                  <option value="Torino">Torino</option>
-                </select>
-                <input 
-                  type="number" 
-                  placeholder="💶 Budget max €" 
-                  value={searchBudget}
-                  onChange={(e) => setSearchBudget(e.target.value)}
-                />
-              </div>
-              <button className="btn-search" onClick={handleSearch}>Cerca Subito →</button>
+            <p style={{ margin: '0 auto' }}>Migliaia di stanze e coinquilini selezionati nelle città italiane. Senza agenzie, senza commissioni.</p>
+            <div style={{ marginTop: '2rem' }}>
+               <Link to="/ricerca" className="btn-fill" style={{ fontSize: '1.2rem', padding: '1rem 2rem' }}>Inizia la ricerca →</Link>
             </div>
           </div>
         </div>
       </section>
-
-      {/* --- TRUST BAND --- */}
-      <div className="trust">
-        <div className="trust-item"><div className="trust-dot"></div>Profili verificati</div>
-        <div className="trust-item"><div className="trust-dot"></div>Chat sicura integrata</div>
-        <div className="trust-item"><div className="trust-dot"></div>Zero commissioni agenzie</div>
-        <div className="trust-item"><div className="trust-dot"></div>4.9/5 · 2.400+ recensioni</div>
-      </div>
 
       {/* --- STANZE IN EVIDENZA (CAROUSEL) --- */}
       <section className="listings" id="trova">
@@ -205,7 +152,7 @@ export default function Home() {
               <div className="step-num">04</div>
               <span className="step-icon">🏠</span>
               <h3>Benvenuto a casa!</h3>
-              <p>Firma l'accordo, prendi le chiavi e inizia la tua nuova convivenza. Semplice come dev'essere.</p>
+              <p>Firma l&apos;accordo, prendi le chiavi e inizia la tua nuova convivenza. Semplice come dev&apos;essere.</p>
             </div>
           </div>
         </div>
@@ -222,9 +169,9 @@ export default function Home() {
             <div className="footer-col">
               <h4>Servizi</h4>
               <ul>
-                <li><a href="#trova">Cerca Stanza</a></li>
-                <li><Link to="/accedi">Pubblica Annuncio</Link></li>
-                <li><a href="#coinquilini">Trova Coinquilini</a></li>
+                <li><Link to="/ricerca">Cerca Stanza</Link></li>
+                <li><Link to="/dashboard">Pubblica Annuncio</Link></li>
+                <li><Link to="/ricerca?intent=coinquilino">Trova Coinquilini</Link></li>
               </ul>
             </div>
             <div className="footer-col">
@@ -245,7 +192,7 @@ export default function Home() {
             </div>
           </div>
           <div className="footer-bottom">
-            <span className="footer-cr">© 2025 RoomDate. Tutti i diritti riservati.</span>
+            <span className="footer-cr">© 2026 RoomDate. Tutti i diritti riservati.</span>
             <div className="footer-links">
               <a href="#">Privacy Policy</a>
               <a href="#">Termini di Servizio</a>
