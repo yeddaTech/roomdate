@@ -10,8 +10,9 @@ import (
 )
 
 type StartChatReq struct {
-	ListingID int    `json:"listingId"`
+	ListingID int    `json:"listingId,omitempty"` // Ora è opzionale!
 	TenantID  string `json:"tenantId"`
+	TargetID  string `json:"targetId,omitempty"` // Nuovo: ID del coinquilino
 }
 
 func StartChatHandler(w http.ResponseWriter, r *http.Request) {
@@ -35,18 +36,31 @@ func StartChatHandler(w http.ResponseWriter, r *http.Request) {
 
 	var convId int
 
-	// 1. Controlla se esiste già una conversazione tra questo utente e questo annuncio
-	err = db.QueryRow("SELECT id FROM roomdate_app.conversations WHERE listing_id = $1 AND tenant_id = $2", req.ListingID, req.TenantID).Scan(&convId)
-
-	if err == sql.ErrNoRows {
-		// 2. Se non esiste, CREA LA NUOVA CONVERSAZIONE!
-		err = db.QueryRow("INSERT INTO roomdate_app.conversations (listing_id, tenant_id) VALUES ($1, $2) RETURNING id", req.ListingID, req.TenantID).Scan(&convId)
-		if err != nil {
-			http.Error(w, "Errore creazione chat: "+err.Error(), http.StatusInternalServerError)
-			return
+	if req.ListingID != 0 {
+		// LOGICA A: Chat per una stanza
+		err = db.QueryRow("SELECT id FROM roomdate_app.conversations WHERE listing_id = $1 AND tenant_id = $2", req.ListingID, req.TenantID).Scan(&convId)
+		if err == sql.ErrNoRows {
+			err = db.QueryRow("INSERT INTO roomdate_app.conversations (listing_id, tenant_id) VALUES ($1, $2) RETURNING id", req.ListingID, req.TenantID).Scan(&convId)
 		}
-	} else if err != nil {
-		http.Error(w, "Errore ricerca chat: "+err.Error(), http.StatusInternalServerError)
+	} else if req.TargetID != "" {
+		// LOGICA B: Chat Diretta tra due persone (Cerco Coinquilino)
+		// Controlla se hanno già una chat aperta
+		err = db.QueryRow(`
+			SELECT id FROM roomdate_app.conversations 
+			WHERE listing_id IS NULL 
+			AND ((tenant_id = $1 AND user2_id = $2) OR (tenant_id = $2 AND user2_id = $1))
+		`, req.TenantID, req.TargetID).Scan(&convId)
+
+		if err == sql.ErrNoRows {
+			err = db.QueryRow("INSERT INTO roomdate_app.conversations (tenant_id, user2_id) VALUES ($1, $2) RETURNING id", req.TenantID, req.TargetID).Scan(&convId)
+		}
+	} else {
+		http.Error(w, "Manca ListingID o TargetID", http.StatusBadRequest)
+		return
+	}
+
+	if err != nil && err != sql.ErrNoRows {
+		http.Error(w, "Errore database: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
