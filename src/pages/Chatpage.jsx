@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import Pusher from 'pusher-js'; // <--- AGGIUNGI QUESTO!
+import './Chatpage.css';
 
 const QUICK_REPLIES = [
   '📅 Quando sei disponibile?',
