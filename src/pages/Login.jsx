@@ -45,9 +45,9 @@ export default function Login() {
           // Salviamo i dati dell'utente nel browser in modo sicuro
           localStorage.setItem('roomdate_user', JSON.stringify(data.user));
 
-          // Aspettiamo 1.5s per far vedere il banner verde, poi andiamo all'area riservata
+          // Aspettiamo 1.5s per far vedere il banner verde, poi andiamo alla Home
           setTimeout(() => {
-            navigate('/dashboard'); // <-- Nuova rotta!
+            navigate('/'); // <-- Modificato: Ora punta alla Home!
           }, 1500);
 
         } else {
