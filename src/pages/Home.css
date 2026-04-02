@@ -186,3 +186,113 @@ footer { background: #1A0E07; padding: 3rem 5% 1.5rem; }
   animation: shimmer 2s infinite linear;
   border-radius: 8px;
 }
+/* =========================================
+   ELEMENTI MOBILE (Nascondi su Desktop)
+   ========================================= */
+.bottom-nav { display: none; }
+.fab { display: none; }
+.mobile-hide { display: inline-block; }
+
+/* =========================================
+   MEDIA QUERY: TELEFONI E TABLET PICCOLI
+   ========================================= */
+@media (max-width: 768px) {
+  
+  /* --- 1. Riorganizzazione Body e Top Nav --- */
+  body {
+    padding-bottom: 80px; /* Spazio per la nav inferiore */
+  }
+  
+  .topnav {
+    padding: 0 16px;
+    justify-content: space-between;
+  }
+  .nav-links { display: none; } /* Nasconde il menu testuale in alto */
+  .mobile-hide { display: none !important; } /* Nasconde il tasto Accedi, lascia solo Registrati */
+
+  /* --- 2. Bottom Nav (Stile "Appunti") --- */
+  .bottom-nav {
+    display: block;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    z-index: 1000;
+    padding: 0 8px;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .bottom-nav__inner {
+    background: rgba(17,17,24,0.96); /* Adatta questo colore al tema di RoomDate */
+    backdrop-filter: blur(24px) saturate(200%);
+    border: 1px solid rgba(255,255,255,0.1); /* Bordo leggero */
+    border-radius: 24px 24px 0 0;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    height: 68px;
+    padding: 0 8px;
+  }
+
+  .bottom-nav__item {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; padding: 8px 10px;
+    text-decoration: none; color: rgba(255,255,255,0.5); /* Colore inattivo */
+    border-radius: 16px; transition: all .25s;
+    position: relative; flex: 1;
+  }
+
+  .bottom-nav__item.active {
+    color: #ff4d6d; /* Colore Accent principale di RoomDate */
+  }
+
+  .bottom-nav__item.active::before {
+    content: '';
+    position: absolute;
+    top: 6px; left: 50%; transform: translateX(-50%);
+    width: 36px; height: 36px;
+    background: rgba(255, 77, 109, 0.12); /* Sfondo leggero sotto l'icona attiva */
+    border-radius: 12px;
+    z-index: -1;
+  }
+
+  .bottom-nav__icon { font-size: 1.35rem; line-height: 1; }
+  .bottom-nav__label { font-size: 0.58rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; }
+
+  /* --- 3. FAB (Floating Action Button) --- */
+  .fab {
+    display: flex;
+    position: fixed; bottom: 86px; right: 20px;
+    width: 56px; height: 56px; border-radius: 18px;
+    background: #ff4d6d; /* Colore Accent principale */
+    color: #fff; text-decoration: none;
+    z-index: 990; font-size: 1.5rem; font-weight: 900;
+    box-shadow: 0 8px 32px rgba(255, 77, 109, 0.4);
+    align-items: center; justify-content: center;
+    transition: all .25s;
+  }
+  .fab:active { transform: scale(0.92); }
+
+  /* --- 4. Caroselli a Scorrimento Orizzontale (Touch Snap) --- */
+  .mobile-snap-grid {
+    display: flex !important;
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 14px;
+    padding-bottom: 12px;
+    scrollbar-width: none; /* Nasconde scrollbar Firefox */
+    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mobile-snap-grid::-webkit-scrollbar { display: none; } /* Nasconde scrollbar Chrome/Safari */
+  
+  .snap-item {
+    scroll-snap-align: start;
+    flex: 0 0 260px !important; /* Forza la larghezza delle card su mobile */
+  }
+
+  /* --- 5. Fix Hero su Mobile --- */
+  .hero { padding-top: calc(64px + 32px); padding-bottom: 0; text-align: left; }
+  .hero-sub { font-size: 0.95rem; margin-bottom: 28px; line-height: 1.6; }
+  .hero-ctas { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+  .cta-primary { justify-content: center; border-radius: 16px; }
+}
