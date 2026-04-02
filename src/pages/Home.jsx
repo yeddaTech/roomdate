@@ -8,6 +8,9 @@ export default function Home() {
   const [listings, setListings] = useState([]); 
   const [roommates, setRoommates] = useState([]);
 
+  const [isLoadingListings, setIsLoadingListings] = useState(true);
+  const [isLoadingRoommates, setIsLoadingRoommates] = useState(true);
+  
   useEffect(() => {
     const savedUser = localStorage.getItem('roomdate_user');
     if (savedUser) setUser(JSON.parse(savedUser));
@@ -15,12 +18,14 @@ export default function Home() {
     fetch('/api/get_listings')
       .then(res => res.json())
       .then(data => { if (data) setListings(data); })
-      .catch(() => setListings([]));
+      .catch(() => setListings([]))
+      .finally(() => setIsLoadingListings(false)); // <--- Spegne il caricamento stanze
 
     fetch('/api/get_roommates')
       .then(res => res.json())
       .then(data => { if (data) setRoommates(data); })
-      .catch(() => setRoommates([]));
+      .catch(() => setRoommates([]))
+      .finally(() => setIsLoadingRoommates(false)); // <--- Spegne il caricamento coinquilini
   }, []);
 
   return (
@@ -72,17 +77,32 @@ export default function Home() {
           <h2 className="section-h serif">Stanze selezionate per te</h2>
           
           <div className="carousel">
-            {listings.length === 0 ? <p style={{color: 'var(--wg)'}}>Nessuna stanza caricata al momento.</p> : listings.map(l => (
-              <div className="card" key={l.id}>
-                <div className="card-img" style={{ background: `linear-gradient(135deg, ${l.color}, ${l.color}88)` }}>
-                  {l.emoji}
-                  <span className={`card-badge ${l.avail ? 'avail' : 'busy'}`}>✅ Disponibile</span>
-                  <div className="card-price"><span className="price-n">€{l.price}</span><span className="price-u">/mese</span></div>
+            {isLoadingListings ? (
+              /* SKELETON PER LE STANZE */
+              [1, 2, 3, 4].map((n) => (
+                <div className="card" key={`skel-list-${n}`} style={{ height: '360px', display: 'flex', flexDirection: 'column', flex: '0 0 auto', width: '280px' }}>
+                  <div className="skeleton-box" style={{ height: '180px', width: '100%', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}></div>
+                  <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', flexGrow: 1 }}>
+                    <div className="skeleton-box" style={{ height: '24px', width: '80%' }}></div>
+                    <div className="skeleton-box" style={{ height: '16px', width: '50%' }}></div>
+                    <div className="skeleton-box" style={{ height: '40px', width: '100%', marginTop: 'auto', borderRadius: '2rem' }}></div>
+                  </div>
                 </div>
-                <div className="card-body">
-                  <div className="card-title">{l.title}</div>
-                  <div className="card-loc">📍 {l.zone}, {l.city}</div>
-                  <div className="tags">{l.tags.map(t => <span className="tag" key={t}>{t}</span>)}</div>
+              ))
+            ) : listings.length === 0 ? (
+              <p style={{color: 'var(--wg)'}}>Nessuna stanza caricata al momento.</p>
+            ) : (
+              listings.map(l => (
+                <div className="card" key={l.id}>
+                  <div className="card-img" style={{ background: `linear-gradient(135deg, ${l.color}, ${l.color}88)` }}>
+                    {l.emoji}
+                    <span className={`card-badge ${l.avail ? 'avail' : 'busy'}`}>✅ Disponibile</span>
+                    <div className="card-price"><span className="price-n">€{l.price}</span><span className="price-u">/mese</span></div>
+                  </div>
+                  <div className="card-body">
+                    <div className="card-title">{l.title}</div>
+                    <div className="card-loc">📍 {l.zone}, {l.city}</div>
+                    <div className="tags">{l.tags.map(t => <span className="tag" key={t}>{t}</span>)}</div>
                     <Link 
                       to={`/dettagli/${l.id}`} 
                       className="btn-card"
@@ -95,9 +115,11 @@ export default function Home() {
                       }}
                     >
                       Vedi dettagli
-                    </Link>                </div>
-              </div>
-            ))}
+                    </Link>                
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </section>
@@ -109,17 +131,32 @@ export default function Home() {
           <h2 className="section-h serif">Chi cerca con te</h2>
           
           <div className="carousel">
-            {roommates.length === 0 ? <p style={{color: 'var(--wg)'}}>Nessun profilo caricato al momento.</p> : roommates.map(rm => (
-              <div className="rm-card" key={rm.id}>
-                <div className="rm-avatar" style={{ background: `linear-gradient(135deg, ${rm.color1}, ${rm.color2})` }}>{rm.emoji}</div>
-                <div className="rm-name">{rm.name}</div>
-                <div className="rm-meta">{rm.age} anni · {rm.job} · {rm.city}</div>
-                <div className="rm-quote">"{rm.quote}"</div>
-                <div className="tags">{rm.tags.map(t => <span className="tag" key={t}>{t}</span>)}</div>
-                <div className="match-bar"><div className="match-fill" style={{ width: `${rm.match}%` }}></div></div>
-                <div className="match-label">{rm.match}% compatibile</div>
-              </div>
-            ))}
+            {isLoadingRoommates ? (
+              /* SKELETON PER I COINQUILINI */
+              [1, 2, 3, 4].map((n) => (
+                <div className="rm-card" key={`skel-rm-${n}`} style={{ height: '280px', flex: '0 0 auto', width: '250px' }}>
+                  <div className="skeleton-box" style={{ width: '64px', height: '64px', borderRadius: '50%', margin: '0 auto 1rem auto' }}></div>
+                  <div className="skeleton-box" style={{ height: '20px', width: '60%', margin: '0 auto 0.5rem auto' }}></div>
+                  <div className="skeleton-box" style={{ height: '14px', width: '80%', margin: '0 auto 1rem auto' }}></div>
+                  <div className="skeleton-box" style={{ height: '12px', width: '90%', margin: '0 auto 1.5rem auto' }}></div>
+                  <div className="skeleton-box" style={{ height: '8px', width: '100%', borderRadius: '4px', marginTop: 'auto' }}></div>
+                </div>
+              ))
+            ) : roommates.length === 0 ? (
+              <p style={{color: 'var(--wg)'}}>Nessun profilo caricato al momento.</p>
+            ) : (
+              roommates.map(rm => (
+                <div className="rm-card" key={rm.id}>
+                  <div className="rm-avatar" style={{ background: `linear-gradient(135deg, ${rm.color1}, ${rm.color2})` }}>{rm.emoji}</div>
+                  <div className="rm-name">{rm.name}</div>
+                  <div className="rm-meta">{rm.age} anni · {rm.job} · {rm.city}</div>
+                  <div className="rm-quote">"{rm.quote}"</div>
+                  <div className="tags">{rm.tags.map(t => <span className="tag" key={t}>{t}</span>)}</div>
+                  <div className="match-bar"><div className="match-fill" style={{ width: `${rm.match}%` }}></div></div>
+                  <div className="match-label">{rm.match}% compatibile</div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </section>
