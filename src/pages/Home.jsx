@@ -19,19 +19,19 @@ export default function Home() {
       .then(res => res.json())
       .then(data => { if (data) setListings(data); })
       .catch(() => setListings([]))
-      .finally(() => setIsLoadingListings(false)); // <--- Spegne il caricamento stanze
+      .finally(() => setIsLoadingListings(false));
 
     fetch('/api/get_roommates')
       .then(res => res.json())
       .then(data => { if (data) setRoommates(data); })
       .catch(() => setRoommates([]))
-      .finally(() => setIsLoadingRoommates(false)); // <--- Spegne il caricamento coinquilini
+      .finally(() => setIsLoadingRoommates(false));
   }, []);
 
   return (
     <>
-      {/* --- NAV --- */}
-      <nav>
+      {/* --- TOP NAV (Desktop) --- */}
+      <nav className="topnav">
         <div className="logo">Room<span>Date</span></div>
         <div className="nav-links">
           <Link to="/">Home</Link>
@@ -42,29 +42,53 @@ export default function Home() {
         </div>
         <div className="nav-btns">
           {user ? (
-            <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginRight: '0.5rem' }}>
+            <span className="user-greeting" style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginRight: '0.5rem' }}>
               Ciao, <strong>{user.nome}</strong>!
             </span>
           ) : (
             <>
-              <Link to="/accedi" className="btn-ghost">Accedi</Link>
-              <Link to="/registrati" className="btn-fill">Registrati Gratis</Link>
+              <Link to="/accedi" className="btn-ghost mobile-hide">Accedi</Link>
+              <Link to="/registrati" className="btn-fill">Registrati</Link>
             </>
           )}
         </div>
       </nav>
 
+      {/* --- BOTTOM NAV (Mobile) --- */}
+      <nav className="bottom-nav">
+        <div className="bottom-nav__inner">
+          <Link to="/" className="bottom-nav__item active">
+            <span className="bottom-nav__icon">🏠</span>
+            <span className="bottom-nav__label">Home</span>
+          </Link>
+          <Link to="/ricerca" className="bottom-nav__item">
+            <span className="bottom-nav__icon">🔍</span>
+            <span className="bottom-nav__label">Cerca</span>
+          </Link>
+          <Link to="/chat" className="bottom-nav__item">
+            <span className="bottom-nav__icon">💬</span>
+            <span className="bottom-nav__label">Chat</span>
+          </Link>
+          <Link to="/dashboard" className="bottom-nav__item">
+            <span className="bottom-nav__icon">👤</span>
+            <span className="bottom-nav__label">Profilo</span>
+          </Link>
+        </div>
+      </nav>
+
+      {/* --- FAB (Mobile Solo) --- */}
+      <Link to="/dashboard" className="fab" title="Pubblica Annuncio">＋</Link>
+
       {/* --- HERO --- */}
       <section className="hero">
         <div className="dot-grid"></div>
         <div className="hero-grid" style={{ gridTemplateColumns: '1fr', textAlign: 'center' }}>
-          {/* Centrato e allargato visto che non c'è più il box laterale */}
-          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
             <div className="hero-badge" style={{ display: 'inline-block' }}>🏡 Oltre 12.000 annunci attivi in Italia</div>
             <h1 className="serif">Trova la tua stanza,<br/><em>trova casa.</em></h1>
-            <p style={{ margin: '0 auto' }}>Migliaia di stanze e coinquilini selezionati nelle città italiane. Senza agenzie, senza commissioni.</p>
-            <div style={{ marginTop: '2rem' }}>
-               <Link to="/ricerca" className="btn-fill" style={{ fontSize: '1.2rem', padding: '1rem 2rem' }}>Inizia la ricerca →</Link>
+            <p className="hero-sub" style={{ margin: '0 auto' }}>Migliaia di stanze e coinquilini selezionati nelle città italiane. Senza agenzie, senza commissioni.</p>
+            <div className="hero-ctas" style={{ marginTop: '2rem' }}>
+               <Link to="/ricerca" className="btn-fill cta-primary" style={{ fontSize: '1.2rem', padding: '1rem 2rem' }}>Inizia la ricerca →</Link>
             </div>
           </div>
         </div>
@@ -76,9 +100,8 @@ export default function Home() {
           <div className="section-eyebrow">Annunci in evidenza</div>
           <h2 className="section-h serif">Stanze selezionate per te</h2>
           
-          <div className="carousel">
+          <div className="carousel mobile-snap-grid">
             {isLoadingListings ? (
-              /* SKELETON PER LE STANZE */
               [1, 2, 3, 4].map((n) => (
                 <div className="card" key={`skel-list-${n}`} style={{ height: '360px', display: 'flex', flexDirection: 'column', flex: '0 0 auto', width: '280px' }}>
                   <div className="skeleton-box" style={{ height: '180px', width: '100%', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}></div>
@@ -93,7 +116,7 @@ export default function Home() {
               <p style={{color: 'var(--wg)'}}>Nessuna stanza caricata al momento.</p>
             ) : (
               listings.map(l => (
-                <div className="card" key={l.id}>
+                <div className="card snap-item" key={l.id}>
                   <div className="card-img" style={{ background: `linear-gradient(135deg, ${l.color}, ${l.color}88)` }}>
                     {l.emoji}
                     <span className={`card-badge ${l.avail ? 'avail' : 'busy'}`}>✅ Disponibile</span>
@@ -103,17 +126,7 @@ export default function Home() {
                     <div className="card-title">{l.title}</div>
                     <div className="card-loc">📍 {l.zone}, {l.city}</div>
                     <div className="tags">{l.tags.map(t => <span className="tag" key={t}>{t}</span>)}</div>
-                    <Link 
-                      to={`/dettagli/${l.id}`} 
-                      className="btn-card"
-                      style={{ 
-                        display: 'block', 
-                        textAlign: 'center', 
-                        textDecoration: 'none',
-                        boxSizing: 'border-box',
-                        marginTop: '1rem'
-                      }}
-                    >
+                    <Link to={`/dettagli/${l.id}`} className="btn-card" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box', marginTop: '1rem' }}>
                       Vedi dettagli
                     </Link>                
                   </div>
@@ -130,9 +143,8 @@ export default function Home() {
           <div className="section-eyebrow">Profili in evidenza</div>
           <h2 className="section-h serif">Chi cerca con te</h2>
           
-          <div className="carousel">
+          <div className="carousel mobile-snap-grid">
             {isLoadingRoommates ? (
-              /* SKELETON PER I COINQUILINI */
               [1, 2, 3, 4].map((n) => (
                 <div className="rm-card" key={`skel-rm-${n}`} style={{ height: '280px', flex: '0 0 auto', width: '250px' }}>
                   <div className="skeleton-box" style={{ width: '64px', height: '64px', borderRadius: '50%', margin: '0 auto 1rem auto' }}></div>
@@ -146,7 +158,7 @@ export default function Home() {
               <p style={{color: 'var(--wg)'}}>Nessun profilo caricato al momento.</p>
             ) : (
               roommates.map(rm => (
-                <div className="rm-card" key={rm.id}>
+                <div className="rm-card snap-item" key={rm.id}>
                   <div className="rm-avatar" style={{ background: `linear-gradient(135deg, ${rm.color1}, ${rm.color2})` }}>{rm.emoji}</div>
                   <div className="rm-name">{rm.name}</div>
                   <div className="rm-meta">{rm.age} anni · {rm.job} · {rm.city}</div>
@@ -189,7 +201,7 @@ export default function Home() {
               <div className="step-num">04</div>
               <span className="step-icon">🏠</span>
               <h3>Benvenuto a casa!</h3>
-              <p>Firma l&apos;accordo, prendi le chiavi e inizia la tua nuova convivenza. Semplice come dev&apos;essere.</p>
+              <p>Firma l'accordo, prendi le chiavi e inizia la tua nuova convivenza. Semplice come dev'essere.</p>
             </div>
           </div>
         </div>
