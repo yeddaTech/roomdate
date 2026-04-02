@@ -213,8 +213,14 @@ footer { background: #1A0E07; padding: 3rem 5% 1.5rem; }
   /* --- 2. Bottom Nav (Stile "Appunti") --- */
   .bottom-nav {
     display: block;
-    position: fixed; bottom: 0; left: 0; right: 0;
+    position: fixed; 
+    bottom: 0; 
+    top: auto; /* FIX: annulla il top: 0 ereditato dalla regola nav generale */
+    left: 0; 
+    right: 0;
     z-index: 1000;
+    height: auto; /* FIX: annulla l'altezza fissa a 62px ereditata */
+    border-bottom: none; /* FIX: rimuove la linea arancione ereditata */
     padding: 0 8px;
     padding-bottom: env(safe-area-inset-bottom);
   }
