@@ -112,7 +112,7 @@ export default function ChatPage() {
     setMobileView('chat');
   };
 
-  // 3. INVIA IL MESSAGGIO AL VERO DATABASE
+// 3. INVIA IL MESSAGGIO (CON UI OTTIMISTICA!)
   const handleSend = async () => {
     if (!inputText.trim() || !activeConvId || !user) return;
     
@@ -120,7 +120,24 @@ export default function ChatPage() {
     setInputText(''); 
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
+    // MAGIA: Creiamo un messaggio finto e lo stampiamo SUBITO a schermo
+    const tempMsg = {
+      id: Date.now(), // Un ID temporaneo
+      type: 'sent',
+      text: textToSend,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    // Aggiorniamo lo stato di React all'istante, senza aspettare il database!
+    setConversations(prevConvs => prevConvs.map(conv => {
+      if (conv.id === activeConvId) {
+        return { ...conv, messages: [...conv.messages, tempMsg] };
+      }
+      return conv;
+    }));
+
     try {
+      // Ora, con calma in background, mandiamo il messaggio vero al database
       await fetch('/api/send_message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -130,8 +147,9 @@ export default function ChatPage() {
           text: textToSend
         })
       });
+      // (Pusher si occuperà di sistemare l'ID vero appena il server risponde)
     } catch (err) {
-      alert("Errore nell'invio del messaggio");
+      alert("Errore di connessione. Il messaggio potrebbe non essere stato inviato.");
     }
   };
 
