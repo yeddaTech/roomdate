@@ -222,8 +222,15 @@ export default function ChatPage() {
                   <div className="conv-avatar" style={{ background: `linear-gradient(135deg, ${conv.color1}, ${conv.color2})` }}>
                     {conv.emoji}
                   </div>
-                  <div className="conv-info">
+                    <div className="conv-info">
                     <div className="conv-name">{conv.name}</div>
+                    
+                      {/* 👇 AGGIUNTA: Mostra il nome della stanza in piccolo! 👇 */}
+                      <div style={{ fontSize: '0.7rem', color: 'var(--t)', fontWeight: 'bold', marginBottom: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        🏠 {conv.listing.title}
+                      </div>
+                      {/* 👆 FINE AGGIUNTA 👆 */}
+
                     <div className="conv-preview">{lastMsg}</div>
                   </div>
                 </div>
