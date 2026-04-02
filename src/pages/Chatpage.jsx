@@ -17,14 +17,12 @@ export default function ChatPage() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  // STATI DINAMICI VERI
+  // STATI DINAMICI
   const [conversations, setConversations] = useState([]);
   const [activeConvId, setActiveConvId] = useState(null);
   const [inputText, setInputText] = useState('');
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState('Tutti');
-  const [showProfile, setShowProfile] = useState(false);
   const [mobileView, setMobileView] = useState('list'); 
 
   const messagesEndRef = useRef(null);
@@ -40,48 +38,40 @@ export default function ChatPage() {
     }
   }, [navigate]);
 
-  // Gestione Logout per la navbar
   const handleLogout = () => {
     localStorage.removeItem('roomdate_user');
     setUser(null);
     navigate('/');
   };
 
-  // 2. IL MOTORE DELLA CHAT: Scarica dal DB
+  // 2. SCARICA DAL DATABASE
   const fetchChats = async () => {
       if (!user) return;
       try {
         const res = await fetch(`/api/get_chats?userId=${user.id}`);
         const data = await res.json();
-        if (data) {
-          setConversations(data);
-        }
+        if (data) setConversations(data);
       } catch (err) {
         console.error("Errore caricamento chat:", err);
       } finally {
-        setIsLoading(false); // Spegne gli skeleton quando arrivano i dati!
+        setIsLoading(false);
       }
     };
 
-  // MOTORE DELLA CHAT: REAL-TIME CON PUSHER!
+  // 3. REAL-TIME CON PUSHER
   useEffect(() => {
     if (user) {
-      // 1. Scarica le chat all'apertura
       fetchChats(); 
 
-      // 2. Si connette a Pusher per ascoltare i messaggi in arrivo
       const pusher = new Pusher('29ac9eeeb3352ae5b069', {
         cluster: 'eu'
       });
 
       const channel = pusher.subscribe('roomdate-channel');
-      
-      // 3. Quando Pusher dice "nuovo-messaggio", React riscarica i messaggi all'istante
       channel.bind('nuovo-messaggio', function(data) {
         fetchChats();
       });
 
-      // Pulisce la connessione se cambi pagina
       return () => {
         channel.unbind_all();
         channel.unsubscribe();
@@ -96,6 +86,7 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeConv?.messages]);
 
+  // Apre automaticamente una chat se proveniamo da un'altra pagina
   useEffect(() => {
     if (location.state?.openChatId && conversations.length > 0) {
       setActiveConvId(location.state.openChatId);
@@ -115,7 +106,7 @@ export default function ChatPage() {
     setMobileView('chat');
   };
 
-  // 3. INVIA IL MESSAGGIO (CON UI OTTIMISTICA!)
+  // 4. INVIO MESSAGGIO CON UI OTTIMISTICA
   const handleSend = async () => {
     if (!inputText.trim() || !activeConvId || !user) return;
     
@@ -123,24 +114,21 @@ export default function ChatPage() {
     setInputText(''); 
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
-    // MAGIA: Creiamo un messaggio finto e lo stampiamo SUBITO a schermo
     const tempMsg = {
-      id: Date.now(), // Un ID temporaneo
+      id: Date.now(), 
       type: 'sent',
       text: textToSend,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    // Aggiorniamo lo stato di React all'istante, senza aspettare il database!
     setConversations(prevConvs => prevConvs.map(conv => {
       if (conv.id === activeConvId) {
-        return { ...conv, messages: [...conv.messages, tempMsg] };
+        return { ...conv, messages: [...(conv.messages || []), tempMsg] };
       }
       return conv;
     }));
 
     try {
-      // Ora, con calma in background, mandiamo il messaggio vero al database
       await fetch('/api/send_message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -150,7 +138,6 @@ export default function ChatPage() {
           text: textToSend
         })
       });
-      // (Pusher si occuperà di sistemare l'ID vero appena il server risponde)
     } catch (err) {
       alert("Errore di connessione. Il messaggio potrebbe non essere stato inviato.");
     }
@@ -170,23 +157,20 @@ export default function ChatPage() {
 
   const filteredConvs = conversations.filter(c => {
     const lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1].text : '';
-    const matchSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      lastMsg.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchSearch;
+    return c.name.toLowerCase().includes(searchQuery.toLowerCase()) || lastMsg.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   return (
-    <div className="chat-page" style={{ backgroundColor: '#FEFAF4', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="chat-page">
       
-      {/* ── NAVBAR TOP (Desktop e Mobile header) ── */}
-      <nav style={{ flexShrink: 0 }}>
+      {/* ── NAVBAR TOP ── */}
+      <nav className="chat-nav">
         <div className="logo">Room<span>Date</span></div>
         <div className="nav-links">
           <Link to="/">Home</Link>
           <Link to="/ricerca">Cerca Stanza</Link>
           <Link to="/chat">Chat</Link>
           <Link to="/dashboard">Profilo</Link>
-          <Link to="/impostazioni">Impostazioni</Link>
         </div>
         <div className="nav-btns">
           {user ? (
@@ -206,7 +190,7 @@ export default function ChatPage() {
       </nav>
 
       {/* ── LAYOUT CHAT ── */}
-      <div className="chat-layout" style={{ flexGrow: 1, overflow: 'hidden' }}>
+      <div className="chat-layout">
 
         {/* ── SIDEBAR ── */}
         <aside className={`chat-sidebar ${mobileView === 'chat' ? 'mobile-hide' : ''}`}>
@@ -224,47 +208,37 @@ export default function ChatPage() {
               />
             </div>
           </div>
-            <div className="conv-list">
+          
+          <div className="conv-list">
             {isLoading ? (
-              /* SKELETON LOADERS PER LE CHAT */
               [1, 2, 3, 4, 5].map(n => (
                 <div key={n} className="conv-item" style={{ pointerEvents: 'none' }}>
-                  {/* Finto Avatar */}
                   <div className="skeleton-box" style={{ width: '48px', height: '48px', borderRadius: '50%', flexShrink: 0 }}></div>
-                  
-                  {/* Finti Testi */}
                   <div className="conv-info" style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                     <div className="skeleton-box" style={{ height: '16px', width: '60%' }}></div>
                     <div className="skeleton-box" style={{ height: '12px', width: '40%' }}></div>
-                    <div className="skeleton-box" style={{ height: '14px', width: '90%' }}></div>
                   </div>
                 </div>
               ))
             ) : filteredConvs.length === 0 ? (
               <div style={{ padding: '3rem 2rem', textAlign: 'center', color: 'var(--wg)' }}>
                 <div style={{fontSize: '3rem', marginBottom: '1rem'}}>📭</div>
-                Non hai ancora nessuna conversazione attiva.
+                Non hai ancora nessuna conversazione.
               </div>
             ) : filteredConvs.map(conv => {
               const lastMsg = conv.messages && conv.messages.length > 0 ? conv.messages[conv.messages.length - 1].text : 'Nessun messaggio';
-              
               return (
-                <div
-                  key={conv.id}
-                  className={`conv-item ${conv.id === activeConvId ? 'active' : ''}`}
-                  onClick={() => handleSelectConv(conv)}
-                >
+                <div key={conv.id} className={`conv-item ${conv.id === activeConvId ? 'active' : ''}`} onClick={() => handleSelectConv(conv)}>
                   <div className="conv-avatar" style={{ background: `linear-gradient(135deg, ${conv.color1}, ${conv.color2})` }}>
                     {conv.emoji}
                   </div>
-                    <div className="conv-info">
+                  <div className="conv-info">
                     <div className="conv-name">{conv.name}</div>
-                    
-                      {/* 👇 Mostra il nome della stanza in piccolo! 👇 */}
+                    {conv.listing && (
                       <div style={{ fontSize: '0.7rem', color: 'var(--t)', fontWeight: 'bold', marginBottom: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         🏠 {conv.listing.title}
                       </div>
-
+                    )}
                     <div className="conv-preview">{lastMsg}</div>
                   </div>
                 </div>
@@ -293,18 +267,12 @@ export default function ChatPage() {
                   <h3>{activeConv.name}</h3>
                   <p>Inquilino/Proprietario</p>
                 </div>
-                <span className="listing-pill">
-                  {activeConv.listing.emoji} {activeConv.listing.title} - €{activeConv.listing.price}
-                </span>
-                <div className="chat-header-actions">
-                  <button className="icon-btn" onClick={() => setShowProfile(!showProfile)}>👤</button>
-                </div>
               </div>
 
               {/* Messages */}
               <div className="messages-area">
                 {!activeConv.messages || activeConv.messages.length === 0 ? (
-                  <div style={{textAlign: 'center', padding: '2rem', color: 'var(--wg)'}}>Invia il primo messaggio per iniziare la conversazione!</div>
+                  <div style={{textAlign: 'center', padding: '2rem', color: 'var(--wg)'}}>Invia il primo messaggio per iniziare!</div>
                 ) : (
                   activeConv.messages.map(msg => (
                     <div key={msg.id} className={`msg ${msg.type}`}>
@@ -314,9 +282,7 @@ export default function ChatPage() {
                         </div>
                       )}
                       <div>
-                        <div className="msg-bubble">
-                          {msg.text}
-                        </div>
+                        <div className="msg-bubble">{msg.text}</div>
                         <div className="msg-time">{msg.time}</div>
                       </div>
                     </div>
@@ -328,9 +294,7 @@ export default function ChatPage() {
               {/* Quick replies */}
               <div className="quick-replies">
                 {QUICK_REPLIES.map(qr => (
-                  <button key={qr} className="qr-btn" onClick={() => handleQuickReply(qr)}>
-                    {qr}
-                  </button>
+                  <button key={qr} className="qr-btn" onClick={() => handleQuickReply(qr)}>{qr}</button>
                 ))}
               </div>
 
@@ -352,26 +316,6 @@ export default function ChatPage() {
             </>
           )}
         </main>
-
-        {/* ── PROFILE PANEL ── */}
-        {activeConv && showProfile && (
-          <aside className="profile-panel visible">
-            <div className="pp-header">
-              <div className="pp-avatar" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
-                {activeConv.emoji}
-              </div>
-              <div className="pp-name">{activeConv.name}</div>
-            </div>
-            <div className="pp-section">
-              <h4>Annuncio d'interesse</h4>
-              <div className="pp-listing">
-                <span className="pl-emoji">{activeConv.listing.emoji}</span>
-                <div className="pl-title">{activeConv.listing.title}</div>
-                <div className="pl-price">€{activeConv.listing.price}/mese</div>
-              </div>
-            </div>
-          </aside>
-        )}
       </div>
 
       {/* ── BOTTOM NAV (Mobile) ── */}
