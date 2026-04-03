@@ -10,6 +10,7 @@ export default function Search() {
   const [user, setUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  // LOGICA INIZIALE URL
   let currentIntent = searchParams.get('intent') || 'stanza'; 
   const currentCity = searchParams.get('citta') || '';
   const currentBudget = searchParams.get('budget') || '';
@@ -28,9 +29,11 @@ export default function Search() {
       const parsedUser = JSON.parse(savedUser);
       setUser(parsedUser);
       
-      if (parsedUser.user_type === 'cerca' && currentIntent === 'coinquilino') {
+      // AUTO-REINDIRIZZAMENTO FORZATO:
+      // Se cerchi casa, non puoi spiare i coinquilini. Se offri casa, non guardi le altre case.
+      if (parsedUser.userType === 'cerca' && currentIntent === 'coinquilino') {
         handleTopSearch('stanza', currentCity, currentBudget);
-      } else if (parsedUser.user_type === 'affitta' && currentIntent === 'stanza') {
+      } else if (parsedUser.userType === 'affitta' && currentIntent === 'stanza') {
         handleTopSearch('coinquilino', currentCity, currentBudget);
       }
     }
@@ -87,36 +90,26 @@ export default function Search() {
       });
   }, [currentIntent]);
 
-  // CONTROLLO PROFILO COMPLETO
-  // Consideriamo il profilo incompleto se manca la bio o l'occupazione
-  const isProfileComplete = user ? (user.bio && user.occupation) : true;
-
-  // FILTRI BLINDATI
+  // --- IL FILTRO BLINDATO ---
   const filteredResults = results.filter(item => {
     let match = true;
     
-    // 0. AUTO-ESCLUSIONE: Non mostrare te stesso
-    if (user) {
-      if (currentIntent === 'coinquilino' && item.id === user.id) match = false;
-      if (currentIntent === 'stanza' && (item.userId === user.id || item.user_id === user.id)) match = false;
-    }
-
-    // 1. Filtro Città (legge sia city che citta dal database)
-    const itemCity = item.citta || item.city;
-    if (currentCity && itemCity && itemCity.toLowerCase() !== currentCity.toLowerCase()) match = false;
+    // 1. Filtro Città
+    if (currentCity && item.city && item.city.toLowerCase() !== currentCity.toLowerCase()) match = false;
     
-    // 2. Filtro Budget (Sbloccato anche per i coinquilini)
-    if (currentBudget) {
-      if (currentIntent === 'stanza' && item.price > parseInt(currentBudget)) match = false;
-      
-      // Se offri una stanza, mostra solo coinquilini che hanno un budget >= al tuo prezzo
-      const itemBudget = item.budget_max || item.budgetMax;
-      if (currentIntent === 'coinquilino' && itemBudget && parseInt(itemBudget) < parseInt(currentBudget)) match = false;
+    // 2. Filtro per le STANZE
+    if (currentIntent === 'stanza') {
+      if (currentBudget && item.price > parseInt(currentBudget)) match = false;
     }
     
-    // 3. Filtro Incrociato Coinquilini
+    // 3. Filtro per i COINQUILINI (La logica che hai richiesto)
     if (currentIntent === 'coinquilino') {
-      const tipoProfilo = item.user_type || item.userType || item.type;
+      // Dobbiamo mostrare SOLO le persone che stanno cercando una stanza.
+      // (Nascondiamo gli altri proprietari/affitta)
+      const tipoProfilo = item.userType || item.user_type || item.type;
+      
+      // Se l'API restituisce il tipo di utente, mostriamo solo chi 'cerca'. 
+      // (Se manca il dato per i profili finti temporanei, li mostra lo stesso)
       if (tipoProfilo && tipoProfilo !== 'cerca') {
         match = false;
       }
@@ -145,7 +138,7 @@ export default function Search() {
         <div className="hidden md:flex gap-4 items-center">
           {user ? (
             <>
-              <span className="text-sm text-neutral-300">Ciao, <strong className="text-white">{user.first_name || user.nome}</strong>!</span>
+              <span className="text-sm text-neutral-300">Ciao, <strong className="text-white">{user.nome}</strong>!</span>
               <button onClick={handleLogout} className="border border-neutral-500 hover:border-[#D4835E] hover:text-[#D4835E] px-4 py-2 rounded-full text-sm transition-colors">Esci</button>
             </>
           ) : (
@@ -156,6 +149,7 @@ export default function Search() {
           )}
         </div>
 
+        {/* Hamburger Mobile */}
         <button className="md:hidden flex flex-col gap-1.5 z-[1001]" onClick={() => setIsMenuOpen(!isMenuOpen)}>
           <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
           <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></div>
@@ -168,7 +162,7 @@ export default function Search() {
         <div className="flex flex-col gap-6 text-lg font-medium text-white">
           {user && (
              <div className="border-b border-neutral-700 pb-4 mb-2">
-               <h3 className="text-xl">👤 Ciao, {user.first_name || user.nome}!</h3>
+               <h3 className="text-xl">👤 Ciao, {user.nome}!</h3>
              </div>
           )}
           <Link to="/" onClick={() => setIsMenuOpen(false)}>🏠 Home</Link>
@@ -196,8 +190,9 @@ export default function Search() {
         
         <div className="bg-white/95 backdrop-blur-md rounded-3xl p-6 shadow-2xl w-full max-w-3xl relative z-10 border border-white/20">
           
+          {/* I BOTTONI INTELLIGENTI: Si mostrano solo se competono all'utente */}
           <div className="flex gap-2 bg-neutral-100 p-1.5 rounded-2xl mb-6">
-            {(!user || user.user_type === 'cerca' || !user.user_type) && (
+            {(!user || user.userType === 'cerca') && (
               <button 
                 className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all shadow-sm ${currentIntent === 'stanza' ? 'bg-[#C4603A] text-white shadow-md' : 'text-[#8A7B6E] hover:bg-white hover:text-[#2C1A0E]'}`} 
                 onClick={() => handleTopSearch('stanza', currentCity, currentBudget)}
@@ -206,7 +201,7 @@ export default function Search() {
               </button>
             )}
             
-            {(!user || user.user_type === 'affitta') && (
+            {(!user || user.userType === 'affitta') && (
               <button 
                 className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all shadow-sm ${currentIntent === 'coinquilino' ? 'bg-[#C4603A] text-white shadow-md' : 'text-[#8A7B6E] hover:bg-white hover:text-[#2C1A0E]'}`} 
                 onClick={() => handleTopSearch('coinquilino', currentCity, currentBudget)}
@@ -230,147 +225,131 @@ export default function Search() {
             </select>
             <input 
               type="number" 
-              placeholder={currentIntent === 'coinquilino' ? "💶 Budget minimo richiesto (€)" : "💶 Budget max (€/mese)"}
-              className="w-full bg-white border border-neutral-200 text-[#2C1A0E] text-sm rounded-2xl px-5 py-4 focus:outline-none focus:border-[#C4603A] focus:ring-2 focus:ring-orange-100 transition-all font-medium"
+              placeholder="💶 Budget max (€/mese)" 
+              className={`w-full bg-white border border-neutral-200 text-[#2C1A0E] text-sm rounded-2xl px-5 py-4 focus:outline-none focus:border-[#C4603A] focus:ring-2 focus:ring-orange-100 transition-all font-medium ${currentIntent === 'coinquilino' ? 'opacity-50 cursor-not-allowed bg-neutral-50' : ''}`}
               value={currentBudget}
               onChange={(e) => handleTopSearch(currentIntent, currentCity, e.target.value)}
+              disabled={currentIntent === 'coinquilino'}
             />
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-12 animate-fade-in-up">
-        
-        {/* BLOCCO SE IL PROFILO NON È COMPLETO */}
-        {!isProfileComplete ? (
-          <div className="bg-white rounded-3xl border-2 border-dashed border-[#D4835E] p-10 md:p-16 text-center shadow-sm max-w-2xl mx-auto">
-            <span className="text-6xl block mb-6">🚧</span>
-            <h3 className="font-serif text-3xl text-[#2C1A0E] mb-3 font-bold">Completa il tuo profilo</h3>
-            <p className="text-[#8A7B6E] mb-8 text-lg">Per poter cercare e contattare altre persone, devi prima dirci qualcosa di te. Aggiungi la tua Bio e la tua Occupazione nella Dashboard.</p>
-            <button 
-              className="bg-[#C4603A] text-white px-8 py-4 rounded-full font-bold hover:bg-[#9A4628] transition-colors shadow-md"
-              onClick={() => navigate('/dashboard')}
-            >
-              Vai alla Dashboard ⚙️
-            </button>
-          </div>
-        ) : (
-          /* SE IL PROFILO È COMPLETO, MOSTRA I RISULTATI */
-          <main>
-            <h1 className="font-serif text-3xl md:text-5xl text-[#2C1A0E] mb-3">
-              {currentIntent === 'coinquilino' ? 'Coinquilini disponibili' : 'Stanze in affitto'}
-            </h1>
-            <p className="text-[#8A7B6E] mb-10 font-medium text-lg">
-              Trovati <span className="font-bold text-[#C4603A]">{filteredResults.length}</span> risultati {currentCity && `a ${currentCity}`}
-            </p>
+        <main>
+          <h1 className="font-serif text-3xl md:text-5xl text-[#2C1A0E] mb-3">
+            {currentIntent === 'coinquilino' ? 'Coinquilini disponibili' : 'Stanze in affitto'}
+          </h1>
+          <p className="text-[#8A7B6E] mb-10 font-medium text-lg">
+            Trovati <span className="font-bold text-[#C4603A]">{filteredResults.length}</span> risultati {currentCity && `a ${currentCity}`}
+          </p>
 
-            {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                {[1, 2, 3, 4, 5, 6].map((n) => (
-                  <div key={n} className="bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col h-full min-h-[380px]">
-                    <div className="h-48 w-full bg-neutral-200 animate-pulse rounded-t-3xl"></div>
-                    <div className="p-6 flex flex-col gap-4 grow">
-                      <div className="h-6 w-3/4 bg-neutral-200 animate-pulse rounded"></div>
-                      <div className="h-4 w-1/2 bg-neutral-200 animate-pulse rounded"></div>
-                      <div className="h-12 w-full bg-neutral-200 animate-pulse rounded-2xl mt-auto"></div>
-                    </div>
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <div key={n} className="bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col h-full min-h-[380px]">
+                  <div className="h-48 w-full bg-neutral-200 animate-pulse rounded-t-3xl"></div>
+                  <div className="p-6 flex flex-col gap-4 grow">
+                    <div className="h-6 w-3/4 bg-neutral-200 animate-pulse rounded"></div>
+                    <div className="h-4 w-1/2 bg-neutral-200 animate-pulse rounded"></div>
+                    <div className="h-12 w-full bg-neutral-200 animate-pulse rounded-2xl mt-auto"></div>
                   </div>
-                ))}
-              </div>
-            ) : filteredResults.length === 0 ? (
-              <div className="bg-white rounded-3xl border-2 border-dashed border-[#D4835E] p-16 text-center shadow-sm">
-                <span className="text-6xl block mb-6">🏜️</span>
-                <h3 className="font-serif text-3xl text-[#2C1A0E] mb-3 font-bold">Nessun risultato trovato</h3>
-                <p className="text-[#8A7B6E] mb-8 text-lg">Non ci sono {currentIntent === 'coinquilino' ? 'profili in cerca' : 'stanze'} che corrispondono ai tuoi criteri.</p>
-                <button 
-                  className="bg-transparent border-2 border-[#C4603A] text-[#C4603A] px-8 py-3 rounded-full font-bold hover:bg-orange-50 transition-colors"
-                  onClick={() => handleTopSearch(currentIntent, '', '')}
-                >
-                  Azzera Filtri
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                
-                {filteredResults.map(item => {
-                  if (currentIntent === 'stanza') {
-                    return (
-                      <div key={item.id} className="w-full bg-white rounded-3xl shadow-md border border-neutral-100 flex flex-col transition-all hover:-translate-y-2 hover:shadow-xl cursor-pointer overflow-hidden group">
-                        <div className="h-56 flex items-center justify-center text-6xl relative" style={{ background: `linear-gradient(135deg, ${item.color || '#C4603A'}, ${item.color || '#D4835E'}88)` }}>
-                          {item.emoji || '🏠'}
-                          <span className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm ${item.avail !== false ? 'bg-white text-green-700' : 'bg-black/60 text-white backdrop-blur-sm'}`}>
-                            {item.avail !== false ? '✅ Disponibile' : 'Occupata'}
-                          </span>
-                          <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm px-4 py-1.5 rounded-xl shadow-sm">
-                            <span className="font-serif font-bold text-xl text-[#C4603A]">€{item.price}</span><span className="text-xs text-[#8A7B6E] font-medium">/mese</span>
-                          </div>
-                        </div>
-                        <div className="p-6 flex flex-col grow">
-                          <h3 className="font-serif font-bold text-xl text-[#2C1A0E] leading-tight mb-2">{item.title}</h3>
-                          <p className="text-sm text-[#8A7B6E] mb-5 flex items-center gap-1">
-                            <span className="text-[#C4603A]">📍</span> {item.zone}, {item.city || item.citta}
-                          </p>
-                          <div className="flex flex-wrap gap-2 mb-6">
-                            {(item.tags || []).map(t => <span key={t} className="bg-neutral-100 text-[#7A4B2A] px-3 py-1.5 rounded-lg text-xs font-semibold">{t}</span>)}
-                          </div>
-                          <Link 
-                              to={`/dettagli/${item.id}`} 
-                              className="mt-auto block text-center bg-neutral-50 text-[#C4603A] py-3.5 rounded-2xl font-bold transition-colors group-hover:bg-[#C4603A] group-hover:text-white"
-                            >
-                            Vedi dettagli
-                          </Link>                      
+                </div>
+              ))}
+            </div>
+          ) : filteredResults.length === 0 ? (
+            <div className="bg-white rounded-3xl border-2 border-dashed border-[#D4835E] p-16 text-center shadow-sm">
+              <span className="text-6xl block mb-6">🏜️</span>
+              <h3 className="font-serif text-3xl text-[#2C1A0E] mb-3 font-bold">Nessun risultato trovato</h3>
+              <p className="text-[#8A7B6E] mb-8 text-lg">Non ci sono {currentIntent === 'coinquilino' ? 'profili in cerca' : 'stanze'} che corrispondono ai tuoi criteri.</p>
+              <button 
+                className="bg-transparent border-2 border-[#C4603A] text-[#C4603A] px-8 py-3 rounded-full font-bold hover:bg-orange-50 transition-colors"
+                onClick={() => handleTopSearch(currentIntent, '', '')}
+              >
+                Azzera Filtri
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              
+              {filteredResults.map(item => {
+                if (currentIntent === 'stanza') {
+                  return (
+                    <div key={item.id} className="w-full bg-white rounded-3xl shadow-md border border-neutral-100 flex flex-col transition-all hover:-translate-y-2 hover:shadow-xl cursor-pointer overflow-hidden group">
+                      <div className="h-56 flex items-center justify-center text-6xl relative" style={{ background: `linear-gradient(135deg, ${item.color || '#C4603A'}, ${item.color || '#D4835E'}88)` }}>
+                        {item.emoji || '🏠'}
+                        <span className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm ${item.avail !== false ? 'bg-white text-green-700' : 'bg-black/60 text-white backdrop-blur-sm'}`}>
+                          {item.avail !== false ? '✅ Disponibile' : 'Occupata'}
+                        </span>
+                        <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm px-4 py-1.5 rounded-xl shadow-sm">
+                          <span className="font-serif font-bold text-xl text-[#C4603A]">€{item.price}</span><span className="text-xs text-[#8A7B6E] font-medium">/mese</span>
                         </div>
                       </div>
-                    );
-                  } else {
-                    return (
-                      <div key={item.id} className="w-full bg-[#FEFAF4] rounded-3xl shadow-sm border border-orange-50 p-6 flex flex-col transition-all hover:-translate-y-2 hover:shadow-lg group relative overflow-hidden">
-                        <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-100/50 rounded-full blur-2xl"></div>
-                        
-                        <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 shadow-inner relative z-10" style={{ background: `linear-gradient(135deg, ${item.color1 || '#F5C29A'}, ${item.color2 || '#C4603A'})` }}>
-                          {item.emoji || '👤'}
+                      <div className="p-6 flex flex-col grow">
+                        <h3 className="font-serif font-bold text-xl text-[#2C1A0E] leading-tight mb-2">{item.title}</h3>
+                        <p className="text-sm text-[#8A7B6E] mb-5 flex items-center gap-1">
+                          <span className="text-[#C4603A]">📍</span> {item.zone}, {item.city}
+                        </p>
+                        <div className="flex flex-wrap gap-2 mb-6">
+                          {(item.tags || []).map(t => <span key={t} className="bg-neutral-100 text-[#7A4B2A] px-3 py-1.5 rounded-lg text-xs font-semibold">{t}</span>)}
                         </div>
-                        <div className="text-center font-bold text-[#2C1A0E] text-xl relative z-10">{item.name || item.first_name || item.nome}</div>
-                        <div className="text-center text-sm text-[#8A7B6E] mb-4 font-medium relative z-10">{item.age ? `${item.age} anni · ` : ''}{item.job || item.occupation || 'Studente'}</div>
-                        
-                        <div className="bg-white p-4 rounded-2xl text-sm text-[#8A7B6E] italic text-center mb-5 leading-relaxed shadow-sm relative z-10">"{item.quote || item.bio || 'Cerco una stanza!'}"</div>
-                        
-                        <div className="flex flex-wrap justify-center gap-1.5 mb-6 relative z-10">
-                          {(item.tags || (item.lifestyle_tags ? item.lifestyle_tags.split(',') : [])).map(t => <span key={t} className="bg-orange-100/50 text-[#7A4B2A] px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider">{t.trim()}</span>)}
-                        </div>
-                        
-                        <div className="mt-auto mb-5 relative z-10">
-                          <div className="flex justify-between items-center mb-1.5">
-                            <span className="text-[10px] font-bold text-[#8A7B6E] uppercase">Compatibilità stimata</span>
-                            <span className="text-xs font-bold text-[#C4603A]">{item.match || 85}%</span>
-                          </div>
-                          <div className="w-full bg-orange-100/50 rounded-full h-2 overflow-hidden">
-                            <div className="bg-gradient-to-r from-[#D4835E] to-[#C4603A] h-full rounded-full transition-all duration-1000" style={{ width: `${item.match || 85}%` }}></div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex flex-col gap-2 relative z-10 mt-auto">
-                          <Link 
-                            to={`/coinquilino/${item.id}`} 
-                            className="w-full block text-center bg-white border-2 border-[#C4603A] text-[#C4603A] py-3 rounded-2xl font-bold transition-all hover:bg-orange-50 shadow-sm"
+                        <Link 
+                            to={`/dettagli/${item.id}`} 
+                            className="mt-auto block text-center bg-neutral-50 text-[#C4603A] py-3.5 rounded-2xl font-bold transition-colors group-hover:bg-[#C4603A] group-hover:text-white"
                           >
-                            Vedi dettagli profilo
-                          </Link>
-                          <button 
-                            onClick={() => handleDirectContact(item.id)} 
-                            className="w-full bg-[#C4603A] text-white py-3 rounded-2xl font-bold transition-all hover:bg-[#9A4628] shadow-md flex items-center justify-center gap-2"
-                          >
-                            <span className="text-lg">💬</span> Contatta
-                          </button>   
-                        </div>              
+                          Vedi dettagli
+                        </Link>                      
                       </div>
-                    );
-                  }
-                })}
-              </div>
-            )}
-          </main>
-        )}
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div key={item.id} className="w-full bg-[#FEFAF4] rounded-3xl shadow-sm border border-orange-50 p-6 flex flex-col transition-all hover:-translate-y-2 hover:shadow-lg group relative overflow-hidden">
+                      <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-100/50 rounded-full blur-2xl"></div>
+                      
+                      <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 shadow-inner relative z-10" style={{ background: `linear-gradient(135deg, ${item.color1 || '#F5C29A'}, ${item.color2 || '#C4603A'})` }}>
+                        {item.emoji || '👤'}
+                      </div>
+                      <div className="text-center font-bold text-[#2C1A0E] text-xl relative z-10">{item.name || item.first_name}</div>
+                      <div className="text-center text-sm text-[#8A7B6E] mb-4 font-medium relative z-10">{item.age ? `${item.age} anni · ` : ''}{item.job || item.occupation || 'Studente'}</div>
+                      
+                      <div className="bg-white p-4 rounded-2xl text-sm text-[#8A7B6E] italic text-center mb-5 leading-relaxed shadow-sm relative z-10">"{item.quote || item.bio || 'Cerco una stanza accogliente!'}"</div>
+                      
+                      <div className="flex flex-wrap justify-center gap-1.5 mb-6 relative z-10">
+                        {(item.tags || (item.lifestyle_tags ? item.lifestyle_tags.split(',') : [])).map(t => <span key={t} className="bg-orange-100/50 text-[#7A4B2A] px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider">{t.trim()}</span>)}
+                      </div>
+                      
+                      <div className="mt-auto mb-5 relative z-10">
+                        <div className="flex justify-between items-center mb-1.5">
+                          <span className="text-[10px] font-bold text-[#8A7B6E] uppercase">Compatibilità stimata</span>
+                          <span className="text-xs font-bold text-[#C4603A]">{item.match || 85}%</span>
+                        </div>
+                        <div className="w-full bg-orange-100/50 rounded-full h-2 overflow-hidden">
+                          <div className="bg-gradient-to-r from-[#D4835E] to-[#C4603A] h-full rounded-full transition-all duration-1000" style={{ width: `${item.match || 85}%` }}></div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-col gap-2 relative z-10 mt-auto">
+                        <Link 
+                          to={`/coinquilino/${item.id}`} 
+                          className="w-full block text-center bg-white border-2 border-[#C4603A] text-[#C4603A] py-3 rounded-2xl font-bold transition-all hover:bg-orange-50 shadow-sm"
+                        >
+                          Vedi dettagli profilo
+                        </Link>
+                        <button 
+                          onClick={() => handleDirectContact(item.id)} 
+                          className="w-full bg-[#C4603A] text-white py-3 rounded-2xl font-bold transition-all hover:bg-[#9A4628] shadow-md flex items-center justify-center gap-2"
+                        >
+                          <span className="text-lg">💬</span> Contatta
+                        </button>   
+                      </div>              
+                    </div>
+                  );
+                }
+              })}
+            </div>
+          )}
+        </main>
       </div>
 
     </div>
