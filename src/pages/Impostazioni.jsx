@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-// Puoi riutilizzare il CSS della Dashboard per avere uno stile coerente
-import './Dashboard.css'; 
+
 
 export default function Impostazioni() {
   const navigate = useNavigate();
