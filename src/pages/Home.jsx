@@ -49,6 +49,8 @@ export default function Home() {
           <Link to="/ricerca" className="hover:text-[#D4835E] transition-colors">Cerca Stanza</Link>
           <Link to="/chat" className="hover:text-[#D4835E] transition-colors">Chat</Link>
           <Link to="/dashboard" className="hover:text-[#D4835E] transition-colors">Profilo</Link>
+          <Link to="/impostazioni" className="text-[#D4835E] transition-colors">Impostazioni</Link>
+          
         </div>
 
         <div className="hidden md:flex gap-4 items-center">

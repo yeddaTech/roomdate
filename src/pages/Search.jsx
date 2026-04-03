@@ -80,8 +80,21 @@ export default function Search() {
 
   const filteredResults = results.filter(item => {
     let match = true;
+    
+    // Filtro Città e Budget...
     if (currentCity && item.city && item.city.toLowerCase() !== currentCity.toLowerCase()) match = false;
     if (currentIntent === 'stanza' && currentBudget && item.price > parseInt(currentBudget)) match = false;
+    
+    // LA NUOVA LOGICA DI INCROCIO:
+    if (currentIntent === 'coinquilino' && user) {
+      // Se l'utente ha registrato di avere una stanza ('affitta')
+      // mostragli solo i coinquilini che stanno cercando ('cerca')
+      if (user.userType === 'affitta' && item.type !== 'cerca') match = false;
+      
+      // Viceversa, se l'utente 'cerca', mostragli i profili che offrono 'affitta'
+      if (user.userType === 'cerca' && item.type !== 'affitta') match = false;
+    }
+
     return match;
   });
 
@@ -99,6 +112,8 @@ export default function Search() {
           <Link to="/ricerca" className="text-[#D4835E] transition-colors">Cerca Stanza</Link>
           <Link to="/chat" className="hover:text-[#D4835E] transition-colors">Chat</Link>
           <Link to="/dashboard" className="hover:text-[#D4835E] transition-colors">Profilo</Link>
+          <Link to="/impostazioni" className="text-[#D4835E] transition-colors">Impostazioni</Link>
+          
         </div>
 
         <div className="hidden md:flex gap-4 items-center">
@@ -293,7 +308,13 @@ export default function Search() {
                           <div className="bg-gradient-to-r from-[#D4835E] to-[#C4603A] h-full rounded-full transition-all duration-1000" style={{ width: `${item.match}%` }}></div>
                         </div>
                       </div>
-
+                      {/* Invece del solo bottone contatta, mettiamo Vedi Dettagli nella card del coinquilino */}
+                      <Link 
+                        to={`/coinquilino/${item.id}`} 
+                        className="w-full block text-center bg-[#C4603A] text-white py-3.5 rounded-2xl font-bold transition-all hover:bg-[#9A4628] shadow-md hover:shadow-xl relative z-10"
+                      >
+                        Vedi dettagli profilo
+                      </Link>
                       <button 
                         onClick={() => handleDirectContact(item.id)} 
                         className="w-full bg-[#C4603A] text-white py-3.5 rounded-2xl font-bold transition-all hover:bg-[#9A4628] shadow-md hover:shadow-xl relative z-10 flex items-center justify-center gap-2"
