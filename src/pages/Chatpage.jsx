@@ -15,7 +15,7 @@ export default function ChatPage() {
   const location = useLocation(); 
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isMenuOpen, setIsMenuOpen] = useState(false); // Menu mobile
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   // STATI DINAMICI
   const [conversations, setConversations] = useState([]);
@@ -28,7 +28,6 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
-  // 1. RECUPERA L'UTENTE LOGGATO
   useEffect(() => {
     const savedUser = localStorage.getItem('roomdate_user');
     if (!savedUser) {
@@ -45,7 +44,6 @@ export default function ChatPage() {
     navigate('/');
   };
 
-  // 2. SCARICA DAL DATABASE
   const fetchChats = async () => {
       if (!user) return;
       try {
@@ -59,7 +57,6 @@ export default function ChatPage() {
       }
     };
 
-  // 3. REAL-TIME CON PUSHER
   useEffect(() => {
     if (user) {
       fetchChats(); 
@@ -82,12 +79,10 @@ export default function ChatPage() {
 
   const activeConv = conversations.find(c => c.id === activeConvId);
 
-  // Scroll automatico in basso
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeConv?.messages]);
 
-  // Apre automaticamente una chat se proveniamo da un'altra pagina
   useEffect(() => {
     if (location.state?.openChatId && conversations.length > 0) {
       setActiveConvId(location.state.openChatId);
@@ -107,7 +102,6 @@ export default function ChatPage() {
     setMobileView('chat');
   };
 
-  // 4. INVIO MESSAGGIO CON UI OTTIMISTICA
   const handleSend = async () => {
     if (!inputText.trim() || !activeConvId || !user) return;
     
@@ -162,9 +156,10 @@ export default function ChatPage() {
   });
 
   return (
-    <div className="flex flex-col h-screen bg-[#FEFAF4] font-sans overflow-hidden">
+    // FIX 1: Usa h-[100dvh] invece di h-screen, e forza w-full e overflow-hidden
+    <div className="flex flex-col h-[100dvh] w-full max-w-[100vw] bg-[#FEFAF4] font-sans overflow-hidden">
       
-      {/* --- TOP NAV (Identica a Home/Search) --- */}
+      {/* --- TOP NAV --- */}
       <nav className="shrink-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-white decoration-none">
           Room<span className="text-[#D4835E]">Date</span>
@@ -225,8 +220,8 @@ export default function ChatPage() {
       </div>
       {isMenuOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] md:hidden" onClick={() => setIsMenuOpen(false)}></div>}
 
-      {/* ── LAYOUT CHAT (Flex-1 per prendere il resto dello schermo) ── */}
-      <div className="flex-1 flex overflow-hidden pb-16 md:pb-0"> {/* pb-16 fa spazio alla nav bottom mobile */}
+      {/* ── LAYOUT CHAT ── */}
+      <div className="flex-1 flex overflow-hidden pb-16 md:pb-0 relative w-full">
 
         {/* ── SIDEBAR LISTA CHAT ── */}
         <aside className={`${mobileView === 'chat' ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[380px] bg-white border-r border-neutral-200 flex-col h-full shrink-0`}>
@@ -234,10 +229,11 @@ export default function ChatPage() {
             <h2 className="font-serif text-2xl text-[#2C1A0E] font-bold mb-4">Messaggi</h2>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">🔍</span>
+              {/* FIX ZOOM: Usa text-base (16px) per evitare lo zoom su iOS */}
               <input
                 type="text"
                 placeholder="Cerca conversazioni..."
-                className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-[#C4603A] transition-colors"
+                className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] text-base md:text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-[#C4603A] transition-colors"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -288,7 +284,7 @@ export default function ChatPage() {
         </aside>
 
         {/* ── CHAT MAIN AREA ── */}
-        <main className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 flex-col h-full bg-[#FEFAF4] relative`}>
+        <main className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 flex-col h-full bg-[#FEFAF4] w-full max-w-full relative`}>
           {!activeConv ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-[#8A7B6E]">
               <div className="text-6xl mb-4">💬</div>
@@ -298,19 +294,19 @@ export default function ChatPage() {
           ) : (
             <>
               {/* Header Chat Attiva */}
-              <div className="bg-white px-4 md:px-6 py-3 md:py-4 border-b border-neutral-200 flex items-center gap-4 shrink-0 shadow-sm z-10">
-                <button className="md:hidden text-2xl text-[#8A7B6E]" onClick={() => setMobileView('list')}>←</button>
+              <div className="bg-white px-4 md:px-6 py-3 md:py-4 border-b border-neutral-200 flex items-center gap-4 shrink-0 shadow-sm z-10 w-full">
+                <button className="md:hidden text-2xl text-[#8A7B6E] px-2" onClick={() => setMobileView('list')}>←</button>
                 <div className="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-xl shadow-sm shrink-0" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
                   {activeConv.emoji}
                 </div>
-                <div>
-                  <h3 className="font-bold text-[#2C1A0E] leading-tight">{activeConv.name}</h3>
-                  <p className="text-xs text-[#8A7B6E]">Inquilino/Proprietario</p>
+                <div className="overflow-hidden">
+                  <h3 className="font-bold text-[#2C1A0E] leading-tight truncate">{activeConv.name}</h3>
+                  <p className="text-xs text-[#8A7B6E] truncate">Inquilino/Proprietario</p>
                 </div>
               </div>
 
               {/* Area Messaggi */}
-              <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col gap-4">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 flex flex-col gap-4 w-full">
                 {!activeConv.messages || activeConv.messages.length === 0 ? (
                   <div className="text-center p-8 text-[#8A7B6E] text-sm bg-white rounded-2xl border border-neutral-100 shadow-sm self-center my-auto">
                     👋 Invia il primo messaggio per iniziare!
@@ -319,14 +315,15 @@ export default function ChatPage() {
                   activeConv.messages.map(msg => {
                     const isMine = msg.type === 'sent';
                     return (
-                      <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end gap-2`}>
+                      <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end gap-2 w-full`}>
                         {!isMine && (
                           <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 shadow-sm" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
                             {activeConv.emoji}
                           </div>
                         )}
-                        <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[75%] md:max-w-[65%]`}>
-                          <div className={`px-4 py-2.5 text-sm md:text-base shadow-sm ${
+                        <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[80%] md:max-w-[70%]`}>
+                          {/* FIX WRAP: Aggiunto break-words per non far esplodere la chat con parole lunghe */}
+                          <div className={`px-4 py-2.5 text-sm md:text-base shadow-sm break-words whitespace-pre-wrap w-full ${
                             isMine 
                               ? 'bg-[#C4603A] text-white rounded-2xl rounded-br-sm' 
                               : 'bg-white border border-neutral-100 text-[#2C1A0E] rounded-2xl rounded-bl-sm'
@@ -343,7 +340,7 @@ export default function ChatPage() {
               </div>
 
               {/* Quick Replies */}
-              <div className="shrink-0 bg-white border-t border-neutral-100 p-2 md:p-3 overflow-x-auto hide-scrollbar flex gap-2">
+              <div className="shrink-0 bg-white border-t border-neutral-100 p-2 md:p-3 overflow-x-auto hide-scrollbar flex gap-2 w-full">
                 {QUICK_REPLIES.map(qr => (
                   <button 
                     key={qr} 
@@ -356,10 +353,11 @@ export default function ChatPage() {
               </div>
 
               {/* Input Area */}
-              <div className="shrink-0 bg-white p-3 md:p-4 border-t border-neutral-100 flex items-end gap-3">
+              <div className="shrink-0 bg-white p-3 md:p-4 border-t border-neutral-100 flex items-end gap-3 w-full pb-safe">
+                {/* FIX ZOOM: text-base forzato su mobile */}
                 <textarea
                   ref={textareaRef}
-                  className="flex-1 bg-neutral-50 border border-neutral-200 text-[#2C1A0E] text-sm rounded-2xl px-4 py-3 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors resize-none max-h-[120px]"
+                  className="flex-1 bg-neutral-50 border border-neutral-200 text-[#2C1A0E] text-base md:text-sm rounded-2xl px-4 py-3 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors resize-none max-h-[120px] w-full"
                   placeholder="Scrivi un messaggio..."
                   value={inputText}
                   onChange={handleTextareaChange}
