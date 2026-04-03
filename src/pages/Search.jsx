@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import './Home.css'; // Usiamo il CSS della Home per avere lo stile del search-box
 
 export default function Search() {
   const navigate = useNavigate();
