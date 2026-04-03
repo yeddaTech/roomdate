@@ -145,6 +145,8 @@ export default function Dashboard() {
           <Link to="/ricerca" className="hover:text-[#D4835E] transition-colors">Cerca Stanza</Link>
           <Link to="/chat" className="hover:text-[#D4835E] transition-colors">Chat</Link>
           <Link to="/dashboard" className="text-[#D4835E] transition-colors">Profilo</Link>
+          <Link to="/impostazioni" className="text-[#D4835E] transition-colors">Impostazioni</Link>
+          
         </div>
 
         <div className="hidden md:flex gap-4 items-center">
@@ -242,12 +244,7 @@ export default function Dashboard() {
           >
             📄 I Miei Annunci
           </button>
-          <button 
-            className={`px-6 py-3 rounded-full font-bold text-sm transition-all shadow-sm ${activeView === 'savedRooms' ? 'bg-[#C4603A] text-white shadow-md' : 'bg-orange-50 text-[#7A4B2A] hover:bg-white hover:shadow'}`}
-            onClick={() => setActiveView('savedRooms')}
-          >
-            ❤️ Salvati
-          </button>
+
           <button 
             className={`px-6 py-3 rounded-full font-bold text-sm transition-all shadow-sm ${activeView === 'editProfile' ? 'bg-[#C4603A] text-white shadow-md' : 'bg-orange-50 text-[#7A4B2A] hover:bg-white hover:shadow'}`}
             onClick={() => setActiveView('editProfile')}
@@ -304,20 +301,6 @@ export default function Dashboard() {
                   ))}
                 </div>
               )}
-            </div>
-          )}
-
-          {/* TAB: SALVATI */}
-          {activeView === 'savedRooms' && (
-            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-orange-50">
-              <h2 className="font-serif text-2xl font-bold text-[#2C1A0E] mb-6">Le tue Stanze Preferite</h2>
-              <div className="text-center py-16 px-4 bg-neutral-50 rounded-2xl border-2 border-dashed border-neutral-200">
-                <div className="text-5xl mb-4">💔</div>
-                <p className="text-[#8A7B6E] font-medium mb-6">Non hai ancora salvato nessuna stanza.</p>
-                <Link to="/ricerca" className="bg-transparent border-2 border-[#C4603A] text-[#C4603A] px-6 py-2.5 rounded-full font-bold hover:bg-orange-50 transition-colors inline-block">
-                  Esplora gli annunci
-                </Link>
-              </div>
             </div>
           )}
 

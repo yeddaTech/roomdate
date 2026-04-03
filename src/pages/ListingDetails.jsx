@@ -119,6 +119,8 @@ export default function ListingDetails() {
           <Link to="/ricerca" className="text-[#D4835E] transition-colors">Cerca Stanza</Link>
           <Link to="/chat" className="hover:text-[#D4835E] transition-colors">Chat</Link>
           <Link to="/dashboard" className="hover:text-[#D4835E] transition-colors">Profilo</Link>
+          <Link to="/impostazioni" className="text-[#D4835E] transition-colors">Impostazioni</Link>
+          
         </div>
 
         <div className="hidden md:flex gap-4 items-center">
@@ -284,9 +286,7 @@ export default function ListingDetails() {
                 <span>💬</span> Contatta in Chat
               </button>
               
-              <button className="w-full bg-white border-2 border-[#C4603A] text-[#C4603A] hover:bg-orange-50 py-3.5 rounded-2xl font-bold transition-all flex justify-center items-center gap-2 text-base">
-                <span>❤️</span> Salva nei preferiti
-              </button>
+
             </div>
 
             {/* TRUST BADGE */}
