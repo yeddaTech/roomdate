@@ -4,16 +4,14 @@ import { Link, useNavigate } from 'react-router-dom';
 export default function Register() {
   const navigate = useNavigate();
 
-  // --- STATI DELLA PAGINA ---
-  const [userType, setUserType] = useState('cerca'); // 'cerca' o 'affitta'
+  const [userType, setUserType] = useState('cerca'); 
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Stato unificato per i dati del form
+  // Tolto telefono da qui
   const [formData, setFormData] = useState({
     nome: '',
     cognome: '',
     email: '',
-    telefono: '',
     citta: '',
     nascita: '',
     password: '',
@@ -21,7 +19,6 @@ export default function Register() {
     newsletter: false
   });
 
-  // Gestione dell'input per aggiornare lo stato
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
@@ -30,7 +27,6 @@ export default function Register() {
     }));
   };
 
-  // --- LOGICA PASSWORD STRENGTH ---
   const getPasswordScore = (pw) => {
     if (!pw) return 0;
     let score = 0;
@@ -58,6 +54,7 @@ export default function Register() {
     setIsSubmitting(true);
 
     try {
+      // Tolto telefono dall'invio dati
       const response = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,10 +63,9 @@ export default function Register() {
           cognome: formData.cognome,
           email: formData.email,
           password: formData.password,
-          telefono: formData.telefono,
           citta: formData.citta,
           nascita: formData.nascita,
-          userType: userType // <- AGGIUNTO QUESTO (importantissimo!)
+          userType: userType
         }),
       });
 
@@ -90,7 +86,6 @@ export default function Register() {
   return (
     <div className="min-h-[100dvh] flex flex-col font-sans bg-[#FEFAF4]">
       
-      {/* --- TOP NAV MINIMALE --- */}
       <nav className="shrink-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">
         <div className="flex items-center gap-6">
           <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-white decoration-none">
@@ -107,10 +102,8 @@ export default function Register() {
         </div>
       </nav>
 
-      {/* --- MAIN LAYOUT SPLIT --- */}
       <div className="flex-1 flex flex-col lg:flex-row w-full">
         
-        {/* LEFT COLUMN (Informativa - Nascosta su mobile) */}
         <div className="hidden lg:flex lg:w-5/12 bg-gradient-to-br from-[#2C1A0E] to-[#5A2C1A] p-12 xl:p-16 flex-col justify-center relative overflow-hidden text-white border-r border-[#C4603A]/20">
           <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle, white 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
           
@@ -151,7 +144,6 @@ export default function Register() {
           </div>
         </div>
 
-        {/* RIGHT COLUMN (Form di Registrazione) */}
         <div className="w-full lg:w-7/12 flex flex-col justify-center items-center p-6 md:p-10 lg:p-12 overflow-y-auto">
           
           <div className="w-full max-w-xl bg-white p-8 md:p-10 rounded-3xl shadow-lg border border-orange-50 animate-fade-in-up my-auto">
@@ -167,7 +159,6 @@ export default function Register() {
             <h1 className="font-serif text-4xl text-[#2C1A0E] font-bold mb-2">Crea il tuo account</h1>
             <p className="text-[#8A7B6E] text-sm mb-8">Gratis, sempre. Nessuna carta di credito richiesta.</p>
 
-            {/* Tipo utente (Sostituisce la vecchia funzione JS selectType) */}
             <div className="grid grid-cols-2 gap-4 mb-8">
               <button 
                 className={`flex flex-col items-center text-center p-4 rounded-2xl border-2 transition-all ${userType === 'cerca' ? 'border-[#C4603A] bg-[#FEFAF4]' : 'border-neutral-100 bg-white hover:border-orange-200'}`} 
@@ -193,7 +184,6 @@ export default function Register() {
               <div className="flex-1 h-px bg-neutral-200"></div>
             </div>
 
-            {/* FORM REACT */}
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -227,7 +217,6 @@ export default function Register() {
                 </div>
               </div>
               
-              {/* PASSWORD FIELD & STRENGTH INDICATOR */}
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-bold text-[#2C1A0E]">Password</label>
                 <input 
