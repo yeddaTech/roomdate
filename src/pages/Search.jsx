@@ -12,7 +12,7 @@ export default function Search() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
-  const [isMenuOpen, setIsMenuOpen] = useState(false); // Aggiunto per il menu mobile
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('roomdate_user');
@@ -88,7 +88,7 @@ export default function Search() {
   return (
     <div className="min-h-screen bg-[#FEFAF4] pb-20 md:pb-0 font-sans">
       
-      {/* --- TOP NAV --- */}
+      {/* --- TOP NAV (Coerente con Home) --- */}
       <nav className="sticky top-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-white decoration-none">
           Room<span className="text-[#D4835E]">Date</span>
@@ -123,7 +123,7 @@ export default function Search() {
         </button>
       </nav>
 
-      {/* --- MOBILE SIDEBAR --- */}
+      {/* --- MOBILE SIDEBAR (Coerente con Home) --- */}
       <div className={`fixed inset-y-0 right-0 w-72 bg-[#2C1A0E] shadow-2xl z-[1000] p-8 pt-24 transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex flex-col gap-6 text-lg font-medium text-white">
           {user && (
@@ -150,130 +150,155 @@ export default function Search() {
       </div>
       {isMenuOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] md:hidden" onClick={() => setIsMenuOpen(false)}></div>}
 
-      {/* --- HERO SEARCH BOX --- */}
-      <div className="bg-[#C4603A] px-6 py-12 flex justify-center">
-         <div className="bg-white rounded-3xl p-6 shadow-xl w-full max-w-3xl border border-orange-100">
-            <div className="flex gap-2 bg-neutral-100 p-1.5 rounded-full mb-6">
-              <button 
-                className={`flex-1 py-2.5 rounded-full text-sm font-bold transition-all ${currentIntent === 'stanza' ? 'bg-[#C4603A] text-white shadow-md' : 'text-[#8A7B6E] hover:text-[#2C1A0E]'}`} 
-                onClick={() => handleTopSearch('stanza', currentCity, currentBudget)}
-              >
-                🔍 Cerca Stanza
-              </button>
-              <button 
-                className={`flex-1 py-2.5 rounded-full text-sm font-bold transition-all ${currentIntent === 'coinquilino' ? 'bg-[#C4603A] text-white shadow-md' : 'text-[#8A7B6E] hover:text-[#2C1A0E]'}`} 
-                onClick={() => handleTopSearch('coinquilino', currentCity, currentBudget)}
-              >
-                👥 Cerco Coinquilino
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <select 
-                className="w-full bg-neutral-50 border-2 border-neutral-100 text-[#2C1A0E] text-sm rounded-xl px-4 py-3 focus:outline-none focus:border-[#C4603A] transition-colors"
-                value={currentCity} 
-                onChange={(e) => handleTopSearch(currentIntent, e.target.value, currentBudget)}
-              >
-                <option value="">📍 Città (Tutte)</option>
-                <option value="Milano">Milano</option>
-                <option value="Roma">Roma</option>
-                <option value="Bologna">Bologna</option>
-                <option value="Torino">Torino</option>
-              </select>
-              <input 
-                type="number" 
-                placeholder="💶 Budget max €" 
-                className={`w-full bg-neutral-50 border-2 border-neutral-100 text-[#2C1A0E] text-sm rounded-xl px-4 py-3 focus:outline-none focus:border-[#C4603A] transition-colors ${currentIntent === 'coinquilino' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                value={currentBudget}
-                onChange={(e) => handleTopSearch(currentIntent, currentCity, e.target.value)}
-                disabled={currentIntent === 'coinquilino'}
-              />
-            </div>
+      {/* --- HERO SEARCH BOX (Stile Premium) --- */}
+      <div className="bg-gradient-to-br from-[#2C1A0E] to-[#C4603A] px-6 py-12 flex justify-center relative overflow-hidden">
+        {/* Pattern decorativo */}
+        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, white 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
+        
+        <div className="bg-white/95 backdrop-blur-md rounded-3xl p-6 shadow-2xl w-full max-w-3xl relative z-10 border border-white/20">
+          <div className="flex gap-2 bg-neutral-100 p-1.5 rounded-2xl mb-6">
+            <button 
+              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all shadow-sm ${currentIntent === 'stanza' ? 'bg-[#C4603A] text-white shadow-md' : 'text-[#8A7B6E] hover:bg-white hover:text-[#2C1A0E]'}`} 
+              onClick={() => handleTopSearch('stanza', currentCity, currentBudget)}
+            >
+              🔍 Cerca Stanza
+            </button>
+            <button 
+              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all shadow-sm ${currentIntent === 'coinquilino' ? 'bg-[#C4603A] text-white shadow-md' : 'text-[#8A7B6E] hover:bg-white hover:text-[#2C1A0E]'}`} 
+              onClick={() => handleTopSearch('coinquilino', currentCity, currentBudget)}
+            >
+              👥 Cerco Coinquilini
+            </button>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <select 
+              className="w-full bg-white border border-neutral-200 text-[#2C1A0E] text-sm rounded-2xl px-5 py-4 focus:outline-none focus:border-[#C4603A] focus:ring-2 focus:ring-orange-100 transition-all font-medium"
+              value={currentCity} 
+              onChange={(e) => handleTopSearch(currentIntent, e.target.value, currentBudget)}
+            >
+              <option value="">📍 Tutte le Città</option>
+              <option value="Milano">Milano</option>
+              <option value="Roma">Roma</option>
+              <option value="Bologna">Bologna</option>
+              <option value="Torino">Torino</option>
+            </select>
+            <input 
+              type="number" 
+              placeholder="💶 Budget max (€/mese)" 
+              className={`w-full bg-white border border-neutral-200 text-[#2C1A0E] text-sm rounded-2xl px-5 py-4 focus:outline-none focus:border-[#C4603A] focus:ring-2 focus:ring-orange-100 transition-all font-medium ${currentIntent === 'coinquilino' ? 'opacity-50 cursor-not-allowed bg-neutral-50' : ''}`}
+              value={currentBudget}
+              onChange={(e) => handleTopSearch(currentIntent, currentCity, e.target.value)}
+              disabled={currentIntent === 'coinquilino'}
+            />
+          </div>
+        </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-12 animate-fade-in-up">
         
         {/* GRIGLIA RISULTATI */}
         <main>
-          <h1 className="font-serif text-3xl md:text-4xl text-[#2C1A0E] mb-2">
-            {currentIntent === 'coinquilino' ? 'Coinquilini disponibili' : 'Stanze disponibili'}
+          <h1 className="font-serif text-3xl md:text-5xl text-[#2C1A0E] mb-3">
+            {currentIntent === 'coinquilino' ? 'Coinquilini disponibili' : 'Stanze in affitto'}
           </h1>
-          <p className="text-[#8A7B6E] mb-8 font-medium">
-            Trovati {filteredResults.length} risultati {currentCity && `a ${currentCity}`}
+          <p className="text-[#8A7B6E] mb-10 font-medium text-lg">
+            Trovati <span className="font-bold text-[#C4603A]">{filteredResults.length}</span> risultati {currentCity && `a ${currentCity}`}
           </p>
 
           {loading ? (
-            /* GRIGLIA SKELETON */
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            /* GRIGLIA SKELETON (Adattato alle nuove card) */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {[1, 2, 3, 4, 5, 6].map((n) => (
-                <div key={n} className="bg-white rounded-2xl shadow-sm border border-neutral-100 flex flex-col h-full min-h-[360px]">
-                  <div className="h-48 w-full bg-neutral-200 animate-pulse rounded-t-2xl"></div>
-                  <div className="p-5 flex flex-col gap-4 grow">
+                <div key={n} className="bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col h-full min-h-[380px]">
+                  <div className="h-48 w-full bg-neutral-200 animate-pulse rounded-t-3xl"></div>
+                  <div className="p-6 flex flex-col gap-4 grow">
                     <div className="h-6 w-3/4 bg-neutral-200 animate-pulse rounded"></div>
                     <div className="h-4 w-1/2 bg-neutral-200 animate-pulse rounded"></div>
-                    <div className="h-10 w-full bg-neutral-200 animate-pulse rounded-full mt-auto"></div>
+                    <div className="h-12 w-full bg-neutral-200 animate-pulse rounded-2xl mt-auto"></div>
                   </div>
                 </div>
               ))}
             </div>
           ) : filteredResults.length === 0 ? (
-            <div className="bg-white rounded-3xl border-2 border-dashed border-orange-200 p-12 text-center shadow-sm">
-              <span className="text-6xl block mb-4">🏜️</span>
-              <h3 className="font-serif text-2xl text-[#2C1A0E] mb-2 font-bold">Nessun risultato trovato</h3>
-              <p className="text-[#8A7B6E] mb-6">Prova ad ampliare i filtri di ricerca nel box in alto.</p>
+            <div className="bg-white rounded-3xl border-2 border-dashed border-[#D4835E] p-16 text-center shadow-sm">
+              <span className="text-6xl block mb-6">🏜️</span>
+              <h3 className="font-serif text-3xl text-[#2C1A0E] mb-3 font-bold">Nessun risultato trovato</h3>
+              <p className="text-[#8A7B6E] mb-8 text-lg">Non ci sono {currentIntent === 'coinquilino' ? 'profili' : 'stanze'} che corrispondono ai tuoi criteri.</p>
               <button 
-                className="bg-transparent border-2 border-[#C4603A] text-[#C4603A] px-6 py-2 rounded-full font-bold hover:bg-orange-50 transition-colors"
+                className="bg-transparent border-2 border-[#C4603A] text-[#C4603A] px-8 py-3 rounded-full font-bold hover:bg-orange-50 transition-colors"
                 onClick={() => handleTopSearch(currentIntent, '', '')}
               >
                 Azzera Filtri
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               
               {/* RENDER DINAMICO: Stanze o Coinquilini? */}
               {filteredResults.map(item => {
                 
                 if (currentIntent === 'stanza') {
                   return (
-                    <div key={item.id} className="bg-white rounded-2xl shadow-md border border-neutral-100 flex flex-col transition-all hover:-translate-y-2 hover:shadow-xl cursor-pointer overflow-hidden group">
-                      <div className="h-48 flex items-center justify-center text-5xl relative" style={{ background: `linear-gradient(135deg, ${item.color}, ${item.color}88)` }}>
+                    <div key={item.id} className="w-full bg-white rounded-3xl shadow-md border border-neutral-100 flex flex-col transition-all hover:-translate-y-2 hover:shadow-xl cursor-pointer overflow-hidden group">
+                      <div className="h-56 flex items-center justify-center text-6xl relative" style={{ background: `linear-gradient(135deg, ${item.color}, ${item.color}88)` }}>
                         {item.emoji}
-                        <div className="absolute bottom-3 right-3 bg-white px-3 py-1 rounded-lg shadow-sm">
-                          <span className="font-serif font-bold text-[#C4603A]">€{item.price}</span><span className="text-xs text-[#8A7B6E]">/mese</span>
+                        <span className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm ${item.avail ? 'bg-white text-green-700' : 'bg-black/60 text-white backdrop-blur-sm'}`}>
+                          {item.avail ? '✅ Disponibile' : 'Occupata'}
+                        </span>
+                        <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm px-4 py-1.5 rounded-xl shadow-sm">
+                          <span className="font-serif font-bold text-xl text-[#C4603A]">€{item.price}</span><span className="text-xs text-[#8A7B6E] font-medium">/mese</span>
                         </div>
                       </div>
-                      <div className="p-5 flex flex-col grow">
-                        <h3 className="font-serif font-bold text-lg text-[#2C1A0E] mb-1">{item.title}</h3>
-                        <p className="text-sm text-[#8A7B6E] mb-4">📍 {item.zone}, {item.city}</p>
+                      <div className="p-6 flex flex-col grow">
+                        <h3 className="font-serif font-bold text-xl text-[#2C1A0E] leading-tight mb-2">{item.title}</h3>
+                        <p className="text-sm text-[#8A7B6E] mb-5 flex items-center gap-1">
+                          <span className="text-[#C4603A]">📍</span> {item.zone}, {item.city}
+                        </p>
+                        <div className="flex flex-wrap gap-2 mb-6">
+                          {item.tags.map(t => <span key={t} className="bg-neutral-100 text-[#7A4B2A] px-3 py-1.5 rounded-lg text-xs font-semibold">{t}</span>)}
+                        </div>
                         <Link 
                             to={`/dettagli/${item.id}`} 
-                            className="mt-auto block text-center border-2 border-[#F5E3CC] text-[#C4603A] py-2.5 rounded-xl font-bold transition-colors group-hover:border-[#C4603A] group-hover:bg-[#FBF3E8]"
+                            className="mt-auto block text-center bg-neutral-50 text-[#C4603A] py-3.5 rounded-2xl font-bold transition-colors group-hover:bg-[#C4603A] group-hover:text-white"
                           >
-                        Vedi dettagli
+                          Vedi dettagli
                         </Link>                      
                       </div>
                     </div>
                   );
                 } else {
                   return (
-                    <div key={item.id} className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 flex flex-col transition-all hover:-translate-y-2 hover:shadow-xl group">
-                      <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl mx-auto mb-4" style={{ background: `linear-gradient(135deg, ${item.color1}, ${item.color2})` }}>
+                    <div key={item.id} className="w-full bg-[#FEFAF4] rounded-3xl shadow-sm border border-orange-50 p-6 flex flex-col transition-all hover:-translate-y-2 hover:shadow-lg group relative overflow-hidden">
+                      {/* Piccola decorazione sfondo */}
+                      <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-100/50 rounded-full blur-2xl"></div>
+                      
+                      <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 shadow-inner relative z-10" style={{ background: `linear-gradient(135deg, ${item.color1}, ${item.color2})` }}>
                         {item.emoji}
                       </div>
-                      <div className="text-center font-bold text-[#2C1A0E] text-lg mb-1">{item.name}</div>
-                      <div className="text-center text-xs text-[#8A7B6E] mb-4 font-medium">{item.age} anni · {item.job}</div>
+                      <div className="text-center font-bold text-[#2C1A0E] text-xl relative z-10">{item.name}</div>
+                      <div className="text-center text-sm text-[#8A7B6E] mb-4 font-medium relative z-10">{item.age} anni · {item.job}</div>
                       
-                      <div className="flex flex-wrap justify-center gap-1.5 mb-4">
-                        {item.tags.map(t => <span key={t} className="bg-[#FBF3E8] text-[#7A4B2A] px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase">{t}</span>)}
+                      <div className="bg-white p-4 rounded-2xl text-sm text-[#8A7B6E] italic text-center mb-5 leading-relaxed shadow-sm relative z-10">"{item.quote}"</div>
+                      
+                      <div className="flex flex-wrap justify-center gap-1.5 mb-6 relative z-10">
+                        {item.tags.map(t => <span key={t} className="bg-orange-100/50 text-[#7A4B2A] px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider">{t}</span>)}
                       </div>
-                      <div className="text-sm text-[#8A7B6E] italic text-center mb-6 leading-relaxed grow">"{item.quote}"</div>
+                      
+                      <div className="mt-auto mb-5 relative z-10">
+                        <div className="flex justify-between items-center mb-1.5">
+                          <span className="text-[10px] font-bold text-[#8A7B6E] uppercase">Compatibilità</span>
+                          <span className="text-xs font-bold text-[#C4603A]">{item.match}%</span>
+                        </div>
+                        <div className="w-full bg-orange-100/50 rounded-full h-2 overflow-hidden">
+                          <div className="bg-gradient-to-r from-[#D4835E] to-[#C4603A] h-full rounded-full transition-all duration-1000" style={{ width: `${item.match}%` }}></div>
+                        </div>
+                      </div>
 
                       <button 
                         onClick={() => handleDirectContact(item.id)} 
-                        className="w-full bg-[#C4603A] text-white py-3 rounded-xl font-bold transition-colors hover:bg-[#9A4628] shadow-md group-hover:shadow-lg"
+                        className="w-full bg-[#C4603A] text-white py-3.5 rounded-2xl font-bold transition-all hover:bg-[#9A4628] shadow-md hover:shadow-xl relative z-10 flex items-center justify-center gap-2"
                       >
-                        Contatta
+                        <span className="text-lg">💬</span> Contatta
                       </button>                 
                     </div>
                   );
@@ -284,28 +309,6 @@ export default function Search() {
           )}
         </main>
       </div>
-      
-      {/* --- MOBILE BOTTOM NAV --- */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-neutral-200 z-[990] pb-safe shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
-        <div className="flex justify-around items-center h-16">
-          <Link to="/" className="flex flex-col items-center gap-1 text-[#8A7B6E] hover:text-[#C4603A] transition-colors">
-            <span className="text-xl">🏠</span>
-            <span className="text-[10px] font-bold uppercase tracking-wider">Home</span>
-          </Link>
-          <Link to="/ricerca" className="flex flex-col items-center gap-1 text-[#C4603A]">
-            <span className="text-xl">🔍</span>
-            <span className="text-[10px] font-bold uppercase tracking-wider">Cerca</span>
-          </Link>
-          <Link to="/chat" className="flex flex-col items-center gap-1 text-[#8A7B6E] hover:text-[#C4603A] transition-colors">
-            <span className="text-xl">💬</span>
-            <span className="text-[10px] font-bold uppercase tracking-wider">Chat</span>
-          </Link>
-          <Link to="/dashboard" className="flex flex-col items-center gap-1 text-[#8A7B6E] hover:text-[#C4603A] transition-colors">
-            <span className="text-xl">👤</span>
-            <span className="text-[10px] font-bold uppercase tracking-wider">Profilo</span>
-          </Link>
-        </div>
-      </nav>
 
     </div>
   );

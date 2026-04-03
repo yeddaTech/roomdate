@@ -45,7 +45,7 @@ export default function Home() {
         </div>
         
         <div className="hidden md:flex gap-8 items-center text-sm font-medium text-neutral-300">
-          <Link to="/" className="hover:text-[#D4835E] transition-colors">Home</Link>
+          <Link to="/" className="text-[#D4835E] transition-colors">Home</Link>
           <Link to="/ricerca" className="hover:text-[#D4835E] transition-colors">Cerca Stanza</Link>
           <Link to="/chat" className="hover:text-[#D4835E] transition-colors">Chat</Link>
           <Link to="/dashboard" className="hover:text-[#D4835E] transition-colors">Profilo</Link>
@@ -101,63 +101,78 @@ export default function Home() {
       </div>
       {isMenuOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] md:hidden" onClick={() => setIsMenuOpen(false)}></div>}
 
-      {/* --- HERO --- */}
-      <section className="bg-[#C4603A] text-white py-20 px-6 text-center animate-fade-in-up relative overflow-hidden">
-        {/* Decorative dots background */}
-        <div className="absolute top-10 left-1/4 w-48 h-48 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, white 1.5px, transparent 1.5px)', backgroundSize: '20px 20px' }}></div>
+      {/* --- HERO 100% FUNZIONALE (Senza dati fake) --- */}
+      <section className="bg-gradient-to-br from-[#2C1A0E] via-[#5A2C1A] to-[#C4603A] text-white py-24 px-6 text-center animate-fade-in-up relative overflow-hidden">
+        {/* Pattern di sfondo sottile */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle, white 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
         
-        <div className="max-w-3xl mx-auto relative z-10">
-          <div className="inline-block bg-white/10 border border-white/20 px-4 py-1.5 rounded-full text-sm font-medium mb-6 backdrop-blur-sm shadow-sm animate-[float_4s_ease-in-out_infinite]">
-            🏡 Oltre 12.000 annunci attivi in Italia
-          </div>
-          <h1 className="font-serif text-5xl md:text-6xl font-bold leading-tight mb-6">
-            Trova la tua stanza,<br/><em className="text-[#F5E3CC] font-light">trova casa.</em>
+        <div className="max-w-4xl mx-auto relative z-10">
+          <h1 className="font-serif text-5xl md:text-7xl font-bold leading-tight mb-6">
+            Il tuo prossimo coinquilino.<br/><em className="text-[#F5E3CC] font-light">La tua prossima casa.</em>
           </h1>
-          <p className="text-white/80 text-lg mb-8 max-w-lg mx-auto">
-            Migliaia di stanze e coinquilini selezionati nelle città italiane. Senza agenzie, senza commissioni.
+          <p className="text-white/80 text-lg md:text-xl mb-12 max-w-2xl mx-auto font-light leading-relaxed">
+            Nessuna agenzia, nessun intermediario. Esplora gli annunci, chatta in tempo reale e trova la tua sistemazione ideale in modo diretto e trasparente.
           </p>
-          <Link to="/ricerca" className="inline-block bg-[#2C1A0E] text-white px-8 py-4 rounded-full text-lg font-bold hover:bg-black transition-all hover:scale-105 shadow-xl">
-            Inizia la ricerca →
-          </Link>
+          
+          {/* Doppia CTA Funzionale */}
+          <div className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-6">
+            <Link to="/ricerca?intent=stanza" className="bg-white text-[#C4603A] px-8 py-4 rounded-2xl text-lg font-bold hover:bg-[#F5E3CC] hover:-translate-y-1 transition-all shadow-xl flex items-center justify-center gap-3">
+               Cerca una Stanza
+            </Link>
+            <Link to="/ricerca?intent=coinquilino" className="bg-white/10 backdrop-blur-md border border-white/20 text-white px-8 py-4 rounded-2xl text-lg font-bold hover:bg-white/20 hover:-translate-y-1 transition-all shadow-xl flex items-center justify-center gap-3">
+               Cerca Coinquilini
+            </Link>
+          </div>
         </div>
       </section>
 
-      {/* --- STANZE IN EVIDENZA --- */}
-      <section className="py-16 px-6 max-w-7xl mx-auto animate-fade-in-up" style={{animationDelay: '0.2s'}}>
-        <div className="text-[#C4603A] text-xs font-bold uppercase tracking-widest mb-2">Annunci in evidenza</div>
-        <h2 className="font-serif text-3xl md:text-4xl text-[#2C1A0E] mb-8">Stanze selezionate per te</h2>
+      {/* --- STANZE REALI DAL DATABASE --- */}
+      <section className="py-20 px-6 max-w-7xl mx-auto animate-fade-in-up" style={{animationDelay: '0.2s'}}>
+        <div className="flex justify-between items-end mb-8">
+          <div>
+            <div className="text-[#C4603A] text-xs font-bold uppercase tracking-widest mb-2">Aggiunte di recente</div>
+            <h2 className="font-serif text-3xl md:text-4xl text-[#2C1A0E]">Le ultime stanze</h2>
+          </div>
+          <Link to="/ricerca" className="hidden md:block text-[#C4603A] font-bold hover:underline">Vedi tutte →</Link>
+        </div>
         
-        <div className="flex gap-6 overflow-x-auto snap-x snap-mandatory hide-scrollbar pb-8">
+        <div className="flex gap-6 overflow-x-auto snap-x snap-mandatory hide-scrollbar pb-8 -mx-6 px-6 md:mx-0 md:px-0">
           {isLoadingListings ? (
             [1, 2, 3, 4].map((n) => (
-              <div key={`skel-list-${n}`} className="shrink-0 w-72 bg-white rounded-2xl shadow-sm border border-neutral-100 flex flex-col snap-start">
-                <div className="h-48 w-full bg-neutral-200 animate-pulse rounded-t-2xl"></div>
+              <div key={`skel-list-${n}`} className="shrink-0 w-[280px] md:w-72 bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col snap-start">
+                <div className="h-48 w-full bg-neutral-200 animate-pulse rounded-t-3xl"></div>
                 <div className="p-6 flex flex-col gap-4">
                   <div className="h-6 w-3/4 bg-neutral-200 animate-pulse rounded"></div>
                   <div className="h-4 w-1/2 bg-neutral-200 animate-pulse rounded"></div>
-                  <div className="h-10 w-full bg-neutral-200 animate-pulse rounded-full mt-4"></div>
+                  <div className="h-12 w-full bg-neutral-200 animate-pulse rounded-2xl mt-4"></div>
                 </div>
               </div>
             ))
           ) : listings.length === 0 ? (
-            <p className="text-[#8A7B6E]">Nessuna stanza caricata al momento.</p>
+            <div className="bg-white rounded-3xl border border-neutral-100 p-8 w-full text-center">
+              <p className="text-[#8A7B6E]">Non ci sono ancora stanze caricate. Sii il primo a pubblicare un annuncio!</p>
+            </div>
           ) : (
             listings.map(l => (
-              <div key={l.id} className="shrink-0 w-72 bg-white rounded-2xl shadow-md border border-neutral-100 flex flex-col snap-start transition-all hover:-translate-y-2 hover:shadow-xl cursor-pointer overflow-hidden group">
-                <div className="h-48 flex items-center justify-center text-5xl relative" style={{ background: `linear-gradient(135deg, ${l.color}, ${l.color}88)` }}>
+              <div key={l.id} className="shrink-0 w-[280px] md:w-72 bg-white rounded-3xl shadow-md border border-neutral-100 flex flex-col snap-start transition-all hover:-translate-y-2 hover:shadow-xl cursor-pointer overflow-hidden group">
+                <div className="h-48 flex items-center justify-center text-6xl relative" style={{ background: `linear-gradient(135deg, ${l.color}, ${l.color}88)` }}>
                   {l.emoji}
-                  <span className={`absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-bold ${l.avail ? 'bg-white/90 text-green-700' : 'bg-black/40 text-white'}`}>✅ Disponibile</span>
-                  <div className="absolute bottom-3 right-3 bg-white px-3 py-1 rounded-lg shadow-sm">
-                    <span className="font-serif font-bold text-[#C4603A]">€{l.price}</span><span className="text-xs text-[#8A7B6E]">/mese</span>
+                  <span className={`absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-bold shadow-sm ${l.avail ? 'bg-white text-green-700' : 'bg-black/60 text-white backdrop-blur-sm'}`}>
+                    {l.avail ? '✅ Disponibile' : 'Occupata'}
+                  </span>
+                  <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm px-4 py-1.5 rounded-xl shadow-sm">
+                    <span className="font-serif font-bold text-lg text-[#C4603A]">€{l.price}</span><span className="text-xs text-[#8A7B6E] font-medium">/mese</span>
                   </div>
                 </div>
-                <div className="p-5 flex flex-col grow">
-                  <h3 className="font-serif font-bold text-lg text-[#2C1A0E]">{l.title}</h3>
-                  <p className="text-sm text-[#8A7B6E] mt-1 mb-4">📍 {l.zone}, {l.city}</p>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {l.tags.map(t => <span key={t} className="bg-[#FBF3E8] text-[#7A4B2A] px-3 py-1 rounded-full text-xs font-medium">{t}</span>)}
+                <div className="p-6 flex flex-col grow">
+                  <h3 className="font-serif font-bold text-xl text-[#2C1A0E] leading-tight mb-1">{l.title}</h3>
+                  <p className="text-sm text-[#8A7B6E] mb-5 flex items-center gap-1">
+                    <span className="text-[#C4603A]">📍</span> {l.zone}, {l.city}
+                  </p>
+                  <div className="flex flex-wrap gap-2 mb-5">
+                    {l.tags.map(t => <span key={t} className="bg-neutral-100 text-[#7A4B2A] px-3 py-1 rounded-lg text-xs font-semibold">{t}</span>)}
                   </div>
-                  <Link to={`/dettagli/${l.id}`} className="mt-auto block text-center border-2 border-[#F5E3CC] text-[#C4603A] py-2 rounded-xl font-bold transition-colors group-hover:border-[#C4603A] group-hover:bg-[#FBF3E8]">
+                  <Link to={`/dettagli/${l.id}`} className="mt-auto block text-center bg-neutral-50 text-[#C4603A] py-3 rounded-2xl font-bold transition-colors group-hover:bg-[#C4603A] group-hover:text-white">
                     Vedi dettagli
                   </Link>                
                 </div>
@@ -167,42 +182,52 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- COINQUILINI IN EVIDENZA --- */}
-      <section className="bg-[#F5E3CC] py-16 px-6 animate-fade-in-up" style={{animationDelay: '0.4s'}}>
+      {/* --- COINQUILINI REALI DAL DATABASE --- */}
+      <section className="bg-white border-y border-neutral-100 py-20 px-6 animate-fade-in-up" style={{animationDelay: '0.4s'}}>
         <div className="max-w-7xl mx-auto">
-          <div className="text-[#C4603A] text-xs font-bold uppercase tracking-widest mb-2">Profili in evidenza</div>
-          <h2 className="font-serif text-3xl md:text-4xl text-[#2C1A0E] mb-8">Chi cerca con te</h2>
+          <div className="flex justify-between items-end mb-8">
+            <div>
+              <div className="text-[#C4603A] text-xs font-bold uppercase tracking-widest mb-2">Nuovi utenti</div>
+              <h2 className="font-serif text-3xl md:text-4xl text-[#2C1A0E]">Chi cerca con te</h2>
+            </div>
+            <Link to="/ricerca?intent=coinquilino" className="hidden md:block text-[#C4603A] font-bold hover:underline">Vedi tutti →</Link>
+          </div>
           
-          <div className="flex gap-6 overflow-x-auto snap-x snap-mandatory hide-scrollbar pb-8">
+          <div className="flex gap-6 overflow-x-auto snap-x snap-mandatory hide-scrollbar pb-8 -mx-6 px-6 md:mx-0 md:px-0">
             {isLoadingRoommates ? (
               [1, 2, 3, 4].map((n) => (
-                <div key={`skel-rm-${n}`} className="shrink-0 w-64 bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 flex flex-col snap-start">
-                  <div className="h-16 w-16 bg-neutral-200 animate-pulse rounded-full mx-auto mb-4"></div>
-                  <div className="h-5 w-3/4 bg-neutral-200 animate-pulse rounded mx-auto mb-2"></div>
-                  <div className="h-3 w-1/2 bg-neutral-200 animate-pulse rounded mx-auto mb-4"></div>
-                  <div className="h-3 w-full bg-neutral-200 animate-pulse rounded mb-6"></div>
-                  <div className="h-2 w-full bg-neutral-200 animate-pulse rounded mt-auto"></div>
+                <div key={`skel-rm-${n}`} className="shrink-0 w-64 bg-[#FEFAF4] rounded-3xl shadow-sm border border-orange-50 p-6 flex flex-col snap-start">
+                  <div className="h-20 w-20 bg-orange-100 animate-pulse rounded-full mx-auto mb-4"></div>
+                  <div className="h-5 w-3/4 bg-orange-100 animate-pulse rounded mx-auto mb-2"></div>
+                  <div className="h-3 w-1/2 bg-orange-100 animate-pulse rounded mx-auto mb-6"></div>
+                  <div className="h-16 w-full bg-orange-100 animate-pulse rounded-xl mb-6"></div>
+                  <div className="h-2 w-full bg-orange-100 animate-pulse rounded mt-auto"></div>
                 </div>
               ))
             ) : roommates.length === 0 ? (
-              <p className="text-[#8A7B6E]">Nessun profilo caricato al momento.</p>
+              <div className="bg-[#FEFAF4] rounded-3xl border border-orange-50 p-8 w-full text-center">
+                <p className="text-[#8A7B6E]">Nessun profilo caricato al momento.</p>
+              </div>
             ) : (
               roommates.map(rm => (
-                <div key={rm.id} className="shrink-0 w-64 bg-white rounded-2xl shadow-sm p-6 flex flex-col snap-start transition-all hover:-translate-y-2 hover:shadow-xl cursor-pointer">
-                  <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl mx-auto mb-4" style={{ background: `linear-gradient(135deg, ${rm.color1}, ${rm.color2})` }}>
+                <div key={rm.id} className="shrink-0 w-64 bg-[#FEFAF4] rounded-3xl shadow-sm border border-orange-50 p-6 flex flex-col snap-start transition-all hover:-translate-y-2 hover:shadow-lg cursor-pointer">
+                  <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 shadow-inner" style={{ background: `linear-gradient(135deg, ${rm.color1}, ${rm.color2})` }}>
                     {rm.emoji}
                   </div>
-                  <div className="text-center font-bold text-[#2C1A0E] text-lg">{rm.name}</div>
-                  <div className="text-center text-xs text-[#8A7B6E] mb-3">{rm.age} anni · {rm.job} · {rm.city}</div>
-                  <div className="text-sm text-[#8A7B6E] italic text-center mb-4 leading-relaxed">"{rm.quote}"</div>
-                  <div className="flex flex-wrap justify-center gap-1.5 mb-5">
-                    {rm.tags.map(t => <span key={t} className="bg-[#FBF3E8] text-[#7A4B2A] px-2 py-1 rounded-md text-[10px] font-medium">{t}</span>)}
+                  <div className="text-center font-bold text-[#2C1A0E] text-xl">{rm.name}</div>
+                  <div className="text-center text-sm text-[#8A7B6E] mb-4 font-medium">{rm.age} anni · {rm.job}</div>
+                  <div className="bg-white p-3 rounded-xl text-sm text-[#8A7B6E] italic text-center mb-5 leading-relaxed shadow-sm">"{rm.quote}"</div>
+                  <div className="flex flex-wrap justify-center gap-1.5 mb-6">
+                    {rm.tags.map(t => <span key={t} className="bg-orange-100/50 text-[#7A4B2A] px-2 py-1 rounded-md text-[10px] font-bold uppercase">{t}</span>)}
                   </div>
                   <div className="mt-auto">
-                    <div className="w-full bg-[#FBF3E8] rounded-full h-1.5 mb-1 overflow-hidden">
-                      <div className="bg-gradient-to-r from-[#D4835E] to-[#C4603A] h-1.5 rounded-full" style={{ width: `${rm.match}%` }}></div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <span className="text-[10px] font-bold text-[#8A7B6E] uppercase">Compatibilità</span>
+                      <span className="text-xs font-bold text-[#C4603A]">{rm.match}%</span>
                     </div>
-                    <div className="text-[10px] text-[#C4603A] font-bold text-center">{rm.match}% compatibile</div>
+                    <div className="w-full bg-orange-100/50 rounded-full h-2 overflow-hidden">
+                      <div className="bg-gradient-to-r from-[#D4835E] to-[#C4603A] h-full rounded-full transition-all duration-1000" style={{ width: `${rm.match}%` }}></div>
+                    </div>
                   </div>
                 </div>
               ))
@@ -211,36 +236,34 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- HOW IT WORKS --- */}
-      <section className="bg-[#C4603A] py-16 px-6 animate-fade-in-up" style={{animationDelay: '0.6s'}}>
+      {/* --- HOW IT WORKS (Pulito e Diretto) --- */}
+      <section className="bg-[#FEFAF4] py-20 px-6 animate-fade-in-up" style={{animationDelay: '0.6s'}}>
         <div className="max-w-7xl mx-auto">
-          <div className="text-white/60 text-xs font-bold uppercase tracking-widest mb-2">Come funziona</div>
-          <h2 className="font-serif text-3xl md:text-4xl text-white mb-8">Trovare casa in 4 passi</h2>
+          <div className="text-center mb-16">
+            <h2 className="font-serif text-3xl md:text-5xl text-[#2C1A0E] mb-4">Come funziona</h2>
+            <p className="text-[#8A7B6E] text-lg max-w-2xl mx-auto">Abbiamo rimosso tutti gli ostacoli. Trovare casa o coinquilini ora richiede solo quattro semplici passaggi.</p>
+          </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white/10 border border-white/10 rounded-2xl p-6 transition-all hover:-translate-y-2 hover:bg-white/20">
-              <div className="font-serif text-4xl font-bold text-white/20 mb-2 leading-none">01</div>
-              <div className="text-3xl mb-3">📝</div>
-              <h3 className="text-white font-bold mb-2">Crea il tuo profilo</h3>
-              <p className="text-white/70 text-sm leading-relaxed">Raccontaci di te, del tuo stile di vita e delle tue preferenze. Più sei specifico, migliori i match.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-neutral-100 transition-all hover:-translate-y-1 hover:shadow-md text-center">
+              <div className="w-16 h-16 mx-auto bg-orange-50 rounded-2xl flex items-center justify-center text-3xl mb-6">📝</div>
+              <h3 className="text-[#2C1A0E] font-bold text-lg mb-3">1. Profilo</h3>
+              <p className="text-[#8A7B6E] text-sm leading-relaxed">Raccontaci chi sei e cosa cerchi. Più dettagli fornisci, migliori saranno i tuoi match.</p>
             </div>
-            <div className="bg-white/10 border border-white/10 rounded-2xl p-6 transition-all hover:-translate-y-2 hover:bg-white/20">
-              <div className="font-serif text-4xl font-bold text-white/20 mb-2 leading-none">02</div>
-              <div className="text-3xl mb-3">🔍</div>
-              <h3 className="text-white font-bold mb-2">Cerca e filtra</h3>
-              <p className="text-white/70 text-sm leading-relaxed">Usa i filtri intelligenti per trovare stanze o coinquilini per budget, zona e compatibilità.</p>
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-neutral-100 transition-all hover:-translate-y-1 hover:shadow-md text-center">
+              <div className="w-16 h-16 mx-auto bg-orange-50 rounded-2xl flex items-center justify-center text-3xl mb-6">🔍</div>
+              <h3 className="text-[#2C1A0E] font-bold text-lg mb-3">2. Ricerca</h3>
+              <p className="text-[#8A7B6E] text-sm leading-relaxed">Filtra per città, budget e compatibilità. Trova esattamente quello di cui hai bisogno.</p>
             </div>
-            <div className="bg-white/10 border border-white/10 rounded-2xl p-6 transition-all hover:-translate-y-2 hover:bg-white/20">
-              <div className="font-serif text-4xl font-bold text-white/20 mb-2 leading-none">03</div>
-              <div className="text-3xl mb-3">💬</div>
-              <h3 className="text-white font-bold mb-2">Contatta direttamente</h3>
-              <p className="text-white/70 text-sm leading-relaxed">Chatta con proprietari o coinquilini senza intermediari. Nessuna agenzia, zero costi nascosti.</p>
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-neutral-100 transition-all hover:-translate-y-1 hover:shadow-md text-center">
+              <div className="w-16 h-16 mx-auto bg-orange-50 rounded-2xl flex items-center justify-center text-3xl mb-6">💬</div>
+              <h3 className="text-[#2C1A0E] font-bold text-lg mb-3">3. Chat</h3>
+              <p className="text-[#8A7B6E] text-sm leading-relaxed">Scrivi direttamente in app ai proprietari o ai futuri coinquilini. Istantaneo e sicuro.</p>
             </div>
-            <div className="bg-white/10 border border-white/10 rounded-2xl p-6 transition-all hover:-translate-y-2 hover:bg-white/20">
-              <div className="font-serif text-4xl font-bold text-white/20 mb-2 leading-none">04</div>
-              <div className="text-3xl mb-3">🏠</div>
-              <h3 className="text-white font-bold mb-2">Benvenuto a casa!</h3>
-              <p className="text-white/70 text-sm leading-relaxed">Firma l'accordo, prendi le chiavi e inizia la tua nuova convivenza. Semplice come dev'essere.</p>
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-neutral-100 transition-all hover:-translate-y-1 hover:shadow-md text-center">
+              <div className="w-16 h-16 mx-auto bg-orange-50 rounded-2xl flex items-center justify-center text-3xl mb-6">🏠</div>
+              <h3 className="text-[#2C1A0E] font-bold text-lg mb-3">4. Match</h3>
+              <p className="text-[#8A7B6E] text-sm leading-relaxed">Trovate un accordo, scambiatevi i contatti e preparatevi per la nuova convivenza.</p>
             </div>
           </div>
         </div>
@@ -255,70 +278,34 @@ export default function Home() {
                 Room<span className="text-[#D4835E]">Date</span>
               </div>
               <p className="text-white/40 text-sm leading-relaxed">
-                Il modo più semplice per trovare stanze e coinquilini in Italia. Senza agenzie, senza stress.
+                Il modo più trasparente per trovare stanze e coinquilini in Italia.
               </p>
             </div>
             
             <div>
-              <h4 className="text-white font-bold mb-4 tracking-wide text-sm">Servizi</h4>
+              <h4 className="text-white font-bold mb-4 tracking-wide text-sm">Piattaforma</h4>
               <ul className="flex flex-col gap-3">
-                <li><Link to="/ricerca" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Cerca Stanza</Link></li>
-                <li><Link to="/dashboard" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Pubblica Annuncio</Link></li>
-                <li><Link to="/ricerca?intent=coinquilino" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Trova Coinquilini</Link></li>
+                <li><Link to="/ricerca" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Stanze disponibili</Link></li>
+                <li><Link to="/ricerca?intent=coinquilino" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Cerca coinquilini</Link></li>
+                <li><Link to="/dashboard" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">La tua dashboard</Link></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="text-white font-bold mb-4 tracking-wide text-sm">Supporto</h4>
+              <h4 className="text-white font-bold mb-4 tracking-wide text-sm">Info</h4>
               <ul className="flex flex-col gap-3">
-                <li><a href="#come-funziona" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Come Funziona</a></li>
-                <li><a href="#" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">FAQ</a></li>
-                <li><a href="#" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Sicurezza</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-white font-bold mb-4 tracking-wide text-sm">Azienda</h4>
-              <ul className="flex flex-col gap-3">
-                <li><a href="#" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Chi Siamo</a></li>
-                <li><a href="#" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Blog</a></li>
-                <li><a href="#" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Lavora con Noi</a></li>
+                <li><a href="#" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Linee Guida</a></li>
+                <li><a href="#" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Sicurezza e Privacy</a></li>
+                <li><a href="#" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Supporto Tecnico</a></li>
               </ul>
             </div>
           </div>
 
           <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-            <span className="text-white/30 text-xs">© 2026 RoomDate. Tutti i diritti riservati.</span>
-            <div className="flex gap-6">
-              <a href="#" className="text-white/30 hover:text-[#D4835E] text-xs transition-colors">Privacy Policy</a>
-              <a href="#" className="text-white/30 hover:text-[#D4835E] text-xs transition-colors">Termini di Servizio</a>
-              <a href="#" className="text-white/30 hover:text-[#D4835E] text-xs transition-colors">Cookie</a>
-            </div>
+            <span className="text-white/30 text-xs">© 2026 RoomDate MVP.</span>
           </div>
         </div>
       </footer>
-      
-      {/* --- MOBILE BOTTOM NAV --- */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-neutral-200 z-[990] pb-safe shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
-        <div className="flex justify-around items-center h-16">
-          <Link to="/" className="flex flex-col items-center gap-1 text-[#C4603A]">
-            <span className="text-xl">🏠</span>
-            <span className="text-[10px] font-bold uppercase tracking-wider">Home</span>
-          </Link>
-          <Link to="/ricerca" className="flex flex-col items-center gap-1 text-[#8A7B6E] hover:text-[#C4603A] transition-colors">
-            <span className="text-xl">🔍</span>
-            <span className="text-[10px] font-bold uppercase tracking-wider">Cerca</span>
-          </Link>
-          <Link to="/chat" className="flex flex-col items-center gap-1 text-[#8A7B6E] hover:text-[#C4603A] transition-colors">
-            <span className="text-xl">💬</span>
-            <span className="text-[10px] font-bold uppercase tracking-wider">Chat</span>
-          </Link>
-          <Link to="/dashboard" className="flex flex-col items-center gap-1 text-[#8A7B6E] hover:text-[#C4603A] transition-colors">
-            <span className="text-xl">👤</span>
-            <span className="text-[10px] font-bold uppercase tracking-wider">Profilo</span>
-          </Link>
-        </div>
-      </nav>
 
     </div>
   );

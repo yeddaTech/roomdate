@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import './Dashboard.css';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   // STATI DI NAVIGAZIONE E DATI
   const [activeView, setActiveView] = useState('myListings'); 
@@ -21,6 +21,7 @@ export default function Dashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem('roomdate_user');
+    setIsMenuOpen(false);
     navigate('/');
   };
 
@@ -130,135 +131,172 @@ export default function Dashboard() {
 
   if (!user) return null;
 
-  // Stili per le Tab
-  const getTabStyle = (tabName) => ({
-    padding: '0.8rem 1.5rem',
-    borderRadius: '2rem',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    transition: '0.2s',
-    backgroundColor: activeView === tabName ? '#C4603A' : '#EAE0D5',
-    color: activeView === tabName ? 'white' : '#7A4B2A',
-  });
-
   return (
-    <div style={{ backgroundColor: '#FEFAF4', minHeight: '100vh', fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#FEFAF4] pb-20 md:pb-0 font-sans">
       
-      {/* --- NAVBAR UNIFICATA --- */}
-      <nav>
-        <div className="logo">Room<span>Date</span></div>
-        <div className="nav-links">
-          <Link to="/">Home</Link>
-          <Link to="/ricerca">Cerca Stanza</Link>
-          <Link to="/chat">Chat</Link>
-          <Link to="/dashboard">Profilo</Link>
-          <Link to="/impostazioni">Impostazioni</Link>
+      {/* --- TOP NAV (Coerente) --- */}
+      <nav className="sticky top-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">
+        <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-white decoration-none">
+          Room<span className="text-[#D4835E]">Date</span>
+        </Link>
+        
+        <div className="hidden md:flex gap-8 items-center text-sm font-medium text-neutral-300">
+          <Link to="/" className="hover:text-[#D4835E] transition-colors">Home</Link>
+          <Link to="/ricerca" className="hover:text-[#D4835E] transition-colors">Cerca Stanza</Link>
+          <Link to="/chat" className="hover:text-[#D4835E] transition-colors">Chat</Link>
+          <Link to="/dashboard" className="text-[#D4835E] transition-colors">Profilo</Link>
         </div>
-        <div className="nav-btns">
+
+        <div className="hidden md:flex gap-4 items-center">
           {user ? (
             <>
-              <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginRight: '0.5rem' }}>
-                Ciao, <strong>{user.nome}</strong>!
-              </span>
-              <button onClick={handleLogout} className="btn-fill" style={{ background: '#E24B4A' }}>Esci</button>
+              <span className="text-sm text-neutral-300">Ciao, <strong className="text-white">{user.nome}</strong>!</span>
+              <button onClick={handleLogout} className="border border-neutral-500 hover:border-[#D4835E] hover:text-[#D4835E] px-4 py-2 rounded-full text-sm transition-colors">Esci</button>
             </>
           ) : (
             <>
-              <Link to="/accedi" className="btn-ghost">Accedi</Link>
-              <Link to="/registrati" className="btn-fill">Registrati Gratis</Link>
+              <Link to="/accedi" className="border border-neutral-500 hover:border-[#D4835E] hover:text-[#D4835E] px-4 py-2 rounded-full text-sm transition-colors">Accedi</Link>
+              <Link to="/registrati" className="bg-[#C4603A] hover:bg-[#9A4628] px-5 py-2 rounded-full text-sm font-bold transition-colors">Registrati Gratis</Link>
             </>
           )}
         </div>
+
+        {/* Hamburger Mobile */}
+        <button className="md:hidden flex flex-col gap-1.5 z-[1001]" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+          <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
+          <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></div>
+          <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
+        </button>
       </nav>
 
-      <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 5%' }}>
-        
-        {/* --- HEADER PROFILO (Ispirato allo screenshot) --- */}
-        <div style={{ background: '#2C1A0E', borderRadius: '1rem', padding: '3rem 2rem', textAlign: 'center', color: 'white', position: 'relative' }}>
+      {/* --- MOBILE SIDEBAR APP MENU --- */}
+      <div className={`fixed inset-y-0 right-0 w-72 bg-[#2C1A0E] shadow-2xl z-[1000] p-8 pt-24 transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className="flex flex-col gap-6 text-lg font-medium text-white">
+          {user && (
+             <div className="border-b border-neutral-700 pb-4 mb-2">
+               <h3 className="text-xl">👤 Ciao, {user.nome}!</h3>
+             </div>
+          )}
+          <Link to="/" onClick={() => setIsMenuOpen(false)}>🏠 Home</Link>
+          <Link to="/ricerca" onClick={() => setIsMenuOpen(false)}>🔍 Cerca Stanza</Link>
+          <Link to="/chat" onClick={() => setIsMenuOpen(false)}>💬 Chat</Link>
+          <Link to="/dashboard" onClick={() => setIsMenuOpen(false)}>👤 Il mio Profilo</Link>
           
-          <div style={{ 
-            width: '120px', height: '120px', borderRadius: '50%', 
-            background: 'linear-gradient(135deg, #F5C29A, #C4603A)', 
-            margin: '0 auto 1.5rem', display: 'flex', justifyContent: 'center', 
-            alignItems: 'center', fontSize: '3.5rem', color: 'white', border: '4px solid #1E1008'
-          }}>
+          <div className="mt-8 flex flex-col gap-3">
+            {user ? (
+              <button onClick={handleLogout} className="bg-[#C4603A] w-full py-3 rounded-full font-bold">Esci</button>
+            ) : (
+              <>
+                <Link to="/accedi" className="border border-neutral-500 text-center py-3 rounded-full" onClick={() => setIsMenuOpen(false)}>Accedi</Link>
+                <Link to="/registrati" className="bg-[#C4603A] text-center py-3 rounded-full font-bold" onClick={() => setIsMenuOpen(false)}>Registrati</Link>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      {isMenuOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] md:hidden" onClick={() => setIsMenuOpen(false)}></div>}
+
+
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        
+        {/* --- HEADER PROFILO --- */}
+        <div className="bg-[#2C1A0E] rounded-3xl p-8 md:p-12 text-center text-white relative shadow-lg">
+          
+          <div className="w-28 h-28 md:w-32 md:h-32 rounded-full mx-auto mb-6 flex justify-center items-center text-4xl md:text-5xl text-white border-4 border-[#1A0E07] shadow-xl bg-gradient-to-br from-[#F5C29A] to-[#C4603A]">
             {user.nome.charAt(0).toUpperCase()}
           </div>
           
-          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: '2.5rem', margin: '0 0 0.5rem 0' }}>
+          <h1 className="font-serif text-3xl md:text-4xl font-bold mb-2">
             {user.nome} {user.cognome}
           </h1>
-          <p style={{ color: '#D4835E', margin: '0 0 1rem 0', fontSize: '1.1rem' }}>
-            @{user.nome.toLowerCase()}{user.id?.substring(0,4)}
+          <p className="text-[#D4835E] text-lg mb-6">
+            @{user.nome.toLowerCase()}{user.id?.toString().substring(0,4)}
           </p>
           
-          <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.1)', padding: '0.5rem 1.5rem', borderRadius: '2rem', fontSize: '0.85rem' }}>
-            🎓 Profilo da completare
+          <div className="inline-block bg-white/10 border border-white/20 px-6 py-2 rounded-full text-sm font-medium backdrop-blur-sm">
+            🎓 Profilo Base
           </div>
         </div>
 
-        {/* --- STAT BAR --- */}
-        <div style={{ 
-          display: 'flex', justifyContent: 'space-around', background: 'white', 
-          padding: '1.5rem', borderRadius: '1rem', marginTop: '-2.5rem', 
-          marginLeft: '2rem', marginRight: '2rem', boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
-          position: 'relative', border: '1px solid #F5E3CC'
-        }}>
-          <div style={{ textAlign: 'center', flex: 1, borderRight: '1px solid #F5E3CC' }}>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#C4603A' }}>{myListings.length}</div>
-            <div style={{ fontSize: '0.75rem', color: '#8A7B6E', letterSpacing: '1px', fontWeight: 'bold' }}>ANNUNCI PUBBLICATI</div>
+        {/* --- STAT BAR (Fluttuante) --- */}
+        <div className="flex flex-col md:flex-row justify-around bg-white p-6 rounded-2xl -mt-8 mx-4 md:mx-8 shadow-md relative z-10 border border-orange-50 gap-4 md:gap-0">
+          <div className="text-center flex-1 md:border-r border-orange-50">
+            <div className="text-3xl font-bold text-[#C4603A]">{myListings.length}</div>
+            <div className="text-xs text-[#8A7B6E] tracking-wider font-bold mt-1">ANNUNCI PUBBLICATI</div>
           </div>
-          <div style={{ textAlign: 'center', flex: 1, borderRight: '1px solid #F5E3CC' }}>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#C4603A' }}>0</div>
-            <div style={{ fontSize: '0.75rem', color: '#8A7B6E', letterSpacing: '1px', fontWeight: 'bold' }}>STANZE SALVATE</div>
+          <div className="text-center flex-1 md:border-r border-orange-50">
+            <div className="text-3xl font-bold text-[#C4603A]">0</div>
+            <div className="text-xs text-[#8A7B6E] tracking-wider font-bold mt-1">STANZE SALVATE</div>
           </div>
-          <div style={{ textAlign: 'center', flex: 1 }}>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#C4603A' }}>0</div>
-            <div style={{ fontSize: '0.75rem', color: '#8A7B6E', letterSpacing: '1px', fontWeight: 'bold' }}>CHAT ATTIVE</div>
+          <div className="text-center flex-1">
+            <div className="text-3xl font-bold text-[#C4603A]">0</div>
+            <div className="text-xs text-[#8A7B6E] tracking-wider font-bold mt-1">CHAT ATTIVE</div>
           </div>
         </div>
 
-        {/* --- TABS --- */}
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '3rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <button style={getTabStyle('myListings')} onClick={() => setActiveView('myListings')}>
+        {/* --- TABS NAVIGAZIONE --- */}
+        <div className="flex flex-wrap justify-center gap-3 mt-12 mb-8">
+          <button 
+            className={`px-6 py-3 rounded-full font-bold text-sm transition-all shadow-sm ${activeView === 'myListings' ? 'bg-[#C4603A] text-white shadow-md' : 'bg-orange-50 text-[#7A4B2A] hover:bg-white hover:shadow'}`}
+            onClick={() => setActiveView('myListings')}
+          >
             📄 I Miei Annunci
           </button>
-          <button style={getTabStyle('savedRooms')} onClick={() => setActiveView('savedRooms')}>
+          <button 
+            className={`px-6 py-3 rounded-full font-bold text-sm transition-all shadow-sm ${activeView === 'savedRooms' ? 'bg-[#C4603A] text-white shadow-md' : 'bg-orange-50 text-[#7A4B2A] hover:bg-white hover:shadow'}`}
+            onClick={() => setActiveView('savedRooms')}
+          >
             ❤️ Salvati
           </button>
-          <button style={getTabStyle('editProfile')} onClick={() => setActiveView('editProfile')}>
+          <button 
+            className={`px-6 py-3 rounded-full font-bold text-sm transition-all shadow-sm ${activeView === 'editProfile' ? 'bg-[#C4603A] text-white shadow-md' : 'bg-orange-50 text-[#7A4B2A] hover:bg-white hover:shadow'}`}
+            onClick={() => setActiveView('editProfile')}
+          >
             ⚙️ Modifica Profilo
           </button>
-          <button style={getTabStyle('createListing')} onClick={() => setActiveView('createListing')}>
+          <button 
+            className={`px-6 py-3 rounded-full font-bold text-sm transition-all shadow-sm ${activeView === 'createListing' ? 'bg-[#C4603A] text-white shadow-md' : 'bg-orange-50 text-[#7A4B2A] hover:bg-white hover:shadow'}`}
+            onClick={() => setActiveView('createListing')}
+          >
             ➕ Pubblica Annuncio
           </button>
         </div>
 
         {/* --- CONTENUTO DELLE TAB --- */}
-        <div style={{ marginTop: '2rem' }}>
+        <div className="animate-fade-in-up">
           
           {/* TAB: I MIEI ANNUNCI */}
           {activeView === 'myListings' && (
-            <div className="dash-card" style={{ background: 'white', padding: '2rem', borderRadius: '1rem', border: '1px solid #F5E3CC' }}>
-              <h2 style={{ marginBottom: '1.5rem' }}>Annunci Attivi</h2>
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-orange-50">
+              <h2 className="font-serif text-2xl font-bold text-[#2C1A0E] mb-6">Annunci Attivi</h2>
               {myListings.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--wg)' }}>
-                  <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🛋️</div>
-                  <p>Non hai ancora nessun annuncio attivo.</p>
-                  <button onClick={() => setActiveView('createListing')} className="btn-ghost" style={{ marginTop: '1rem' }}>Crea il tuo primo annuncio</button>
+                <div className="text-center py-16 px-4 bg-neutral-50 rounded-2xl border-2 border-dashed border-neutral-200">
+                  <div className="text-5xl mb-4">🛋️</div>
+                  <p className="text-[#8A7B6E] font-medium mb-6">Non hai ancora nessun annuncio attivo.</p>
+                  <button 
+                    onClick={() => setActiveView('createListing')} 
+                    className="bg-transparent border-2 border-[#C4603A] text-[#C4603A] px-6 py-2.5 rounded-full font-bold hover:bg-orange-50 transition-colors"
+                  >
+                    Crea il tuo primo annuncio
+                  </button>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="flex flex-col gap-4">
                   {myListings.map(l => (
-                    <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem', background: '#FEFAF4', borderRadius: '0.75rem', border: '1px solid #F5E3CC' }}>
+                    <div key={l.id} className="flex flex-col sm:flex-row justify-between sm:items-center p-5 bg-[#FEFAF4] rounded-2xl border border-orange-100 gap-4 transition-all hover:shadow-md">
                       <div>
-                        <div style={{ fontWeight: 'bold', color: '#2C1A0E', fontSize: '1.2rem', marginBottom: '0.3rem' }}>{l.title}</div>
-                        <div style={{ fontSize: '0.9rem', color: '#8A7B6E' }}>📍 {l.city} · 🏠 {l.roomType} · <strong style={{color: '#C4603A'}}>€{l.price}/mese</strong></div>
+                        <div className="font-bold text-[#2C1A0E] text-lg mb-1">{l.title}</div>
+                        <div className="text-sm text-[#8A7B6E] font-medium flex flex-wrap gap-x-3 gap-y-1">
+                          <span>📍 {l.city}</span> 
+                          <span className="hidden sm:inline">·</span>
+                          <span>🏠 {l.roomType}</span>
+                          <span className="hidden sm:inline">·</span>
+                          <strong className="text-[#C4603A]">€{l.price}/mese</strong>
+                        </div>
                       </div>
                       <button 
                         onClick={() => handleDeleteListing(l.id)}
-                        style={{ background: '#E24B4A', color: 'white', border: 'none', padding: '0.8rem 1.2rem', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: 'bold', transition: '0.2s' }}
+                        className="bg-red-50 text-red-600 border border-red-100 hover:bg-red-600 hover:text-white px-5 py-2.5 rounded-xl font-bold transition-colors shrink-0"
                       >
                         Elimina
                       </button>
@@ -271,56 +309,64 @@ export default function Dashboard() {
 
           {/* TAB: SALVATI */}
           {activeView === 'savedRooms' && (
-            <div className="dash-card" style={{ background: 'white', padding: '2rem', borderRadius: '1rem', border: '1px solid #F5E3CC' }}>
-              <h2 style={{ marginBottom: '1.5rem' }}>Le tue Stanze Preferite</h2>
-              <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--wg)' }}>
-                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>💔</div>
-                <p>Non hai ancora salvato nessuna stanza.</p>
-                <Link to="/ricerca" className="btn-ghost" style={{ display: 'inline-block', marginTop: '1rem' }}>Esplora gli annunci</Link>
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-orange-50">
+              <h2 className="font-serif text-2xl font-bold text-[#2C1A0E] mb-6">Le tue Stanze Preferite</h2>
+              <div className="text-center py-16 px-4 bg-neutral-50 rounded-2xl border-2 border-dashed border-neutral-200">
+                <div className="text-5xl mb-4">💔</div>
+                <p className="text-[#8A7B6E] font-medium mb-6">Non hai ancora salvato nessuna stanza.</p>
+                <Link to="/ricerca" className="bg-transparent border-2 border-[#C4603A] text-[#C4603A] px-6 py-2.5 rounded-full font-bold hover:bg-orange-50 transition-colors inline-block">
+                  Esplora gli annunci
+                </Link>
               </div>
             </div>
           )}
 
           {/* TAB: MODIFICA PROFILO */}
           {activeView === 'editProfile' && (
-            <div className="dash-card" style={{ background: 'white', padding: '2rem', borderRadius: '1rem', border: '1px solid #F5E3CC' }}>
-              <h2 style={{ marginBottom: '1.5rem' }}>Informazioni Personali</h2>
-              <form className="dash-form" onSubmit={handleSaveProfile}>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Occupazione</label>
-                    <select name="occupation" required>
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-orange-50">
+              <h2 className="font-serif text-2xl font-bold text-[#2C1A0E] mb-8">Informazioni Personali</h2>
+              <form onSubmit={handleSaveProfile} className="flex flex-col gap-6">
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-bold text-[#2C1A0E]">Occupazione</label>
+                    <select name="occupation" required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors">
                       <option value="">Seleziona...</option>
                       <option value="studente">Studente</option>
                       <option value="lavoratore">Lavoratore</option>
                       <option value="misto">Studente / Lavoratore</option>
                     </select>
                   </div>
-                  <div className="form-group">
-                    <label>Data di Nascita</label>
-                    <input name="birthdate" type="date" required />
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-bold text-[#2C1A0E]">Data di Nascita</label>
+                    <input name="birthdate" type="date" required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors" />
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Bio (Parlaci di te)</label>
-                  <textarea name="bio" placeholder="Ciao! Mi chiamo..." rows="4" required></textarea>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-bold text-[#2C1A0E]">Bio (Parlaci di te)</label>
+                  <textarea name="bio" placeholder="Ciao! Mi chiamo..." rows="4" required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors resize-none"></textarea>
                 </div>
 
-                <div className="form-group">
-                  <label>Il tuo Stile di Vita</label>
-                  <div className="tag-grid">
-                    <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🚬 Fumatore</span></label>
-                    <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🚭 Non Fumatore</span></label>
-                    <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🐶 Ho animali</span></label>
-                    <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🧹 Ordinato/a</span></label>
-                    <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🎉 Socievole</span></label>
-                    <label><input type="checkbox" className="tag-checkbox" /><span className="tag-label">🥦 Vegano/Vegetariano</span></label>
+                <div className="flex flex-col gap-3">
+                  <label className="text-sm font-bold text-[#2C1A0E]">Il tuo Stile di Vita</label>
+                  <div className="flex flex-wrap gap-3">
+                    {/* Checkbox customizzati stile pulsanti */}
+                    {['🚬 Fumatore', '🚭 Non Fumatore', '🐶 Ho animali', '🧹 Ordinato/a', '🎉 Socievole', '🥦 Vegano/Vegetariano'].map(tag => (
+                      <label key={tag} className="relative cursor-pointer group">
+                        <input type="checkbox" className="tag-checkbox peer sr-only" />
+                        <span className="block px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-full text-sm font-medium text-[#8A7B6E] peer-checked:bg-[#C4603A] peer-checked:text-white peer-checked:border-[#C4603A] transition-all group-hover:shadow-sm">
+                          {tag}
+                        </span>
+                      </label>
+                    ))}
                   </div>
                 </div>
 
-                <div className="form-actions" style={{ marginTop: '2rem' }}>
-                  <button type="submit" className="btn-save" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}>Aggiorna Profilo</button>
+                <div className="mt-6 pt-6 border-t border-neutral-100">
+                  <button type="submit" className="w-full md:w-auto bg-[#C4603A] hover:bg-[#9A4628] text-white px-8 py-4 rounded-full font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
+                    Salva Modifiche
+                  </button>
                 </div>
               </form>
             </div>
@@ -328,48 +374,51 @@ export default function Dashboard() {
 
           {/* TAB: CREA ANNUNCIO */}
           {activeView === 'createListing' && (
-            <div className="dash-card" style={{ background: 'white', padding: '2rem', borderRadius: '1rem', border: '1px solid #F5E3CC' }}>
-              <h2 style={{ marginBottom: '1.5rem' }}>Inserisci una Stanza</h2>
-              <form className="dash-form" onSubmit={handleSaveListing}>
-                <div className="form-group">
-                  <label>Titolo Annuncio</label>
-                  <input name="title" type="text" placeholder="Es: Ampia camera singola in centro..." required />
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-orange-50">
+              <h2 className="font-serif text-2xl font-bold text-[#2C1A0E] mb-8">Inserisci una Stanza</h2>
+              <form onSubmit={handleSaveListing} className="flex flex-col gap-6">
+                
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-bold text-[#2C1A0E]">Titolo Annuncio</label>
+                  <input name="title" type="text" placeholder="Es: Ampia camera singola in centro..." required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors" />
                 </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Città</label>
-                    <input name="city" type="text" placeholder="Es: Milano" required />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-bold text-[#2C1A0E]">Città</label>
+                    <input name="city" type="text" placeholder="Es: Milano" required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors" />
                   </div>
-                  <div className="form-group">
-                    <label>Indirizzo o Zona</label>
-                    <input name="zone" type="text" placeholder="Es: Navigli" required />
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-bold text-[#2C1A0E]">Indirizzo o Zona</label>
+                    <input name="zone" type="text" placeholder="Es: Navigli" required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors" />
                   </div>
                 </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Tipo di Stanza</label>
-                    <select name="roomType" required>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-bold text-[#2C1A0E]">Tipo di Stanza</label>
+                    <select name="roomType" required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors">
                       <option value="">Seleziona...</option>
                       <option value="singola">Camera Singola</option>
                       <option value="doppia">Posto in Doppia</option>
                       <option value="intera">Casa intera</option>
                     </select>
                   </div>
-                  <div className="form-group">
-                    <label>Prezzo Mensile (€)</label>
-                    <input name="price" type="number" placeholder="Es: 600" required />
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-bold text-[#2C1A0E]">Prezzo Mensile (€)</label>
+                    <input name="price" type="number" placeholder="Es: 600" required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors" />
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Descrizione della casa e dei coinquilini</label>
-                  <textarea name="description" placeholder="Descrivi l'ambiente, la casa e chi ci vive..." rows="5" required></textarea>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-bold text-[#2C1A0E]">Descrizione della casa e dei coinquilini</label>
+                  <textarea name="description" placeholder="Descrivi l'ambiente, la casa e chi ci vive..." rows="5" required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors resize-none"></textarea>
                 </div>
 
-                <div className="form-actions" style={{ marginTop: '2rem' }}>
-                  <button type="submit" className="btn-save" style={{ background: '#4CAF50', width: '100%', padding: '1rem', fontSize: '1.1rem' }}>Pubblica Subito</button>
+                <div className="mt-6 pt-6 border-t border-neutral-100">
+                  <button type="submit" className="w-full md:w-auto bg-[#4CAF50] hover:bg-[#388E3C] text-white px-8 py-4 rounded-full font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
+                    Pubblica Annuncio
+                  </button>
                 </div>
               </form>
             </div>
@@ -377,6 +426,7 @@ export default function Dashboard() {
 
         </div>
       </div>
+
     </div>
   );
 }
