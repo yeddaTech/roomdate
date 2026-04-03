@@ -48,7 +48,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	err = db.QueryRow(query, req.Nome, req.Cognome, req.Email, string(hashedPassword), req.Citta, req.UserType, req.Nascita).Scan(&newID)
 
 	if err != nil {
-		http.Error(w, "Email già registrata o errore server", http.StatusInternalServerError)
+		// BASTA MESSAGGI GENERICI! Ora stampiamo il vero errore di Postgres
+		http.Error(w, "ERRORE REALE DEL DB: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
