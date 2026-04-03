@@ -40,8 +40,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TOLTO IL TELEFONO DALLA QUERY
-	query := `INSERT INTO users (first_name, last_name, email, password_hash, citta, user_type, birthdate) 
+	// NOTA IL roomdate_app. AGGIUNTO QUI SOTTO
+	query := `INSERT INTO roomdate_app.users (first_name, last_name, email, password_hash, citta, user_type, birthdate) 
 	          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
 
 	var newID int
