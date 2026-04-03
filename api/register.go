@@ -15,9 +15,8 @@ type RegisterRequest struct {
 	Cognome  string `json:"cognome"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
-	Telefono string `json:"telefono"`
 	Citta    string `json:"citta"`
-	UserType string `json:"userType"` // "cerca" o "affitta"
+	UserType string `json:"userType"`
 	Nascita  string `json:"nascita"`
 }
 
@@ -35,19 +34,18 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. Hash della password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		http.Error(w, "Errore sicurezza", http.StatusInternalServerError)
 		return
 	}
 
-	// 2. Salva nel DB con tutti i nuovi campi
-	query := `INSERT INTO users (first_name, last_name, email, password_hash, telefono, citta, user_type, birthdate) 
-	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
+	// TOLTO IL TELEFONO DALLA QUERY
+	query := `INSERT INTO users (first_name, last_name, email, password_hash, citta, user_type, birthdate) 
+	          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
 
 	var newID int
-	err = db.QueryRow(query, req.Nome, req.Cognome, req.Email, string(hashedPassword), req.Telefono, req.Citta, req.UserType, req.Nascita).Scan(&newID)
+	err = db.QueryRow(query, req.Nome, req.Cognome, req.Email, string(hashedPassword), req.Citta, req.UserType, req.Nascita).Scan(&newID)
 
 	if err != nil {
 		http.Error(w, "Email già registrata o errore server", http.StatusInternalServerError)
