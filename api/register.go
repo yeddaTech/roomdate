@@ -21,7 +21,7 @@ type RegisterRequest struct {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	db, err := sql.Open("postgres", os.Getenv("POSTGRES_URL"))
+	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
 	if err != nil {
 		http.Error(w, "Errore DB", http.StatusInternalServerError)
 		return
