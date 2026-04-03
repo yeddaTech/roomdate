@@ -53,7 +53,6 @@ export default function Register() {
   
   const currentStrength = strengthLevels[score];
 
-  // --- SUBMIT ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -61,26 +60,28 @@ export default function Register() {
     try {
       const response = await fetch('/api/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nome: formData.nome,
           cognome: formData.cognome,
           email: formData.email,
-          password: formData.password
+          password: formData.password,
+          telefono: formData.telefono,
+          citta: formData.citta,
+          nascita: formData.nascita,
+          userType: userType // <- AGGIUNTO QUESTO (importantissimo!)
         }),
       });
 
       if (response.ok) {
-        alert('🎉 Registrazione completata con successo! Ora puoi accedere.');
+        alert('🎉 Registrazione completata! Ora puoi accedere.');
         navigate('/accedi');
       } else {
         const errorMsg = await response.text();
         alert('❌ Errore: ' + errorMsg);
       }
     } catch (error) {
-      alert('⚠️ Si è verificato un errore di connessione con il server.');
+      alert('⚠️ Errore di connessione col server.');
     } finally {
       setIsSubmitting(false);
     }
