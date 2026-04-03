@@ -99,7 +99,8 @@ export default function Search() {
   });
 
   return (
-    <div className="min-h-screen bg-[#FEFAF4] pb-20 md:pb-0 font-sans">
+    // FIX IOS SAFARI: min-h-[100dvh] al posto di min-h-screen
+    <div className="min-h-[100dvh] bg-[#FEFAF4] pb-20 md:pb-0 font-sans">
       
       {/* --- TOP NAV (Coerente con Home) --- */}
       <nav className="sticky top-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">
@@ -112,8 +113,7 @@ export default function Search() {
           <Link to="/ricerca" className="text-[#D4835E] transition-colors">Cerca Stanza</Link>
           <Link to="/chat" className="hover:text-[#D4835E] transition-colors">Chat</Link>
           <Link to="/dashboard" className="hover:text-[#D4835E] transition-colors">Profilo</Link>
-          <Link to="/impostazioni" className="text-[#D4835E] transition-colors">Impostazioni</Link>
-          
+          <Link to="/impostazioni" className="hover:text-[#D4835E] transition-colors">Impostazioni</Link>
         </div>
 
         <div className="hidden md:flex gap-4 items-center">
@@ -138,7 +138,7 @@ export default function Search() {
         </button>
       </nav>
 
-      {/* --- MOBILE SIDEBAR (Coerente con Home) --- */}
+      {/* --- MOBILE SIDEBAR --- */}
       <div className={`fixed inset-y-0 right-0 w-72 bg-[#2C1A0E] shadow-2xl z-[1000] p-8 pt-24 transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex flex-col gap-6 text-lg font-medium text-white">
           {user && (
@@ -165,9 +165,8 @@ export default function Search() {
       </div>
       {isMenuOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] md:hidden" onClick={() => setIsMenuOpen(false)}></div>}
 
-      {/* --- HERO SEARCH BOX (Stile Premium) --- */}
+      {/* --- HERO SEARCH BOX --- */}
       <div className="bg-gradient-to-br from-[#2C1A0E] to-[#C4603A] px-6 py-12 flex justify-center relative overflow-hidden">
-        {/* Pattern decorativo */}
         <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, white 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
         
         <div className="bg-white/95 backdrop-blur-md rounded-3xl p-6 shadow-2xl w-full max-w-3xl relative z-10 border border-white/20">
@@ -210,8 +209,6 @@ export default function Search() {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-12 animate-fade-in-up">
-        
-        {/* GRIGLIA RISULTATI */}
         <main>
           <h1 className="font-serif text-3xl md:text-5xl text-[#2C1A0E] mb-3">
             {currentIntent === 'coinquilino' ? 'Coinquilini disponibili' : 'Stanze in affitto'}
@@ -221,7 +218,6 @@ export default function Search() {
           </p>
 
           {loading ? (
-            /* GRIGLIA SKELETON (Adattato alle nuove card) */
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {[1, 2, 3, 4, 5, 6].map((n) => (
                 <div key={n} className="bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col h-full min-h-[380px]">
@@ -249,9 +245,7 @@ export default function Search() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               
-              {/* RENDER DINAMICO: Stanze o Coinquilini? */}
               {filteredResults.map(item => {
-                
                 if (currentIntent === 'stanza') {
                   return (
                     <div key={item.id} className="w-full bg-white rounded-3xl shadow-md border border-neutral-100 flex flex-col transition-all hover:-translate-y-2 hover:shadow-xl cursor-pointer overflow-hidden group">
@@ -284,7 +278,6 @@ export default function Search() {
                 } else {
                   return (
                     <div key={item.id} className="w-full bg-[#FEFAF4] rounded-3xl shadow-sm border border-orange-50 p-6 flex flex-col transition-all hover:-translate-y-2 hover:shadow-lg group relative overflow-hidden">
-                      {/* Piccola decorazione sfondo */}
                       <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-100/50 rounded-full blur-2xl"></div>
                       
                       <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 shadow-inner relative z-10" style={{ background: `linear-gradient(135deg, ${item.color1}, ${item.color2})` }}>
@@ -308,23 +301,25 @@ export default function Search() {
                           <div className="bg-gradient-to-r from-[#D4835E] to-[#C4603A] h-full rounded-full transition-all duration-1000" style={{ width: `${item.match}%` }}></div>
                         </div>
                       </div>
-                      {/* Invece del solo bottone contatta, mettiamo Vedi Dettagli nella card del coinquilino */}
-                      <Link 
-                        to={`/coinquilino/${item.id}`} 
-                        className="w-full block text-center bg-[#C4603A] text-white py-3.5 rounded-2xl font-bold transition-all hover:bg-[#9A4628] shadow-md hover:shadow-xl relative z-10"
-                      >
-                        Vedi dettagli profilo
-                      </Link>
-                      <button 
-                        onClick={() => handleDirectContact(item.id)} 
-                        className="w-full bg-[#C4603A] text-white py-3.5 rounded-2xl font-bold transition-all hover:bg-[#9A4628] shadow-md hover:shadow-xl relative z-10 flex items-center justify-center gap-2"
-                      >
-                        <span className="text-lg">💬</span> Contatta
-                      </button>                 
+                      
+                      {/* FIX PULSANTI: Ora sono impilati con un gap e con stili differenziati per non sembrare pesanti */}
+                      <div className="flex flex-col gap-2 relative z-10 mt-auto">
+                        <Link 
+                          to={`/coinquilino/${item.id}`} 
+                          className="w-full block text-center bg-white border-2 border-[#C4603A] text-[#C4603A] py-3 rounded-2xl font-bold transition-all hover:bg-orange-50 shadow-sm"
+                        >
+                          Vedi dettagli profilo
+                        </Link>
+                        <button 
+                          onClick={() => handleDirectContact(item.id)} 
+                          className="w-full bg-[#C4603A] text-white py-3 rounded-2xl font-bold transition-all hover:bg-[#9A4628] shadow-md flex items-center justify-center gap-2"
+                        >
+                          <span className="text-lg">💬</span> Contatta
+                        </button>   
+                      </div>              
                     </div>
                   );
                 }
-
               })}
             </div>
           )}
