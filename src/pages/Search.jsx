@@ -5,19 +5,39 @@ export default function Search() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   
-  const currentIntent = searchParams.get('intent') || 'stanza'; 
-  const currentCity = searchParams.get('citta') || '';
-  const currentBudget = searchParams.get('budget') || '';
-
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  // LOGICA INIZIALE URL
+  let currentIntent = searchParams.get('intent') || 'stanza'; 
+  const currentCity = searchParams.get('citta') || '';
+  const currentBudget = searchParams.get('budget') || '';
+
+  const handleTopSearch = (newIntent, newCity, newBudget) => {
+    const params = new URLSearchParams();
+    params.append('intent', newIntent);
+    if (newCity) params.append('citta', newCity);
+    if (newBudget) params.append('budget', newBudget);
+    setSearchParams(params);
+  };
+
   useEffect(() => {
     const savedUser = localStorage.getItem('roomdate_user');
-    if (savedUser) setUser(JSON.parse(savedUser));
-  }, []);
+    if (savedUser) {
+      const parsedUser = JSON.parse(savedUser);
+      setUser(parsedUser);
+      
+      // AUTO-REINDIRIZZAMENTO FORZATO:
+      // Se cerchi casa, non puoi spiare i coinquilini. Se offri casa, non guardi le altre case.
+      if (parsedUser.userType === 'cerca' && currentIntent === 'coinquilino') {
+        handleTopSearch('stanza', currentCity, currentBudget);
+      } else if (parsedUser.userType === 'affitta' && currentIntent === 'stanza') {
+        handleTopSearch('coinquilino', currentCity, currentBudget);
+      }
+    }
+  }, [currentIntent]);
 
   const handleLogout = () => {
     localStorage.removeItem('roomdate_user');
@@ -70,39 +90,38 @@ export default function Search() {
       });
   }, [currentIntent]);
 
-  const handleTopSearch = (newIntent, newCity, newBudget) => {
-    const params = new URLSearchParams();
-    params.append('intent', newIntent);
-    if (newCity) params.append('citta', newCity);
-    if (newBudget) params.append('budget', newBudget);
-    setSearchParams(params);
-  };
-
+  // --- IL FILTRO BLINDATO ---
   const filteredResults = results.filter(item => {
     let match = true;
     
-    // Filtro Città e Budget...
+    // 1. Filtro Città
     if (currentCity && item.city && item.city.toLowerCase() !== currentCity.toLowerCase()) match = false;
-    if (currentIntent === 'stanza' && currentBudget && item.price > parseInt(currentBudget)) match = false;
     
-    // LA NUOVA LOGICA DI INCROCIO:
-    if (currentIntent === 'coinquilino' && user) {
-      // Se l'utente ha registrato di avere una stanza ('affitta')
-      // mostragli solo i coinquilini che stanno cercando ('cerca')
-      if (user.userType === 'affitta' && item.type !== 'cerca') match = false;
+    // 2. Filtro per le STANZE
+    if (currentIntent === 'stanza') {
+      if (currentBudget && item.price > parseInt(currentBudget)) match = false;
+    }
+    
+    // 3. Filtro per i COINQUILINI (La logica che hai richiesto)
+    if (currentIntent === 'coinquilino') {
+      // Dobbiamo mostrare SOLO le persone che stanno cercando una stanza.
+      // (Nascondiamo gli altri proprietari/affitta)
+      const tipoProfilo = item.userType || item.user_type || item.type;
       
-      // Viceversa, se l'utente 'cerca', mostragli i profili che offrono 'affitta'
-      if (user.userType === 'cerca' && item.type !== 'affitta') match = false;
+      // Se l'API restituisce il tipo di utente, mostriamo solo chi 'cerca'. 
+      // (Se manca il dato per i profili finti temporanei, li mostra lo stesso)
+      if (tipoProfilo && tipoProfilo !== 'cerca') {
+        match = false;
+      }
     }
 
     return match;
   });
 
   return (
-    // FIX IOS SAFARI: min-h-[100dvh] al posto di min-h-screen
     <div className="min-h-[100dvh] bg-[#FEFAF4] pb-20 md:pb-0 font-sans">
       
-      {/* --- TOP NAV (Coerente con Home) --- */}
+      {/* --- TOP NAV --- */}
       <nav className="sticky top-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-white decoration-none">
           Room<span className="text-[#D4835E]">Date</span>
@@ -170,20 +189,28 @@ export default function Search() {
         <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, white 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
         
         <div className="bg-white/95 backdrop-blur-md rounded-3xl p-6 shadow-2xl w-full max-w-3xl relative z-10 border border-white/20">
+          
+          {/* I BOTTONI INTELLIGENTI: Si mostrano solo se competono all'utente */}
           <div className="flex gap-2 bg-neutral-100 p-1.5 rounded-2xl mb-6">
-            <button 
-              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all shadow-sm ${currentIntent === 'stanza' ? 'bg-[#C4603A] text-white shadow-md' : 'text-[#8A7B6E] hover:bg-white hover:text-[#2C1A0E]'}`} 
-              onClick={() => handleTopSearch('stanza', currentCity, currentBudget)}
-            >
-              🔍 Cerca Stanza
-            </button>
-            <button 
-              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all shadow-sm ${currentIntent === 'coinquilino' ? 'bg-[#C4603A] text-white shadow-md' : 'text-[#8A7B6E] hover:bg-white hover:text-[#2C1A0E]'}`} 
-              onClick={() => handleTopSearch('coinquilino', currentCity, currentBudget)}
-            >
-              👥 Cerco Coinquilini
-            </button>
+            {(!user || user.userType === 'cerca') && (
+              <button 
+                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all shadow-sm ${currentIntent === 'stanza' ? 'bg-[#C4603A] text-white shadow-md' : 'text-[#8A7B6E] hover:bg-white hover:text-[#2C1A0E]'}`} 
+                onClick={() => handleTopSearch('stanza', currentCity, currentBudget)}
+              >
+                🔍 Cerca Stanza
+              </button>
+            )}
+            
+            {(!user || user.userType === 'affitta') && (
+              <button 
+                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all shadow-sm ${currentIntent === 'coinquilino' ? 'bg-[#C4603A] text-white shadow-md' : 'text-[#8A7B6E] hover:bg-white hover:text-[#2C1A0E]'}`} 
+                onClick={() => handleTopSearch('coinquilino', currentCity, currentBudget)}
+              >
+                👥 Cerco Coinquilini
+              </button>
+            )}
           </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <select 
               className="w-full bg-white border border-neutral-200 text-[#2C1A0E] text-sm rounded-2xl px-5 py-4 focus:outline-none focus:border-[#C4603A] focus:ring-2 focus:ring-orange-100 transition-all font-medium"
@@ -234,7 +261,7 @@ export default function Search() {
             <div className="bg-white rounded-3xl border-2 border-dashed border-[#D4835E] p-16 text-center shadow-sm">
               <span className="text-6xl block mb-6">🏜️</span>
               <h3 className="font-serif text-3xl text-[#2C1A0E] mb-3 font-bold">Nessun risultato trovato</h3>
-              <p className="text-[#8A7B6E] mb-8 text-lg">Non ci sono {currentIntent === 'coinquilino' ? 'profili' : 'stanze'} che corrispondono ai tuoi criteri.</p>
+              <p className="text-[#8A7B6E] mb-8 text-lg">Non ci sono {currentIntent === 'coinquilino' ? 'profili in cerca' : 'stanze'} che corrispondono ai tuoi criteri.</p>
               <button 
                 className="bg-transparent border-2 border-[#C4603A] text-[#C4603A] px-8 py-3 rounded-full font-bold hover:bg-orange-50 transition-colors"
                 onClick={() => handleTopSearch(currentIntent, '', '')}
@@ -249,10 +276,10 @@ export default function Search() {
                 if (currentIntent === 'stanza') {
                   return (
                     <div key={item.id} className="w-full bg-white rounded-3xl shadow-md border border-neutral-100 flex flex-col transition-all hover:-translate-y-2 hover:shadow-xl cursor-pointer overflow-hidden group">
-                      <div className="h-56 flex items-center justify-center text-6xl relative" style={{ background: `linear-gradient(135deg, ${item.color}, ${item.color}88)` }}>
-                        {item.emoji}
-                        <span className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm ${item.avail ? 'bg-white text-green-700' : 'bg-black/60 text-white backdrop-blur-sm'}`}>
-                          {item.avail ? '✅ Disponibile' : 'Occupata'}
+                      <div className="h-56 flex items-center justify-center text-6xl relative" style={{ background: `linear-gradient(135deg, ${item.color || '#C4603A'}, ${item.color || '#D4835E'}88)` }}>
+                        {item.emoji || '🏠'}
+                        <span className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm ${item.avail !== false ? 'bg-white text-green-700' : 'bg-black/60 text-white backdrop-blur-sm'}`}>
+                          {item.avail !== false ? '✅ Disponibile' : 'Occupata'}
                         </span>
                         <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm px-4 py-1.5 rounded-xl shadow-sm">
                           <span className="font-serif font-bold text-xl text-[#C4603A]">€{item.price}</span><span className="text-xs text-[#8A7B6E] font-medium">/mese</span>
@@ -264,7 +291,7 @@ export default function Search() {
                           <span className="text-[#C4603A]">📍</span> {item.zone}, {item.city}
                         </p>
                         <div className="flex flex-wrap gap-2 mb-6">
-                          {item.tags.map(t => <span key={t} className="bg-neutral-100 text-[#7A4B2A] px-3 py-1.5 rounded-lg text-xs font-semibold">{t}</span>)}
+                          {(item.tags || []).map(t => <span key={t} className="bg-neutral-100 text-[#7A4B2A] px-3 py-1.5 rounded-lg text-xs font-semibold">{t}</span>)}
                         </div>
                         <Link 
                             to={`/dettagli/${item.id}`} 
@@ -280,29 +307,28 @@ export default function Search() {
                     <div key={item.id} className="w-full bg-[#FEFAF4] rounded-3xl shadow-sm border border-orange-50 p-6 flex flex-col transition-all hover:-translate-y-2 hover:shadow-lg group relative overflow-hidden">
                       <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-100/50 rounded-full blur-2xl"></div>
                       
-                      <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 shadow-inner relative z-10" style={{ background: `linear-gradient(135deg, ${item.color1}, ${item.color2})` }}>
-                        {item.emoji}
+                      <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 shadow-inner relative z-10" style={{ background: `linear-gradient(135deg, ${item.color1 || '#F5C29A'}, ${item.color2 || '#C4603A'})` }}>
+                        {item.emoji || '👤'}
                       </div>
-                      <div className="text-center font-bold text-[#2C1A0E] text-xl relative z-10">{item.name}</div>
-                      <div className="text-center text-sm text-[#8A7B6E] mb-4 font-medium relative z-10">{item.age} anni · {item.job}</div>
+                      <div className="text-center font-bold text-[#2C1A0E] text-xl relative z-10">{item.name || item.first_name}</div>
+                      <div className="text-center text-sm text-[#8A7B6E] mb-4 font-medium relative z-10">{item.age ? `${item.age} anni · ` : ''}{item.job || item.occupation || 'Studente'}</div>
                       
-                      <div className="bg-white p-4 rounded-2xl text-sm text-[#8A7B6E] italic text-center mb-5 leading-relaxed shadow-sm relative z-10">"{item.quote}"</div>
+                      <div className="bg-white p-4 rounded-2xl text-sm text-[#8A7B6E] italic text-center mb-5 leading-relaxed shadow-sm relative z-10">"{item.quote || item.bio || 'Cerco una stanza accogliente!'}"</div>
                       
                       <div className="flex flex-wrap justify-center gap-1.5 mb-6 relative z-10">
-                        {item.tags.map(t => <span key={t} className="bg-orange-100/50 text-[#7A4B2A] px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider">{t}</span>)}
+                        {(item.tags || (item.lifestyle_tags ? item.lifestyle_tags.split(',') : [])).map(t => <span key={t} className="bg-orange-100/50 text-[#7A4B2A] px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider">{t.trim()}</span>)}
                       </div>
                       
                       <div className="mt-auto mb-5 relative z-10">
                         <div className="flex justify-between items-center mb-1.5">
-                          <span className="text-[10px] font-bold text-[#8A7B6E] uppercase">Compatibilità</span>
-                          <span className="text-xs font-bold text-[#C4603A]">{item.match}%</span>
+                          <span className="text-[10px] font-bold text-[#8A7B6E] uppercase">Compatibilità stimata</span>
+                          <span className="text-xs font-bold text-[#C4603A]">{item.match || 85}%</span>
                         </div>
                         <div className="w-full bg-orange-100/50 rounded-full h-2 overflow-hidden">
-                          <div className="bg-gradient-to-r from-[#D4835E] to-[#C4603A] h-full rounded-full transition-all duration-1000" style={{ width: `${item.match}%` }}></div>
+                          <div className="bg-gradient-to-r from-[#D4835E] to-[#C4603A] h-full rounded-full transition-all duration-1000" style={{ width: `${item.match || 85}%` }}></div>
                         </div>
                       </div>
                       
-                      {/* FIX PULSANTI: Ora sono impilati con un gap e con stili differenziati per non sembrare pesanti */}
                       <div className="flex flex-col gap-2 relative z-10 mt-auto">
                         <Link 
                           to={`/coinquilino/${item.id}`} 
