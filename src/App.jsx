@@ -10,6 +10,7 @@ import Search from './pages/Search';
 import Chatpage from './pages/Chatpage';
 import ListingDetails from './pages/ListingDetails';
 import Impostazioni from './pages/Impostazioni';
+import RoommateDetails from './pages/RoommateDetails';
 
 function App() {
   return (
@@ -27,6 +28,8 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/ricerca" element={<Search />} />
         <Route path="/chat" element={<Chatpage />} />
+        <Route path="/coinquilino/:id" element={<RoommateDetails />} />
+
         
         {/* --- ROTTA IMPOSTAZIONI AGGIUNTA QUI --- */}
         <Route path="/impostazioni" element={<Impostazioni />} />
