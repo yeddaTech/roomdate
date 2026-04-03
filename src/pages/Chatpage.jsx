@@ -17,7 +17,6 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
-  // STATI DINAMICI
   const [conversations, setConversations] = useState([]);
   const [activeConvId, setActiveConvId] = useState(null);
   const [inputText, setInputText] = useState('');
@@ -156,7 +155,6 @@ export default function ChatPage() {
   });
 
   return (
-    // FIX 1: Usa h-[100dvh] invece di h-screen, e forza w-full e overflow-hidden
     <div className="flex flex-col h-[100dvh] w-full max-w-[100vw] bg-[#FEFAF4] font-sans overflow-hidden">
       
       {/* --- TOP NAV --- */}
@@ -170,8 +168,6 @@ export default function ChatPage() {
           <Link to="/ricerca" className="hover:text-[#D4835E] transition-colors">Cerca Stanza</Link>
           <Link to="/chat" className="text-[#D4835E] transition-colors">Chat</Link>
           <Link to="/dashboard" className="hover:text-[#D4835E] transition-colors">Profilo</Link>
-          <Link to="/impostazioni" className="text-[#D4835E] transition-colors">Impostazioni</Link>
-          
         </div>
 
         <div className="hidden md:flex gap-4 items-center">
@@ -223,7 +219,8 @@ export default function ChatPage() {
       {isMenuOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] md:hidden" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* ── LAYOUT CHAT ── */}
-      <div className="flex-1 flex overflow-hidden pb-16 md:pb-0 relative w-full">
+      {/* SOLUZIONE: pb-16 si attiva SOLO se siamo nella lista. Se siamo nella chat scompare. */}
+      <div className={`flex-1 flex overflow-hidden relative w-full ${mobileView === 'list' ? 'pb-16 md:pb-0' : ''}`}>
 
         {/* ── SIDEBAR LISTA CHAT ── */}
         <aside className={`${mobileView === 'chat' ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[380px] bg-white border-r border-neutral-200 flex-col h-full shrink-0`}>
@@ -231,7 +228,6 @@ export default function ChatPage() {
             <h2 className="font-serif text-2xl text-[#2C1A0E] font-bold mb-4">Messaggi</h2>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">🔍</span>
-              {/* FIX ZOOM: Usa text-base (16px) per evitare lo zoom su iOS */}
               <input
                 type="text"
                 placeholder="Cerca conversazioni..."
@@ -324,7 +320,6 @@ export default function ChatPage() {
                           </div>
                         )}
                         <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[80%] md:max-w-[70%]`}>
-                          {/* FIX WRAP: Aggiunto break-words per non far esplodere la chat con parole lunghe */}
                           <div className={`px-4 py-2.5 text-sm md:text-base shadow-sm break-words whitespace-pre-wrap w-full ${
                             isMine 
                               ? 'bg-[#C4603A] text-white rounded-2xl rounded-br-sm' 
@@ -354,9 +349,8 @@ export default function ChatPage() {
                 ))}
               </div>
 
-              {/* Input Area */}
-              <div className="shrink-0 bg-white p-3 md:p-4 border-t border-neutral-100 flex items-end gap-3 w-full pb-safe">
-                {/* FIX ZOOM: text-base forzato su mobile */}
+              {/* Input Area (Rimosso pb-safe finto, aggiunto pb reale per dare spazio) */}
+              <div className="shrink-0 bg-white p-3 pb-6 md:p-4 border-t border-neutral-100 flex items-end gap-3 w-full">
                 <textarea
                   ref={textareaRef}
                   className="flex-1 bg-neutral-50 border border-neutral-200 text-[#2C1A0E] text-base md:text-sm rounded-2xl px-4 py-3 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors resize-none max-h-[120px] w-full"
