@@ -336,7 +336,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* SEZIONE 2: Profilo Personale */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-bold text-[#2C1A0E]">Occupazione</label>
                     <select name="occupation" defaultValue={user.occupation || ''} required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]">
@@ -348,7 +348,12 @@ export default function Dashboard() {
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-bold text-[#2C1A0E]">Città di interesse</label>
-                    <input name="citta" type="text" defaultValue={user.citta || ''} required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]" />
+                    <input name="citta" type="text" defaultValue={user.citta || ''} required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]" />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-bold text-[#2C1A0E]">Data di Nascita</label>
+                    {/* FORMATTAZIONE: Se c'è una data, mostriamo solo la parte YYYY-MM-DD per l'input */}
+                    <input name="birthdate" type="date" defaultValue={user.birthdate ? user.birthdate.split('T')[0] : ''} required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]" />
                   </div>
                 </div>
 
