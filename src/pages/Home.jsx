@@ -7,9 +7,11 @@ export default function Home() {
   const [user, setUser] = useState(null);
   const [listings, setListings] = useState([]); 
   const [roommates, setRoommates] = useState([]);
-
+  
+  // Stati per caricamento e menu mobile
   const [isLoadingListings, setIsLoadingListings] = useState(true);
   const [isLoadingRoommates, setIsLoadingRoommates] = useState(true);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   useEffect(() => {
     const savedUser = localStorage.getItem('roomdate_user');
@@ -28,34 +30,86 @@ export default function Home() {
       .finally(() => setIsLoadingRoommates(false));
   }, []);
 
+  // Funzione di Logout
+  const handleLogout = () => {
+    localStorage.removeItem('roomdate_user');
+    setUser(null);
+    setIsMenuOpen(false); // Chiude il menu se è aperto da mobile
+    navigate('/'); // Riporta alla home in modo pulito
+  };
+
   return (
-    <>
-      {/* --- TOP NAV (Desktop) --- */}
+    <div className="home-container">
+      {/* --- TOP NAV --- */}
       <nav className="topnav">
         <div className="logo">Room<span>Date</span></div>
-        <div className="nav-links">
+        
+        {/* Desktop Links */}
+        <div className="nav-links desktop-only">
           <Link to="/">Home</Link>
           <Link to="/ricerca">Cerca Stanza</Link>
           <Link to="/chat">Chat</Link>
           <Link to="/dashboard">Profilo</Link>
           <Link to="/impostazioni">Impostazioni</Link>
         </div>
-        <div className="nav-btns">
+
+        {/* Desktop Buttons */}
+        <div className="nav-btns desktop-only">
           {user ? (
-            <span className="user-greeting" style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginRight: '0.5rem' }}>
-              Ciao, <strong>{user.nome}</strong>!
-            </span>
+            <>
+              <span className="user-greeting" style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', marginRight: '1rem' }}>
+                Ciao, <strong>{user.nome}</strong>!
+              </span>
+              <button onClick={handleLogout} className="btn-ghost" style={{ cursor: 'pointer' }}>Esci</button>
+            </>
           ) : (
             <>
-              <Link to="/accedi" className="btn-ghost mobile-hide">Accedi</Link>
+              <Link to="/accedi" className="btn-ghost">Accedi</Link>
               <Link to="/registrati" className="btn-fill">Registrati</Link>
             </>
           )}
         </div>
+
+        {/* Hamburger Icon (Mobile) */}
+        <div className="hamburger mobile-only" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+          <div className={`line ${isMenuOpen ? 'open' : ''}`}></div>
+          <div className={`line ${isMenuOpen ? 'open' : ''}`}></div>
+          <div className={`line ${isMenuOpen ? 'open' : ''}`}></div>
+        </div>
       </nav>
 
+      {/* --- MOBILE SIDEBAR MENU --- */}
+      <div className={`mobile-menu ${isMenuOpen ? 'active' : ''}`}>
+        <div className="mobile-menu-content">
+          {user ? (
+            <div className="mobile-user-info">
+              <div style={{ fontSize: '2rem' }}>👤</div>
+              <h3>Ciao, {user.nome}!</h3>
+            </div>
+          ) : null}
+          <Link to="/" onClick={() => setIsMenuOpen(false)}>🏠 Home</Link>
+          <Link to="/ricerca" onClick={() => setIsMenuOpen(false)}>🔍 Cerca Stanza</Link>
+          <Link to="/chat" onClick={() => setIsMenuOpen(false)}>💬 Chat</Link>
+          <Link to="/dashboard" onClick={() => setIsMenuOpen(false)}>👤 Il mio Profilo</Link>
+          <Link to="/impostazioni" onClick={() => setIsMenuOpen(false)}>⚙️ Impostazioni</Link>
+          
+          <div className="mobile-menu-footer">
+            {user ? (
+              <button onClick={handleLogout} className="btn-fill w-100" style={{ marginTop: '1rem' }}>Esci dall'account</button>
+            ) : (
+              <>
+                <Link to="/accedi" className="btn-ghost w-100" onClick={() => setIsMenuOpen(false)}>Accedi</Link>
+                <Link to="/registrati" className="btn-fill w-100" onClick={() => setIsMenuOpen(false)} style={{ marginTop: '0.5rem' }}>Registrati</Link>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      {/* Overlay per cliccare fuori dal menu e chiuderlo */}
+      {isMenuOpen && <div className="menu-overlay" onClick={() => setIsMenuOpen(false)}></div>}
+
       {/* --- BOTTOM NAV (Mobile) --- */}
-      <nav className="bottom-nav">
+      <nav className="bottom-nav mobile-only">
         <div className="bottom-nav__inner">
           <Link to="/" className="bottom-nav__item active">
             <span className="bottom-nav__icon">🏠</span>
@@ -76,26 +130,23 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* --- FAB (Mobile Solo) --- */}
-      <Link to="/dashboard" className="fab" title="Pubblica Annuncio">＋</Link>
-
       {/* --- HERO --- */}
-      <section className="hero">
+      <section className="hero fade-in-up">
         <div className="dot-grid"></div>
         <div className="hero-grid" style={{ gridTemplateColumns: '1fr', textAlign: 'center' }}>
           <div style={{ maxWidth: '800px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-            <div className="hero-badge" style={{ display: 'inline-block' }}>🏡 Oltre 12.000 annunci attivi in Italia</div>
-            <h1 className="serif">Trova la tua stanza,<br/><em>trova casa.</em></h1>
+            <div className="hero-badge hover-float" style={{ display: 'inline-block' }}>🏡 Oltre 12.000 annunci attivi in Italia</div>
+            <h1 className="serif title-animate">Trova la tua stanza,<br/><em>trova casa.</em></h1>
             <p className="hero-sub" style={{ margin: '0 auto' }}>Migliaia di stanze e coinquilini selezionati nelle città italiane. Senza agenzie, senza commissioni.</p>
             <div className="hero-ctas" style={{ marginTop: '2rem' }}>
-               <Link to="/ricerca" className="btn-fill cta-primary" style={{ fontSize: '1.2rem', padding: '1rem 2rem' }}>Inizia la ricerca →</Link>
+               <Link to="/ricerca" className="btn-fill cta-primary pulse-btn" style={{ fontSize: '1.2rem', padding: '1rem 2rem' }}>Inizia la ricerca →</Link>
             </div>
           </div>
         </div>
       </section>
 
       {/* --- STANZE IN EVIDENZA (CAROUSEL) --- */}
-      <section className="listings" id="trova">
+      <section className="listings fade-in-up delay-1" id="trova">
         <div className="listings-inner">
           <div className="section-eyebrow">Annunci in evidenza</div>
           <h2 className="section-h serif">Stanze selezionate per te</h2>
@@ -116,7 +167,7 @@ export default function Home() {
               <p style={{color: 'var(--wg)'}}>Nessuna stanza caricata al momento.</p>
             ) : (
               listings.map(l => (
-                <div className="card snap-item" key={l.id}>
+                <div className="card snap-item card-hover" key={l.id}>
                   <div className="card-img" style={{ background: `linear-gradient(135deg, ${l.color}, ${l.color}88)` }}>
                     {l.emoji}
                     <span className={`card-badge ${l.avail ? 'avail' : 'busy'}`}>✅ Disponibile</span>
@@ -138,7 +189,7 @@ export default function Home() {
       </section>
 
       {/* --- COINQUILINI IN EVIDENZA (CAROUSEL) --- */}
-      <section className="roommates" id="coinquilini">
+      <section className="roommates fade-in-up delay-2" id="coinquilini">
         <div className="roommates-inner">
           <div className="section-eyebrow">Profili in evidenza</div>
           <h2 className="section-h serif">Chi cerca con te</h2>
@@ -158,7 +209,7 @@ export default function Home() {
               <p style={{color: 'var(--wg)'}}>Nessun profilo caricato al momento.</p>
             ) : (
               roommates.map(rm => (
-                <div className="rm-card snap-item" key={rm.id}>
+                <div className="rm-card snap-item card-hover" key={rm.id}>
                   <div className="rm-avatar" style={{ background: `linear-gradient(135deg, ${rm.color1}, ${rm.color2})` }}>{rm.emoji}</div>
                   <div className="rm-name">{rm.name}</div>
                   <div className="rm-meta">{rm.age} anni · {rm.job} · {rm.city}</div>
@@ -174,30 +225,31 @@ export default function Home() {
       </section>
 
       {/* --- HOW IT WORKS --- */}
-      <section className="how" id="come-funziona">
+      <section className="how fade-in-up delay-3" id="come-funziona">
+        {/* ... (Lascia il contenuto originale intatto qui) ... */}
         <div className="how-inner">
           <div className="section-eyebrow">Come funziona</div>
           <h2 className="section-h serif">Trovare casa in 4 passi</h2>
           <div className="steps">
-            <div className="step">
+            <div className="step card-hover">
               <div className="step-num">01</div>
               <span className="step-icon">📝</span>
               <h3>Crea il tuo profilo</h3>
               <p>Raccontaci di te, del tuo stile di vita e delle tue preferenze. Più sei specifico, migliori i match.</p>
             </div>
-            <div className="step">
+            <div className="step card-hover">
               <div className="step-num">02</div>
               <span className="step-icon">🔍</span>
               <h3>Cerca e filtra</h3>
               <p>Usa i filtri intelligenti per trovare stanze o coinquilini per budget, zona e compatibilità.</p>
             </div>
-            <div className="step">
+            <div className="step card-hover">
               <div className="step-num">03</div>
               <span className="step-icon">💬</span>
               <h3>Contatta direttamente</h3>
               <p>Chatta con proprietari o coinquilini senza intermediari. Nessuna agenzia, zero costi nascosti.</p>
             </div>
-            <div className="step">
+            <div className="step card-hover">
               <div className="step-num">04</div>
               <span className="step-icon">🏠</span>
               <h3>Benvenuto a casa!</h3>
@@ -207,39 +259,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- FOOTER --- */}
-      <footer>
-        <div className="footer-inner">
-          <div className="footer-grid">
-            <div>
-              <div className="footer-logo">Room<span>Date</span></div>
-              <p className="footer-desc">Il modo più semplice per trovare stanze e coinquilini in Italia. Senza agenzie, senza stress.</p>
-            </div>
-            <div className="footer-col">
-              <h4>Servizi</h4>
-              <ul>
-                <li><Link to="/ricerca">Cerca Stanza</Link></li>
-                <li><Link to="/dashboard">Pubblica Annuncio</Link></li>
-                <li><Link to="/ricerca?intent=coinquilino">Trova Coinquilini</Link></li>
-              </ul>
-            </div>
-            <div className="footer-col">
-              <h4>Supporto</h4>
-              <ul>
-                <li><a href="#come-funziona">Come Funziona</a></li>
-                <li><a href="#">FAQ</a></li>
-                <li><a href="#">Sicurezza</a></li>
-              </ul>
-            </div>
-            <div className="footer-col">
-              <h4>Azienda</h4>
-              <ul>
-                <li><a href="#">Chi Siamo</a></li>
-                <li><a href="#">Blog</a></li>
-                <li><a href="#">Lavora con Noi</a></li>
-              </ul>
-            </div>
-          </div>
           <div className="footer-bottom">
             <span className="footer-cr">© 2026 RoomDate. Tutti i diritti riservati.</span>
             <div className="footer-links">
@@ -248,8 +267,7 @@ export default function Home() {
               <a href="#">Cookie</a>
             </div>
           </div>
-        </div>
-      </footer>
-    </>
+    </div>
   );
 }
+
