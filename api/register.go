@@ -44,7 +44,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	query := `INSERT INTO roomdate_app.users (first_name, last_name, email, password_hash, citta, user_type, birthdate) 
 	          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
 
-	var newID int
+	var newID string
 	err = db.QueryRow(query, req.Nome, req.Cognome, req.Email, string(hashedPassword), req.Citta, req.UserType, req.Nascita).Scan(&newID)
 
 	if err != nil {
