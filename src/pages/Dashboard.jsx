@@ -60,7 +60,7 @@ export default function Dashboard() {
     }
   };
 
-  // --- SALVA PROFILO ---
+// --- SALVA PROFILO ---
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
@@ -69,8 +69,12 @@ export default function Dashboard() {
       .map(cb => cb.nextElementSibling.innerText)
       .join(', ');
 
+    // ECCO I DATI COMPLETI CHE MANDIAMO AL BACKEND
     const data = {
-      userId: user.id,
+      userId: user.id.toString(), // Assicuriamoci sia stringa per il backend
+      userType: formData.get('userType'),
+      citta: formData.get('citta'),
+      budgetMax: formData.get('budgetMax'),
       occupation: formData.get('occupation'),
       birthdate: formData.get('birthdate'),
       bio: formData.get('bio'),
@@ -85,6 +89,12 @@ export default function Dashboard() {
       });
       if (res.ok) {
         alert("✅ Profilo aggiornato con successo!");
+        
+        // Aggiorniamo anche il LocalStorage così non dobbiamo rifare il login per vedere i cambiamenti!
+        const updatedUser = { ...user, ...data, budget_max: data.budgetMax };
+        localStorage.setItem('roomdate_user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        
         setActiveView('myListings');
       } else {
         const errorMsg = await res.text();
@@ -310,10 +320,26 @@ export default function Dashboard() {
               <h2 className="font-serif text-2xl font-bold text-[#2C1A0E] mb-8">Informazioni Personali</h2>
               <form onSubmit={handleSaveProfile} className="flex flex-col gap-6">
                 
+                {/* SEZIONE 1: Dati Base */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b border-neutral-100">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-bold text-[#2C1A0E]">Il tuo obiettivo</label>
+                    <select name="userType" defaultValue={user.userType || 'cerca'} required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]">
+                      <option value="cerca">🔍 Cerco una stanza</option>
+                      <option value="affitta">🏠 Offro una stanza</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-bold text-[#2C1A0E]">Budget Max / Prezzo Richiesto (€)</label>
+                    <input name="budgetMax" type="number" defaultValue={user.budget_max || ''} placeholder="Es: 600" className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]" />
+                  </div>
+                </div>
+
+                {/* SEZIONE 2: Profilo Personale */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-bold text-[#2C1A0E]">Occupazione</label>
-                    <select name="occupation" required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors">
+                    <select name="occupation" defaultValue={user.occupation || ''} required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]">
                       <option value="">Seleziona...</option>
                       <option value="studente">Studente</option>
                       <option value="lavoratore">Lavoratore</option>
@@ -321,28 +347,30 @@ export default function Dashboard() {
                     </select>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className="text-sm font-bold text-[#2C1A0E]">Data di Nascita</label>
-                    <input name="birthdate" type="date" required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors" />
+                    <label className="text-sm font-bold text-[#2C1A0E]">Città di interesse</label>
+                    <input name="citta" type="text" defaultValue={user.citta || ''} required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]" />
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-bold text-[#2C1A0E]">Bio (Parlaci di te)</label>
-                  <textarea name="bio" placeholder="Ciao! Mi chiamo..." rows="4" required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors resize-none"></textarea>
+                  <textarea name="bio" defaultValue={user.bio || ''} placeholder="Ciao! Mi chiamo..." rows="4" required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] resize-none"></textarea>
                 </div>
 
                 <div className="flex flex-col gap-3">
                   <label className="text-sm font-bold text-[#2C1A0E]">Il tuo Stile di Vita</label>
                   <div className="flex flex-wrap gap-3">
-                    {/* Checkbox customizzati stile pulsanti */}
-                    {['🚬 Fumatore', '🚭 Non Fumatore', '🐶 Ho animali', '🧹 Ordinato/a', '🎉 Socievole', '🥦 Vegano/Vegetariano'].map(tag => (
-                      <label key={tag} className="relative cursor-pointer group">
-                        <input type="checkbox" className="tag-checkbox peer sr-only" />
-                        <span className="block px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-full text-sm font-medium text-[#8A7B6E] peer-checked:bg-[#C4603A] peer-checked:text-white peer-checked:border-[#C4603A] transition-all group-hover:shadow-sm">
-                          {tag}
-                        </span>
-                      </label>
-                    ))}
+                    {['🚬 Fumatore', '🚭 Non Fumatore', '🐶 Ho animali', '🧹 Ordinato/a', '🎉 Socievole', '🥦 Vegano/Vegetariano'].map(tag => {
+                      const isChecked = user.lifestyle_tags && user.lifestyle_tags.includes(tag);
+                      return (
+                        <label key={tag} className="relative cursor-pointer group">
+                          <input type="checkbox" defaultChecked={isChecked} className="tag-checkbox peer sr-only" />
+                          <span className="block px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-full text-sm font-medium text-[#8A7B6E] peer-checked:bg-[#C4603A] peer-checked:text-white peer-checked:border-[#C4603A] transition-all group-hover:shadow-sm">
+                            {tag}
+                          </span>
+                        </label>
+                      )
+                    })}
                   </div>
                 </div>
 
