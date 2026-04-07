@@ -15,6 +15,10 @@ export default function Search() {
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
+  // --- LA SOLUZIONE AL BUG ---
+  // Normalizziamo la lettura del ruolo per supportare sia lo snake_case del DB che il camelCase
+  const ruoloUtente = user ? (user.user_type || user.userType || user.type) : null;
+
   // 2. LETTURA URL
   const currentIntent = searchParams.get('intent') || 'stanza'; 
   const currentCity = searchParams.get('citta') || '';
@@ -37,23 +41,23 @@ export default function Search() {
   // 4. AUTO-REINDIRIZZAMENTO FORZATO (Il Guardiano aggiornato)
   useEffect(() => {
     // Se non c'è utente, O se l'utente ha un ruolo speciale come 'admin', lascialo navigare liberamente
-    if (!user || (user.userType !== 'cerca' && user.userType !== 'affitta')) return; 
+    if (!user || (ruoloUtente !== 'cerca' && ruoloUtente !== 'affitta')) return; 
 
     // Se chi cerca casa prova ad andare sui coinquilini, riportalo alle stanze
-    if (user.userType === 'cerca' && currentIntent !== 'stanza') {
+    if (ruoloUtente === 'cerca' && currentIntent !== 'stanza') {
       handleTopSearch('stanza', currentCity, currentBudget);
     } 
     // Se chi offre casa prova ad andare sulle stanze, riportalo ai coinquilini
-    else if (user.userType === 'affitta' && currentIntent !== 'coinquilino') {
+    else if (ruoloUtente === 'affitta' && currentIntent !== 'coinquilino') {
       handleTopSearch('coinquilino', currentCity, ''); // Niente budget per chi offre
     }
-  }, [user, currentIntent]); 
+  }, [user, currentIntent, ruoloUtente, currentCity, currentBudget]); 
 
   // 5. GESTIONE CHIAMATE API
   useEffect(() => {
     // BLOCCO ANTI-RACE-CONDITION: Evita il fetch se stiamo per fare l'auto-redirect
-    if (user?.userType === 'cerca' && currentIntent === 'coinquilino') return;
-    if (user?.userType === 'affitta' && currentIntent === 'stanza') return;
+    if (ruoloUtente === 'cerca' && currentIntent === 'coinquilino') return;
+    if (ruoloUtente === 'affitta' && currentIntent === 'stanza') return;
 
     setLoading(true);
     const apiEndpoint = currentIntent === 'coinquilino' ? '/api/get_roommates' : '/api/get_listings';
@@ -69,7 +73,7 @@ export default function Search() {
         setResults([]);
         setLoading(false);
       });
-  }, [currentIntent, user]); 
+  }, [currentIntent, ruoloUtente]); 
 
   // --- AZIONI UTENTE ---
   const handleLogout = () => {
@@ -108,9 +112,9 @@ export default function Search() {
   const filteredResults = results.filter(item => {
     let match = true;
     
-    // A. Filtro Città
+    // A. Filtro Città (Tollerante sia a .citta che .city)
     if (currentCity) {
-      const itemCity = item.city || '';
+      const itemCity = item.citta || item.city || '';
       if (itemCity.toLowerCase() !== currentCity.toLowerCase()) {
         match = false;
       }
@@ -118,14 +122,15 @@ export default function Search() {
     
     // B. Filtro specifico per Stanza (Budget)
     if (currentIntent === 'stanza') {
-      if (currentBudget && item.price > parseInt(currentBudget)) {
+      const itemPrice = item.price || item.prezzo || 0; // Fallback di sicurezza
+      if (currentBudget && itemPrice > parseInt(currentBudget)) {
         match = false;
       }
     }
     
     // C. Filtro specifico per Coinquilini (Solo chi "cerca")
     if (currentIntent === 'coinquilino') {
-      const tipoProfilo = item.userType || item.user_type || item.type;
+      const tipoProfilo = item.user_type || item.userType || item.type;
       if (tipoProfilo && tipoProfilo !== 'cerca') {
         match = false;
       }
@@ -154,7 +159,7 @@ export default function Search() {
         <div className="hidden md:flex gap-4 items-center">
           {user ? (
             <>
-              <span className="text-sm text-neutral-300">Ciao, <strong className="text-white">{user.nome || user.username || 'admin'}</strong>!</span>
+              <span className="text-sm text-neutral-300">Ciao, <strong className="text-white">{user.nome || user.first_name || user.username || 'admin'}</strong>!</span>
               <button onClick={handleLogout} className="border border-neutral-500 hover:border-[#D4835E] hover:text-[#D4835E] px-4 py-2 rounded-full text-sm transition-colors">Esci</button>
             </>
           ) : (
@@ -178,7 +183,7 @@ export default function Search() {
         <div className="flex flex-col gap-6 text-lg font-medium text-white">
           {user && (
              <div className="border-b border-neutral-700 pb-4 mb-2">
-               <h3 className="text-xl">👤 Ciao, {user.nome || user.username || 'admin'}!</h3>
+               <h3 className="text-xl">👤 Ciao, {user.nome || user.first_name || user.username || 'admin'}!</h3>
              </div>
           )}
           <Link to="/" onClick={() => setIsMenuOpen(false)}>🏠 Home</Link>
@@ -206,8 +211,8 @@ export default function Search() {
         
         <div className="bg-white/95 backdrop-blur-md rounded-3xl p-6 shadow-2xl w-full max-w-3xl relative z-10 border border-white/20">
           
-          {/* I BOTTONI INTELLIGENTI: Toggle per ospiti/admin, Badge fisso per loggati standard */}
-          {!user || (user.userType !== 'cerca' && user.userType !== 'affitta') ? (
+          {/* I BOTTONI INTELLIGENTI */}
+          {!user || (ruoloUtente !== 'cerca' && ruoloUtente !== 'affitta') ? (
             <div className="flex gap-2 bg-neutral-100 p-1.5 rounded-2xl mb-6">
               <button 
                 className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all shadow-sm ${currentIntent === 'stanza' ? 'bg-[#C4603A] text-white shadow-md' : 'text-[#8A7B6E] hover:bg-white hover:text-[#2C1A0E]'}`} 
@@ -225,7 +230,7 @@ export default function Search() {
           ) : (
             <div className="mb-6 flex justify-center">
               <div className="bg-white/80 border border-[#C4603A]/30 text-[#2C1A0E] px-6 py-2.5 rounded-full text-sm font-bold shadow-sm inline-flex items-center gap-2">
-                {user.userType === 'cerca' ? '🔍 Stai cercando: Stanze in affitto' : '👥 Stai cercando: Coinquilini per la tua stanza'}
+                {ruoloUtente === 'cerca' ? '🔍 Stai cercando: Stanze in affitto' : '👥 Stai cercando: Coinquilini per la tua stanza'}
               </div>
             </div>
           )}
@@ -304,13 +309,13 @@ export default function Search() {
                           {item.avail !== false ? '✅ Disponibile' : 'Occupata'}
                         </span>
                         <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm px-4 py-1.5 rounded-xl shadow-sm">
-                          <span className="font-serif font-bold text-xl text-[#C4603A]">€{item.price}</span><span className="text-xs text-[#8A7B6E] font-medium">/mese</span>
+                          <span className="font-serif font-bold text-xl text-[#C4603A]">€{item.price || item.prezzo}</span><span className="text-xs text-[#8A7B6E] font-medium">/mese</span>
                         </div>
                       </div>
                       <div className="p-6 flex flex-col grow">
                         <h3 className="font-serif font-bold text-xl text-[#2C1A0E] leading-tight mb-2">{item.title}</h3>
                         <p className="text-sm text-[#8A7B6E] mb-5 flex items-center gap-1">
-                          <span className="text-[#C4603A]">📍</span> {item.zone}, {item.city}
+                          <span className="text-[#C4603A]">📍</span> {item.zone || item.zona || item.citta}, {item.city || item.citta}
                         </p>
                         <div className="flex flex-wrap gap-2 mb-6">
                           {(item.tags || []).map(t => <span key={t} className="bg-neutral-100 text-[#7A4B2A] px-3 py-1.5 rounded-lg text-xs font-semibold">{t}</span>)}
