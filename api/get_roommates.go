@@ -10,7 +10,6 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// ABBIAMO AGGIUNTO USERTYPE ALLA STRUTTURA
 type Roommate struct {
 	ID       string   `json:"id"`
 	Name     string   `json:"name"`
@@ -23,7 +22,8 @@ type Roommate struct {
 	Color2   string   `json:"color2"`
 	Emoji    string   `json:"emoji"`
 	Tags     []string `json:"tags"`
-	UserType string   `json:"user_type"` // <--- IL FILTRO REACT NE HA BISOGNO!
+	UserType string   `json:"user_type"`
+	Budget   int      `json:"budget_max"` // <--- AGGIUNTO IL BUDGET
 }
 
 func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +34,7 @@ func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// LA SUPER QUERY AGGIORNATA: Ora prende anche la citta e l'user_type!
+	// Estratto anche il budget_max
 	query := `
         SELECT 
             id::text, 
@@ -43,7 +43,8 @@ func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
             COALESCE(bio, 'Ciao! Sto cercando una nuova casa e dei fantastici coinquilini.'), 
             COALESCE(lifestyle_tags, 'Socievole, Ordinato'),
             COALESCE(citta, ''),
-            COALESCE(user_type, 'cerca')
+            COALESCE(user_type, 'cerca'),
+            COALESCE(budget_max, 0)
         FROM roomdate_app.users 
         LIMIT 8
     `
@@ -63,16 +64,14 @@ func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
 		var rm Roommate
 		var tagsStr string
 
-		// Aggiunti rm.City e rm.UserType nello Scan!
-		if err := rows.Scan(&rm.ID, &rm.Name, &rm.Job, &rm.Quote, &tagsStr, &rm.City, &rm.UserType); err != nil {
+		// Aggiunto &rm.Budget allo Scan
+		if err := rows.Scan(&rm.ID, &rm.Name, &rm.Job, &rm.Quote, &tagsStr, &rm.City, &rm.UserType, &rm.Budget); err != nil {
 			http.Error(w, "Errore Scan: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		// Dividiamo i tag
 		rm.Tags = strings.Split(tagsStr, ", ")
 
-		// Dati grafici finti (Ora City è vera, non è più finta!)
 		rm.Age = 22 + (i % 6)
 		rm.Match = 85 + (i * 2)
 		rm.Color1 = colors[i%len(colors)][0]
