@@ -6,16 +6,19 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
-  // STATI DI NAVIGAZIONE E DATI
   const [activeView, setActiveView] = useState('myListings'); 
   const [myListings, setMyListings] = useState([]);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('roomdate_user');
-    if (!savedUser) {
+    try {
+      const savedUser = localStorage.getItem('roomdate_user');
+      if (!savedUser) {
+        navigate('/accedi');
+      } else {
+        setUser(JSON.parse(savedUser));
+      }
+    } catch {
       navigate('/accedi');
-    } else {
-      setUser(JSON.parse(savedUser));
     }
   }, [navigate]);
 
@@ -25,7 +28,6 @@ export default function Dashboard() {
     navigate('/');
   };
 
-  // --- SCARICA I TUOI ANNUNCI DAL DB ---
   const fetchMyListings = async () => {
     if (!user) return;
     try {
@@ -33,7 +35,7 @@ export default function Dashboard() {
       const data = await res.json();
       if (data) setMyListings(data);
     } catch (err) {
-      console.error("Errore caricamento miei annunci", err);
+      console.error("Errore caricamento annunci", err);
     }
   };
 
@@ -43,7 +45,6 @@ export default function Dashboard() {
     }
   }, [user]);
 
-  // --- ELIMINA ANNUNCIO ---
   const handleDeleteListing = async (id) => {
     if (window.confirm("Sei sicuro di voler eliminare questo annuncio? L'azione è irreversibile!")) {
       try {
@@ -60,21 +61,20 @@ export default function Dashboard() {
     }
   };
 
-// --- SALVA PROFILO ---
+  // --- IL SALVATAGGIO CHIAMA LA TUA API: /api/profile ---
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     
     const tags = Array.from(e.target.querySelectorAll('.tag-checkbox:checked'))
-      .map(cb => cb.nextElementSibling.innerText)
+      .map(cb => cb.dataset.tagname)
       .join(', ');
 
-    // ECCO I DATI COMPLETI CHE MANDIAMO AL BACKEND
-    const data = {
-      userId: user.id.toString(), // Assicuriamoci sia stringa per il backend
+    const payload = {
+      userId: user.id.toString(),
       userType: formData.get('userType'),
       citta: formData.get('citta'),
-      budgetMax: formData.get('budgetMax'),
+      budgetMax: formData.get('budgetMax'), // Lo mandiamo come stringa per comodità
       occupation: formData.get('occupation'),
       birthdate: formData.get('birthdate'),
       bio: formData.get('bio'),
@@ -85,27 +85,35 @@ export default function Dashboard() {
       const res = await fetch('/api/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify(payload)
       });
       if (res.ok) {
         alert("✅ Profilo aggiornato con successo!");
         
-        // Aggiorniamo anche il LocalStorage così non dobbiamo rifare il login per vedere i cambiamenti!
-        const updatedUser = { ...user, ...data, budget_max: data.budgetMax };
+        // Aggiorniamo LocalStorage così vedi subito le modifiche
+        const updatedUser = { 
+          ...user, 
+          user_type: payload.userType,
+          citta: payload.citta,
+          budget_max: payload.budgetMax ? parseInt(payload.budgetMax) : 0,
+          occupation: payload.occupation,
+          nascita: payload.birthdate,
+          bio: payload.bio,
+          lifestyle_tags: payload.tags
+        };
         localStorage.setItem('roomdate_user', JSON.stringify(updatedUser));
         setUser(updatedUser);
         
         setActiveView('myListings');
       } else {
         const errorMsg = await res.text();
-        alert("❌ Errore: " + errorMsg);
+        alert("❌ Errore dal server: " + errorMsg);
       }
     } catch (err) {
       alert("Errore di connessione al server.");
     }
   };
 
-  // --- PUBBLICA ANNUNCIO ---
   const handleSaveListing = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
@@ -144,7 +152,6 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#FEFAF4] pb-20 md:pb-0 font-sans">
       
-      {/* --- TOP NAV (Coerente) --- */}
       <nav className="sticky top-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-white decoration-none">
           Room<span className="text-[#D4835E]">Date</span>
@@ -155,25 +162,14 @@ export default function Dashboard() {
           <Link to="/ricerca" className="hover:text-[#D4835E] transition-colors">Cerca Stanza</Link>
           <Link to="/chat" className="hover:text-[#D4835E] transition-colors">Chat</Link>
           <Link to="/dashboard" className="text-[#D4835E] transition-colors">Profilo</Link>
-          <Link to="/impostazioni" className="text-[#D4835E] transition-colors">Impostazioni</Link>
-          
+          <Link to="/impostazioni" className="hover:text-[#D4835E] transition-colors">Impostazioni</Link>
         </div>
 
         <div className="hidden md:flex gap-4 items-center">
-          {user ? (
-            <>
-              <span className="text-sm text-neutral-300">Ciao, <strong className="text-white">{user.nome}</strong>!</span>
-              <button onClick={handleLogout} className="border border-neutral-500 hover:border-[#D4835E] hover:text-[#D4835E] px-4 py-2 rounded-full text-sm transition-colors">Esci</button>
-            </>
-          ) : (
-            <>
-              <Link to="/accedi" className="border border-neutral-500 hover:border-[#D4835E] hover:text-[#D4835E] px-4 py-2 rounded-full text-sm transition-colors">Accedi</Link>
-              <Link to="/registrati" className="bg-[#C4603A] hover:bg-[#9A4628] px-5 py-2 rounded-full text-sm font-bold transition-colors">Registrati Gratis</Link>
-            </>
-          )}
+          <span className="text-sm text-neutral-300">Ciao, <strong className="text-white">{user.nome || user.first_name}</strong>!</span>
+          <button onClick={handleLogout} className="border border-neutral-500 hover:border-[#D4835E] hover:text-[#D4835E] px-4 py-2 rounded-full text-sm transition-colors">Esci</button>
         </div>
 
-        {/* Hamburger Mobile */}
         <button className="md:hidden flex flex-col gap-1.5 z-[1001]" onClick={() => setIsMenuOpen(!isMenuOpen)}>
           <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
           <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></div>
@@ -181,56 +177,41 @@ export default function Dashboard() {
         </button>
       </nav>
 
-      {/* --- MOBILE SIDEBAR APP MENU --- */}
       <div className={`fixed inset-y-0 right-0 w-72 bg-[#2C1A0E] shadow-2xl z-[1000] p-8 pt-24 transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex flex-col gap-6 text-lg font-medium text-white">
-          {user && (
-             <div className="border-b border-neutral-700 pb-4 mb-2">
-               <h3 className="text-xl">👤 Ciao, {user.nome}!</h3>
-             </div>
-          )}
+          <div className="border-b border-neutral-700 pb-4 mb-2">
+            <h3 className="text-xl">👤 Ciao, {user.nome || user.first_name}!</h3>
+          </div>
           <Link to="/" onClick={() => setIsMenuOpen(false)}>🏠 Home</Link>
           <Link to="/ricerca" onClick={() => setIsMenuOpen(false)}>🔍 Cerca Stanza</Link>
           <Link to="/chat" onClick={() => setIsMenuOpen(false)}>💬 Chat</Link>
           <Link to="/dashboard" onClick={() => setIsMenuOpen(false)}>👤 Il mio Profilo</Link>
+          <Link to="/impostazioni" onClick={() => setIsMenuOpen(false)}>⚙️ Impostazioni</Link>
           
           <div className="mt-8 flex flex-col gap-3">
-            {user ? (
-              <button onClick={handleLogout} className="bg-[#C4603A] w-full py-3 rounded-full font-bold">Esci</button>
-            ) : (
-              <>
-                <Link to="/accedi" className="border border-neutral-500 text-center py-3 rounded-full" onClick={() => setIsMenuOpen(false)}>Accedi</Link>
-                <Link to="/registrati" className="bg-[#C4603A] text-center py-3 rounded-full font-bold" onClick={() => setIsMenuOpen(false)}>Registrati</Link>
-              </>
-            )}
+            <button onClick={handleLogout} className="bg-[#C4603A] w-full py-3 rounded-full font-bold">Esci</button>
           </div>
         </div>
       </div>
       {isMenuOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] md:hidden" onClick={() => setIsMenuOpen(false)}></div>}
 
-
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         
-        {/* --- HEADER PROFILO --- */}
         <div className="bg-[#2C1A0E] rounded-3xl p-8 md:p-12 text-center text-white relative shadow-lg">
-          
           <div className="w-28 h-28 md:w-32 md:h-32 rounded-full mx-auto mb-6 flex justify-center items-center text-4xl md:text-5xl text-white border-4 border-[#1A0E07] shadow-xl bg-gradient-to-br from-[#F5C29A] to-[#C4603A]">
-            {user.nome.charAt(0).toUpperCase()}
+            {(user.nome || user.first_name || 'U').charAt(0).toUpperCase()}
           </div>
-          
           <h1 className="font-serif text-3xl md:text-4xl font-bold mb-2">
-            {user.nome} {user.cognome}
+            {user.nome || user.first_name} {user.cognome || user.last_name}
           </h1>
           <p className="text-[#D4835E] text-lg mb-6">
-            @{user.nome.toLowerCase()}{user.id?.toString().substring(0,4)}
+            @{(user.nome || user.first_name || 'user').toLowerCase()}{user.id?.toString().substring(0,4)}
           </p>
-          
           <div className="inline-block bg-white/10 border border-white/20 px-6 py-2 rounded-full text-sm font-medium backdrop-blur-sm">
             🎓 Profilo Base
           </div>
         </div>
 
-        {/* --- STAT BAR (Fluttuante) --- */}
         <div className="flex flex-col md:flex-row justify-around bg-white p-6 rounded-2xl -mt-8 mx-4 md:mx-8 shadow-md relative z-10 border border-orange-50 gap-4 md:gap-0">
           <div className="text-center flex-1 md:border-r border-orange-50">
             <div className="text-3xl font-bold text-[#C4603A]">{myListings.length}</div>
@@ -246,7 +227,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* --- TABS NAVIGAZIONE --- */}
         <div className="flex flex-wrap justify-center gap-3 mt-12 mb-8">
           <button 
             className={`px-6 py-3 rounded-full font-bold text-sm transition-all shadow-sm ${activeView === 'myListings' ? 'bg-[#C4603A] text-white shadow-md' : 'bg-orange-50 text-[#7A4B2A] hover:bg-white hover:shadow'}`}
@@ -254,7 +234,6 @@ export default function Dashboard() {
           >
             📄 I Miei Annunci
           </button>
-
           <button 
             className={`px-6 py-3 rounded-full font-bold text-sm transition-all shadow-sm ${activeView === 'editProfile' ? 'bg-[#C4603A] text-white shadow-md' : 'bg-orange-50 text-[#7A4B2A] hover:bg-white hover:shadow'}`}
             onClick={() => setActiveView('editProfile')}
@@ -269,7 +248,6 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* --- CONTENUTO DELLE TAB --- */}
         <div className="animate-fade-in-up">
           
           {/* TAB: I MIEI ANNUNCI */}
@@ -320,11 +298,10 @@ export default function Dashboard() {
               <h2 className="font-serif text-2xl font-bold text-[#2C1A0E] mb-8">Informazioni Personali</h2>
               <form onSubmit={handleSaveProfile} className="flex flex-col gap-6">
                 
-                {/* SEZIONE 1: Dati Base */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b border-neutral-100">
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-bold text-[#2C1A0E]">Il tuo obiettivo</label>
-                    <select name="userType" defaultValue={user.userType || 'cerca'} required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]">
+                    <select name="userType" defaultValue={user.user_type || user.userType || 'cerca'} required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]">
                       <option value="cerca">🔍 Cerco una stanza</option>
                       <option value="affitta">🏠 Offro una stanza</option>
                     </select>
@@ -335,15 +312,14 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* SEZIONE 2: Profilo Personale */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-bold text-[#2C1A0E]">Occupazione</label>
                     <select name="occupation" defaultValue={user.occupation || ''} required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]">
                       <option value="">Seleziona...</option>
-                      <option value="studente">Studente</option>
-                      <option value="lavoratore">Lavoratore</option>
-                      <option value="misto">Studente / Lavoratore</option>
+                      <option value="Studente">Studente</option>
+                      <option value="Lavoratore">Lavoratore</option>
+                      <option value="Studente e Lavoratore">Studente e Lavoratore</option>
                     </select>
                   </div>
                   <div className="flex flex-col gap-2">
@@ -352,8 +328,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-bold text-[#2C1A0E]">Data di Nascita</label>
-                    {/* FORMATTAZIONE: Se c'è una data, mostriamo solo la parte YYYY-MM-DD per l'input */}
-                    <input name="birthdate" type="date" defaultValue={user.birthdate ? user.birthdate.split('T')[0] : ''} required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]" />
+                    <input name="birthdate" type="date" defaultValue={user.nascita ? user.nascita.split('T')[0] : ''} required className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-4 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]" />
                   </div>
                 </div>
 
@@ -365,13 +340,20 @@ export default function Dashboard() {
                 <div className="flex flex-col gap-3">
                   <label className="text-sm font-bold text-[#2C1A0E]">Il tuo Stile di Vita</label>
                   <div className="flex flex-wrap gap-3">
-                    {['🚬 Fumatore', '🚭 Non Fumatore', '🐶 Ho animali', '🧹 Ordinato/a', '🎉 Socievole', '🥦 Vegano/Vegetariano'].map(tag => {
-                      const isChecked = user.lifestyle_tags && user.lifestyle_tags.includes(tag);
+                    {[
+                      { label: '🚬 Fumatore', name: 'Fumatore' },
+                      { label: '🚭 Non Fumatore', name: 'Non Fumatore' },
+                      { label: '🐶 Ho animali', name: 'Ho animali' },
+                      { label: '🧹 Ordinato/a', name: 'Ordinato/a' },
+                      { label: '🎉 Socievole', name: 'Socievole' },
+                      { label: '🥦 Vegano/Vegetariano', name: 'Vegano/Vegetariano' }
+                    ].map(tag => {
+                      const isChecked = user.lifestyle_tags && user.lifestyle_tags.includes(tag.name);
                       return (
-                        <label key={tag} className="relative cursor-pointer group">
-                          <input type="checkbox" defaultChecked={isChecked} className="tag-checkbox peer sr-only" />
+                        <label key={tag.name} className="relative cursor-pointer group">
+                          <input type="checkbox" data-tagname={tag.name} defaultChecked={isChecked} className="tag-checkbox peer sr-only" />
                           <span className="block px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-full text-sm font-medium text-[#8A7B6E] peer-checked:bg-[#C4603A] peer-checked:text-white peer-checked:border-[#C4603A] transition-all group-hover:shadow-sm">
-                            {tag}
+                            {tag.label}
                           </span>
                         </label>
                       )
@@ -442,7 +424,6 @@ export default function Dashboard() {
 
         </div>
       </div>
-
     </div>
   );
 }
