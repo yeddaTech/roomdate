@@ -9,61 +9,58 @@ export default function Search() {
   const [loading, setLoading] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // 1. INIZIALIZZAZIONE UTENTE
+  // 1. INIZIALIZZAZIONE UTENTE SICURA (Anti-Crash)
   const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('roomdate_user');
-    return savedUser ? JSON.parse(savedUser) : null;
+    try {
+      const savedUser = localStorage.getItem('roomdate_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
   });
 
-  // --- LA SOLUZIONE AL BUG ---
-  // Normalizziamo la lettura del ruolo per supportare sia lo snake_case del DB che il camelCase
+  // Normalizziamo il ruolo per coprire i vari formati del database
   const ruoloUtente = user ? (user.user_type || user.userType || user.type) : null;
 
-  // 2. LETTURA URL
-  const currentIntent = searchParams.get('intent') || 'stanza'; 
+  // 2. LETTURA URL 
+  const urlIntent = searchParams.get('intent'); 
   const currentCity = searchParams.get('citta') || '';
   const currentBudget = searchParams.get('budget') || '';
 
-  // 3. AGGIORNAMENTO URL PULITO
+  // 3. LA LOGICA DI FERRO (Niente Loop di re-render)
+  let currentIntent = 'stanza'; 
+  if (ruoloUtente === 'cerca') {
+    currentIntent = 'stanza';
+  } else if (ruoloUtente === 'affitta') {
+    currentIntent = 'coinquilino';
+  } else {
+    // Visitatori o admin possono scegliere, di default stanze
+    currentIntent = urlIntent === 'coinquilino' ? 'coinquilino' : 'stanza';
+  }
+
+  // 4. AGGIORNAMENTO URL (Solo su interazione manuale dell'utente)
   const handleTopSearch = (newIntent, newCity, newBudget) => {
     const params = new URLSearchParams();
     params.append('intent', newIntent);
     if (newCity) params.append('citta', newCity);
     
-    // Se passiamo a stanze, teniamo il budget. Se passiamo a coinquilini, lo ignoriamo.
+    // Il budget ha senso solo se stiamo cercando stanze
     if (newIntent === 'stanza' && newBudget) {
       params.append('budget', newBudget);
     }
-    
     setSearchParams(params);
   };
 
-  // 4. AUTO-REINDIRIZZAMENTO FORZATO (Il Guardiano aggiornato)
+  // 5. FETCH API PULITA (Parte una volta sola quando l'intento effettivo cambia)
   useEffect(() => {
-    // Se non c'è utente, O se l'utente ha un ruolo speciale come 'admin', lascialo navigare liberamente
-    if (!user || (ruoloUtente !== 'cerca' && ruoloUtente !== 'affitta')) return; 
-
-    // Se chi cerca casa prova ad andare sui coinquilini, riportalo alle stanze
-    if (ruoloUtente === 'cerca' && currentIntent !== 'stanza') {
-      handleTopSearch('stanza', currentCity, currentBudget);
-    } 
-    // Se chi offre casa prova ad andare sulle stanze, riportalo ai coinquilini
-    else if (ruoloUtente === 'affitta' && currentIntent !== 'coinquilino') {
-      handleTopSearch('coinquilino', currentCity, ''); // Niente budget per chi offre
-    }
-  }, [user, currentIntent, ruoloUtente, currentCity, currentBudget]); 
-
-  // 5. GESTIONE CHIAMATE API
-  useEffect(() => {
-    // BLOCCO ANTI-RACE-CONDITION: Evita il fetch se stiamo per fare l'auto-redirect
-    if (ruoloUtente === 'cerca' && currentIntent === 'coinquilino') return;
-    if (ruoloUtente === 'affitta' && currentIntent === 'stanza') return;
-
     setLoading(true);
     const apiEndpoint = currentIntent === 'coinquilino' ? '/api/get_roommates' : '/api/get_listings';
 
     fetch(apiEndpoint)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('Errore di rete');
+        return res.json();
+      })
       .then(data => {
         setResults(Array.isArray(data) ? data : []);
         setLoading(false);
@@ -73,7 +70,7 @@ export default function Search() {
         setResults([]);
         setLoading(false);
       });
-  }, [currentIntent, ruoloUtente]); 
+  }, [currentIntent]); 
 
   // --- AZIONI UTENTE ---
   const handleLogout = () => {
@@ -112,7 +109,7 @@ export default function Search() {
   const filteredResults = results.filter(item => {
     let match = true;
     
-    // A. Filtro Città (Tollerante sia a .citta che .city)
+    // A. Filtro Città
     if (currentCity) {
       const itemCity = item.citta || item.city || '';
       if (itemCity.toLowerCase() !== currentCity.toLowerCase()) {
@@ -122,7 +119,7 @@ export default function Search() {
     
     // B. Filtro specifico per Stanza (Budget)
     if (currentIntent === 'stanza') {
-      const itemPrice = item.price || item.prezzo || 0; // Fallback di sicurezza
+      const itemPrice = item.price || item.prezzo || 0;
       if (currentBudget && itemPrice > parseInt(currentBudget)) {
         match = false;
       }
