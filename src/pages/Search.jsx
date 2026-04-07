@@ -9,7 +9,6 @@ export default function Search() {
   const [loading, setLoading] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // 1. INIZIALIZZAZIONE UTENTE SICURA (Anti-Crash)
   const [user, setUser] = useState(() => {
     try {
       const savedUser = localStorage.getItem('roomdate_user');
@@ -19,39 +18,30 @@ export default function Search() {
     }
   });
 
-  // Normalizziamo il ruolo per coprire i vari formati del database
   const ruoloUtente = user ? (user.user_type || user.userType || user.type) : null;
 
-  // 2. LETTURA URL 
   const urlIntent = searchParams.get('intent'); 
   const currentCity = searchParams.get('citta') || '';
   const currentBudget = searchParams.get('budget') || '';
 
-  // 3. LA LOGICA DI FERRO (Niente Loop di re-render)
   let currentIntent = 'stanza'; 
   if (ruoloUtente === 'cerca') {
     currentIntent = 'stanza';
   } else if (ruoloUtente === 'affitta') {
     currentIntent = 'coinquilino';
   } else {
-    // Visitatori o utenti con ruolo non definito possono scegliere, di default stanze
     currentIntent = urlIntent === 'coinquilino' ? 'coinquilino' : 'stanza';
   }
 
-  // 4. AGGIORNAMENTO URL (Solo su interazione manuale dell'utente)
+  // AGGIORNATO: Ora teniamo sempre il budget nell'URL
   const handleTopSearch = (newIntent, newCity, newBudget) => {
     const params = new URLSearchParams();
     params.append('intent', newIntent);
     if (newCity) params.append('citta', newCity);
-    
-    // Il budget ha senso solo se stiamo cercando stanze
-    if (newIntent === 'stanza' && newBudget) {
-      params.append('budget', newBudget);
-    }
+    if (newBudget) params.append('budget', newBudget);
     setSearchParams(params);
   };
 
-  // 5. FETCH API PULITA (Parte una volta sola quando l'intento effettivo cambia)
   useEffect(() => {
     setLoading(true);
     const apiEndpoint = currentIntent === 'coinquilino' ? '/api/get_roommates' : '/api/get_listings';
@@ -72,7 +62,6 @@ export default function Search() {
       });
   }, [currentIntent]); 
 
-  // --- AZIONI UTENTE ---
   const handleLogout = () => {
     localStorage.removeItem('roomdate_user');
     setUser(null);
@@ -105,11 +94,9 @@ export default function Search() {
     }
   };
 
-  // --- 6. FILTRO BLINDATO ---
   const filteredResults = results.filter(item => {
     let match = true;
     
-    // A. Filtro Città
     if (currentCity) {
       const itemCity = item.citta || item.city || '';
       if (itemCity.toLowerCase() !== currentCity.toLowerCase()) {
@@ -117,7 +104,6 @@ export default function Search() {
       }
     }
     
-    // B. Filtro specifico per Stanza (Budget)
     if (currentIntent === 'stanza') {
       const itemPrice = item.price || item.prezzo || 0;
       if (currentBudget && itemPrice > parseInt(currentBudget)) {
@@ -125,10 +111,16 @@ export default function Search() {
       }
     }
     
-    // C. Filtro specifico per Coinquilini (Solo chi "cerca")
     if (currentIntent === 'coinquilino') {
       const tipoProfilo = item.user_type || item.userType || item.type;
       if (tipoProfilo && tipoProfilo !== 'cerca') {
+        match = false;
+      }
+
+      // NUOVO FILTRO BUDGET COINQUILINO
+      const budgetCoinquilino = item.budget_max || item.budgetMax || 0;
+      // Se tu offri una stanza a "currentBudget", scartiamo chi ha un budget inferiore (se ce l'ha impostato)
+      if (currentBudget && budgetCoinquilino > 0 && budgetCoinquilino < parseInt(currentBudget)) {
         match = false;
       }
     }
@@ -139,7 +131,6 @@ export default function Search() {
   return (
     <div className="min-h-[100dvh] bg-[#FEFAF4] pb-20 md:pb-0 font-sans">
       
-      {/* --- TOP NAV --- */}
       <nav className="sticky top-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-white decoration-none">
           Room<span className="text-[#D4835E]">Date</span>
@@ -167,7 +158,6 @@ export default function Search() {
           )}
         </div>
 
-        {/* Hamburger Mobile */}
         <button className="md:hidden flex flex-col gap-1.5 z-[1001]" onClick={() => setIsMenuOpen(!isMenuOpen)}>
           <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
           <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></div>
@@ -175,7 +165,6 @@ export default function Search() {
         </button>
       </nav>
 
-      {/* --- MOBILE SIDEBAR --- */}
       <div className={`fixed inset-y-0 right-0 w-72 bg-[#2C1A0E] shadow-2xl z-[1000] p-8 pt-24 transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex flex-col gap-6 text-lg font-medium text-white">
           {user && (
@@ -202,13 +191,11 @@ export default function Search() {
       </div>
       {isMenuOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] md:hidden" onClick={() => setIsMenuOpen(false)}></div>}
 
-      {/* --- HERO SEARCH BOX --- */}
       <div className="bg-gradient-to-br from-[#2C1A0E] to-[#C4603A] px-6 py-12 flex justify-center relative overflow-hidden">
         <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, white 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
         
         <div className="bg-white/95 backdrop-blur-md rounded-3xl p-6 shadow-2xl w-full max-w-3xl relative z-10 border border-white/20">
           
-          {/* I BOTTONI INTELLIGENTI */}
           {!user || (ruoloUtente !== 'cerca' && ruoloUtente !== 'affitta') ? (
             <div className="flex gap-2 bg-neutral-100 p-1.5 rounded-2xl mb-6">
               <button 
@@ -232,7 +219,7 @@ export default function Search() {
             </div>
           )}
 
-          <div className={`grid grid-cols-1 ${currentIntent === 'stanza' ? 'md:grid-cols-2' : ''} gap-4`}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <select 
               className="w-full bg-white border border-neutral-200 text-[#2C1A0E] text-sm rounded-2xl px-5 py-4 focus:outline-none focus:border-[#C4603A] focus:ring-2 focus:ring-orange-100 transition-all font-medium"
               value={currentCity} 
@@ -245,16 +232,14 @@ export default function Search() {
               <option value="Torino">Torino</option>
             </select>
             
-            {/* Il budget appare SOLO se stiamo cercando una stanza */}
-            {currentIntent === 'stanza' && (
-              <input 
-                type="number" 
-                placeholder="💶 Budget max (€/mese)" 
-                className="w-full bg-white border border-neutral-200 text-[#2C1A0E] text-sm rounded-2xl px-5 py-4 focus:outline-none focus:border-[#C4603A] focus:ring-2 focus:ring-orange-100 transition-all font-medium"
-                value={currentBudget}
-                onChange={(e) => handleTopSearch(currentIntent, currentCity, e.target.value)}
-              />
-            )}
+            {/* AGGIORNATO: Ora appare sempre, ma cambia il placeholder in base a cosa cerchi! */}
+            <input 
+              type="number" 
+              placeholder={currentIntent === 'stanza' ? "💶 Budget max (€/mese)" : "💶 Costo tua stanza (€/mese)"} 
+              className="w-full bg-white border border-neutral-200 text-[#2C1A0E] text-sm rounded-2xl px-5 py-4 focus:outline-none focus:border-[#C4603A] focus:ring-2 focus:ring-orange-100 transition-all font-medium"
+              value={currentBudget}
+              onChange={(e) => handleTopSearch(currentIntent, currentCity, e.target.value)}
+            />
           </div>
         </div>
       </div>
@@ -339,9 +324,16 @@ export default function Search() {
                       
                       <div className="bg-white p-4 rounded-2xl text-sm text-[#8A7B6E] italic text-center mb-5 leading-relaxed shadow-sm relative z-10">"{item.quote || item.bio || 'Cerco una stanza accogliente!'}"</div>
                       
-                      <div className="flex flex-wrap justify-center gap-1.5 mb-6 relative z-10">
+                      <div className="flex flex-wrap justify-center gap-1.5 mb-4 relative z-10">
                         {(item.tags || (item.lifestyle_tags ? item.lifestyle_tags.split(',') : [])).map(t => <span key={t} className="bg-orange-100/50 text-[#7A4B2A] px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider">{t.trim()}</span>)}
                       </div>
+
+                      {/* AGGIUNTO: Stampiamo il budget del coinquilino (se l'ha impostato maggiore di zero) */}
+                      {item.budget_max > 0 && (
+                        <div className="text-center text-sm font-bold text-[#C4603A] mb-4 relative z-10 bg-orange-50 py-1.5 rounded-xl border border-orange-100">
+                           Budget: fino a €{item.budget_max}
+                        </div>
+                      )}
                       
                       <div className="mt-auto mb-5 relative z-10">
                         <div className="flex justify-between items-center mb-1.5">
