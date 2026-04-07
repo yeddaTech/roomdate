@@ -10,19 +10,18 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Dati che ci aspettiamo da React
 type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-// Dati che manderemo indietro a React se il login ha successo
-// Dati che manderemo indietro a React se il login ha successo
+// ABBIAMO AGGIUNTO USERTYPE QUI SOTTO
 type UserData struct {
-	ID      string `json:"id"` // <--- CAMBIA QUI: da int a string!
-	Nome    string `json:"nome"`
-	Cognome string `json:"cognome"`
-	Email   string `json:"email"`
+	ID       string `json:"id"`
+	Nome     string `json:"nome"`
+	Cognome  string `json:"cognome"`
+	Email    string `json:"email"`
+	UserType string `json:"user_type"` // <--- FONDAMENTALE PER REACT!
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -45,33 +44,30 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// 1. Cerchiamo l'utente tramite l'email
 	var user UserData
 	var hashedPassword string
 
-	query := `SELECT id, first_name, last_name, email, password_hash FROM roomdate_app.users WHERE email = $1`
-	err = db.QueryRow(query, req.Email).Scan(&user.ID, &user.Nome, &user.Cognome, &user.Email, &hashedPassword)
+	// AGGIUNTO user_type (con COALESCE per evitare crash se il campo è vuoto nel DB)
+	query := `SELECT id::text, first_name, last_name, email, password_hash, COALESCE(user_type, '') FROM roomdate_app.users WHERE email = $1`
+
+	// AGGIUNTO &user.UserType nello Scan
+	err = db.QueryRow(query, req.Email).Scan(&user.ID, &user.Nome, &user.Cognome, &user.Email, &hashedPassword, &user.UserType)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, "Email non trovata", http.StatusUnauthorized)
 			return
 		}
-		// PRIMA ERA COSÌ: http.Error(w, "Errore del server", http.StatusInternalServerError)
-
-		// ORA LO CAMBIAMO COSÌ PER VEDERE IL VERO ERRORE:
 		http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 2. Confrontiamo la password inserita con l'hash salvato nel database
 	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(req.Password))
 	if err != nil {
 		http.Error(w, "Password errata", http.StatusUnauthorized)
 		return
 	}
 
-	// 3. Login effettuato! Restituiamo i dati dell'utente a React (senza la password ovviamente!)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Login effettuato con successo",
