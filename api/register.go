@@ -10,6 +10,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// Aggiungiamo alla struttura i campi del profilo che React ci sta inviando
 type RegisterRequest struct {
 	Nome     string `json:"nome"`
 	Cognome  string `json:"cognome"`
@@ -18,6 +19,11 @@ type RegisterRequest struct {
 	Citta    string `json:"citta"`
 	UserType string `json:"userType"`
 	Nascita  string `json:"nascita"`
+	// --- NUOVI CAMPI PROFILO ---
+	BudgetMax     int    `json:"budgetMax"`
+	Occupation    string `json:"occupation"`
+	Bio           string `json:"bio"`
+	LifestyleTags string `json:"lifestyle_tags"`
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -40,12 +46,27 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// NOTA IL roomdate_app. AGGIUNTO QUI SOTTO
-	query := `INSERT INTO roomdate_app.users (first_name, last_name, email, password_hash, citta, user_type, birthdate) 
-	          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
+	// AGGIORNATA LA QUERY: Inseriamo anche i nuovi campi
+	query := `INSERT INTO roomdate_app.users 
+              (first_name, last_name, email, password_hash, citta, user_type, birthdate, budget_max, occupation, bio, lifestyle_tags) 
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`
 
 	var newID string
-	err = db.QueryRow(query, req.Nome, req.Cognome, req.Email, string(hashedPassword), req.Citta, req.UserType, req.Nascita).Scan(&newID)
+	// AGGIORNATA LA FUNZIONE: Passiamo tutti i nuovi req.Valore alla query
+	err = db.QueryRow(
+		query,
+		req.Nome,
+		req.Cognome,
+		req.Email,
+		string(hashedPassword),
+		req.Citta,
+		req.UserType,
+		req.Nascita,
+		req.BudgetMax,
+		req.Occupation,
+		req.Bio,
+		req.LifestyleTags,
+	).Scan(&newID)
 
 	if err != nil {
 		// BASTA MESSAGGI GENERICI! Ora stampiamo il vero errore di Postgres
