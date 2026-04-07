@@ -26,7 +26,7 @@ export default function Search() {
     params.append('intent', newIntent);
     if (newCity) params.append('citta', newCity);
     
-    // Se passiamo a coinquilini, puliamo il budget dall'URL per non lasciare "sporcizia"
+    // Se passiamo a stanze, teniamo il budget. Se passiamo a coinquilini, lo ignoriamo.
     if (newIntent === 'stanza' && newBudget) {
       params.append('budget', newBudget);
     }
@@ -34,16 +34,19 @@ export default function Search() {
     setSearchParams(params);
   };
 
-  // 4. AUTO-REINDIRIZZAMENTO FORZATO
+  // 4. AUTO-REINDIRIZZAMENTO FORZATO (Il Guardiano)
   useEffect(() => {
-    if (user) {
-      if (user.userType === 'cerca' && currentIntent === 'coinquilino') {
-        handleTopSearch('stanza', currentCity, currentBudget);
-      } else if (user.userType === 'affitta' && currentIntent === 'stanza') {
-        handleTopSearch('coinquilino', currentCity, ''); // Reset del budget
-      }
+    if (!user) return; // I visitatori possono navigare liberamente
+
+    // Se chi cerca casa prova ad andare sui coinquilini, riportalo alle stanze
+    if (user.userType === 'cerca' && currentIntent !== 'stanza') {
+      handleTopSearch('stanza', currentCity, currentBudget);
+    } 
+    // Se chi offre casa prova ad andare sulle stanze, riportalo ai coinquilini
+    else if (user.userType === 'affitta' && currentIntent !== 'coinquilino') {
+      handleTopSearch('coinquilino', currentCity, ''); // Niente budget per chi offre
     }
-  }, [user, currentIntent]); // Non serve mettere currentCity/Budget qui, evitiamo loop
+  }, [user, currentIntent]); 
 
   // 5. GESTIONE CHIAMATE API
   useEffect(() => {
@@ -57,7 +60,7 @@ export default function Search() {
     fetch(apiEndpoint)
       .then(res => res.json())
       .then(data => {
-        setResults(Array.isArray(data) ? data : []); // Prevenzione errori se data non è un array
+        setResults(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch((err) => {
@@ -102,34 +105,35 @@ export default function Search() {
 
   // --- 6. IL FILTRO VERAMENTE BLINDATO ---
   const filteredResults = results.filter(item => {
-    // A. Filtro Città Infallibile
+    let match = true;
+    
+    // A. Filtro Città
     if (currentCity) {
-      const itemCity = item.city || ''; // Fallback se il db non restituisce la città
+      const itemCity = item.city || '';
       if (itemCity.toLowerCase() !== currentCity.toLowerCase()) {
-        return false; // Scarta istantaneamente
+        match = false;
       }
     }
     
-    // B. Filtro specifico per Stanza
+    // B. Filtro specifico per Stanza (Budget)
     if (currentIntent === 'stanza') {
       if (currentBudget && item.price > parseInt(currentBudget)) {
-        return false;
+        match = false;
       }
     }
     
-    // C. Filtro specifico per Coinquilini
+    // C. Filtro specifico per Coinquilini (Solo chi "cerca")
     if (currentIntent === 'coinquilino') {
       const tipoProfilo = item.userType || item.user_type || item.type;
       if (tipoProfilo && tipoProfilo !== 'cerca') {
-        return false;
+        match = false;
       }
     }
 
-    return true; // Se passa tutti gli ostacoli, viene mostrato
+    return match;
   });
 
   return (
-    // ... IL TUO CODICE JSX DA QUI IN POI È PERFETTO E RIMANE UGUALE ...
     <div className="min-h-[100dvh] bg-[#FEFAF4] pb-20 md:pb-0 font-sans">
       
       {/* --- TOP NAV --- */}
@@ -201,28 +205,31 @@ export default function Search() {
         
         <div className="bg-white/95 backdrop-blur-md rounded-3xl p-6 shadow-2xl w-full max-w-3xl relative z-10 border border-white/20">
           
-          {/* I BOTTONI INTELLIGENTI: Si mostrano solo se competono all'utente */}
-          <div className="flex gap-2 bg-neutral-100 p-1.5 rounded-2xl mb-6">
-            {(!user || user.userType === 'cerca') && (
+          {/* I BOTTONI INTELLIGENTI: Toggle per ospiti, Badge fisso per loggati */}
+          {!user ? (
+            <div className="flex gap-2 bg-neutral-100 p-1.5 rounded-2xl mb-6">
               <button 
                 className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all shadow-sm ${currentIntent === 'stanza' ? 'bg-[#C4603A] text-white shadow-md' : 'text-[#8A7B6E] hover:bg-white hover:text-[#2C1A0E]'}`} 
                 onClick={() => handleTopSearch('stanza', currentCity, currentBudget)}
               >
                 🔍 Cerca Stanza
               </button>
-            )}
-            
-            {(!user || user.userType === 'affitta') && (
               <button 
                 className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all shadow-sm ${currentIntent === 'coinquilino' ? 'bg-[#C4603A] text-white shadow-md' : 'text-[#8A7B6E] hover:bg-white hover:text-[#2C1A0E]'}`} 
-                onClick={() => handleTopSearch('coinquilino', currentCity, currentBudget)}
+                onClick={() => handleTopSearch('coinquilino', currentCity, '')}
               >
                 👥 Cerco Coinquilini
               </button>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="mb-6 flex justify-center">
+              <div className="bg-white/80 border border-[#C4603A]/30 text-[#2C1A0E] px-6 py-2.5 rounded-full text-sm font-bold shadow-sm inline-flex items-center gap-2">
+                {user.userType === 'cerca' ? '🔍 Stai cercando: Stanze in affitto' : '👥 Stai cercando: Coinquilini per la tua stanza'}
+              </div>
+            </div>
+          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className={`grid grid-cols-1 ${currentIntent === 'stanza' ? 'md:grid-cols-2' : ''} gap-4`}>
             <select 
               className="w-full bg-white border border-neutral-200 text-[#2C1A0E] text-sm rounded-2xl px-5 py-4 focus:outline-none focus:border-[#C4603A] focus:ring-2 focus:ring-orange-100 transition-all font-medium"
               value={currentCity} 
@@ -234,14 +241,17 @@ export default function Search() {
               <option value="Bologna">Bologna</option>
               <option value="Torino">Torino</option>
             </select>
-            <input 
-              type="number" 
-              placeholder="💶 Budget max (€/mese)" 
-              className={`w-full bg-white border border-neutral-200 text-[#2C1A0E] text-sm rounded-2xl px-5 py-4 focus:outline-none focus:border-[#C4603A] focus:ring-2 focus:ring-orange-100 transition-all font-medium ${currentIntent === 'coinquilino' ? 'opacity-50 cursor-not-allowed bg-neutral-50' : ''}`}
-              value={currentBudget}
-              onChange={(e) => handleTopSearch(currentIntent, currentCity, e.target.value)}
-              disabled={currentIntent === 'coinquilino'}
-            />
+            
+            {/* Il budget appare SOLO se stiamo cercando una stanza */}
+            {currentIntent === 'stanza' && (
+              <input 
+                type="number" 
+                placeholder="💶 Budget max (€/mese)" 
+                className="w-full bg-white border border-neutral-200 text-[#2C1A0E] text-sm rounded-2xl px-5 py-4 focus:outline-none focus:border-[#C4603A] focus:ring-2 focus:ring-orange-100 transition-all font-medium"
+                value={currentBudget}
+                onChange={(e) => handleTopSearch(currentIntent, currentCity, e.target.value)}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -362,7 +372,6 @@ export default function Search() {
           )}
         </main>
       </div>
-
     </div>
   );
 }
