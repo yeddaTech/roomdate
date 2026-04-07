@@ -10,18 +10,20 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// ABBIAMO AGGIUNTO USERTYPE ALLA STRUTTURA
 type Roommate struct {
-	ID     string   `json:"id"`
-	Name   string   `json:"name"`
-	Job    string   `json:"job"`
-	Quote  string   `json:"quote"`
-	Age    int      `json:"age"`
-	City   string   `json:"city"`
-	Match  int      `json:"match"`
-	Color1 string   `json:"color1"`
-	Color2 string   `json:"color2"`
-	Emoji  string   `json:"emoji"`
-	Tags   []string `json:"tags"`
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	Job      string   `json:"job"`
+	Quote    string   `json:"quote"`
+	Age      int      `json:"age"`
+	City     string   `json:"city"`
+	Match    int      `json:"match"`
+	Color1   string   `json:"color1"`
+	Color2   string   `json:"color2"`
+	Emoji    string   `json:"emoji"`
+	Tags     []string `json:"tags"`
+	UserType string   `json:"user_type"` // <--- IL FILTRO REACT NE HA BISOGNO!
 }
 
 func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
@@ -32,17 +34,19 @@ func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// LA SUPER QUERY: Postgres riempie i buchi (NULL) e formatta l'ID prima di darli a Go!
+	// LA SUPER QUERY AGGIORNATA: Ora prende anche la citta e l'user_type!
 	query := `
-		SELECT 
-			id::text, 
-			COALESCE(first_name, 'Utente'), 
-			COALESCE(occupation, 'Studente/Lavoratore'), 
-			COALESCE(bio, 'Ciao! Sto cercando una nuova casa e dei fantastici coinquilini.'), 
-			COALESCE(lifestyle_tags, 'Socievole, Ordinato') 
-		FROM roomdate_app.users 
-		LIMIT 8
-	`
+        SELECT 
+            id::text, 
+            COALESCE(first_name, 'Utente'), 
+            COALESCE(occupation, 'Studente/Lavoratore'), 
+            COALESCE(bio, 'Ciao! Sto cercando una nuova casa e dei fantastici coinquilini.'), 
+            COALESCE(lifestyle_tags, 'Socievole, Ordinato'),
+            COALESCE(citta, ''),
+            COALESCE(user_type, 'cerca')
+        FROM roomdate_app.users 
+        LIMIT 8
+    `
 	rows, err := db.Query(query)
 	if err != nil {
 		http.Error(w, "Errore query", http.StatusInternalServerError)
@@ -59,9 +63,8 @@ func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
 		var rm Roommate
 		var tagsStr string
 
-		// Ora la lettura (Scan) è semplicissima e a prova di bomba
-		if err := rows.Scan(&rm.ID, &rm.Name, &rm.Job, &rm.Quote, &tagsStr); err != nil {
-			// Se fallisce, non stiamo più in silenzio, ma facciamo crashare l'API per leggere l'errore vero!
+		// Aggiunti rm.City e rm.UserType nello Scan!
+		if err := rows.Scan(&rm.ID, &rm.Name, &rm.Job, &rm.Quote, &tagsStr, &rm.City, &rm.UserType); err != nil {
 			http.Error(w, "Errore Scan: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -69,9 +72,8 @@ func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
 		// Dividiamo i tag
 		rm.Tags = strings.Split(tagsStr, ", ")
 
-		// Dati grafici finti per riempire le card
+		// Dati grafici finti (Ora City è vera, non è più finta!)
 		rm.Age = 22 + (i % 6)
-		rm.City = "In Italia"
 		rm.Match = 85 + (i * 2)
 		rm.Color1 = colors[i%len(colors)][0]
 		rm.Color2 = colors[i%len(colors)][1]

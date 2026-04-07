@@ -34,7 +34,7 @@ export default function Search() {
   } else if (ruoloUtente === 'affitta') {
     currentIntent = 'coinquilino';
   } else {
-    // Visitatori o admin possono scegliere, di default stanze
+    // Visitatori o utenti con ruolo non definito possono scegliere, di default stanze
     currentIntent = urlIntent === 'coinquilino' ? 'coinquilino' : 'stanza';
   }
 
