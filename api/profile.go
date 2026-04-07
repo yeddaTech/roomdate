@@ -5,16 +5,16 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"strconv" // <-- Aggiunto per convertire il budget in numero
+	"strconv"
 
 	_ "github.com/lib/pq"
 )
 
 type ProfileRequest struct {
 	UserID     string `json:"userId"`
-	UserType   string `json:"userType"`  // <-- NUOVO
-	Citta      string `json:"citta"`     // <-- NUOVO
-	BudgetMax  string `json:"budgetMax"` // <-- NUOVO
+	UserType   string `json:"userType"`
+	Citta      string `json:"citta"`
+	BudgetMax  string `json:"budgetMax"` // Lo riceviamo come stringa da React
 	Occupation string `json:"occupation"`
 	Birthdate  string `json:"birthdate"`
 	Bio        string `json:"bio"`
@@ -40,24 +40,25 @@ func ProfileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// Convertiamo il budget da stringa a numero intero (se è vuoto, lo mettiamo a 0)
+	// Convertiamo il budget da stringa a numero intero (se è vuoto diventa 0)
 	budget := 0
 	if req.BudgetMax != "" {
 		budget, _ = strconv.Atoi(req.BudgetMax)
 	}
 
-	// AGGIORNATA LA QUERY PER SALVARE TUTTI I CAMPI
+	// Salviamo tutto nel DB
 	query := `
-		UPDATE roomdate_app.users 
-		SET occupation = $1, birthdate = $2, bio = $3, lifestyle_tags = $4, user_type = $5, citta = $6, budget_max = $7
-		WHERE id = $8
-	`
-	_, err = db.Exec(query, req.Occupation, req.Birthdate, req.Bio, req.Tags, req.UserType, req.Citta, budget, req.UserID)
+        UPDATE roomdate_app.users 
+        SET user_type = $1, citta = $2, budget_max = $3, occupation = $4, birthdate = $5, bio = $6, lifestyle_tags = $7
+        WHERE id = $8
+    `
+	_, err = db.Exec(query, req.UserType, req.Citta, budget, req.Occupation, req.Birthdate, req.Bio, req.Tags, req.UserID)
+
 	if err != nil {
-		http.Error(w, "Errore durante il salvataggio: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Profilo aggiornato!"})
+	w.Write([]byte("Profilo aggiornato con successo"))
 }
