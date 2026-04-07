@@ -6,16 +6,26 @@ export default function Impostazioni() {
   const [user, setUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  // Stati per le password e i messaggi a schermo
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [statusMsg, setStatusMsg] = useState({ text: '', type: '' }); // type: 'success' o 'error'
+  const [isLoading, setIsLoading] = useState(false);
+
   // Stati per i toggle delle impostazioni
   const [emailNotif, setEmailNotif] = useState(true);
   const [pushNotif, setPushNotif] = useState(false);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('roomdate_user');
-    if (!savedUser) {
-      navigate('/accedi'); // Se non è loggato, via!
-    } else {
-      setUser(JSON.parse(savedUser));
+    try {
+      const savedUser = localStorage.getItem('roomdate_user');
+      if (!savedUser) {
+        navigate('/accedi'); // Se non è loggato, via!
+      } else {
+        setUser(JSON.parse(savedUser));
+      }
+    } catch {
+      navigate('/accedi');
     }
   }, [navigate]);
 
@@ -25,15 +35,74 @@ export default function Impostazioni() {
     navigate('/');
   };
 
-  const handleSaveSettings = (e) => {
+  // --- LA VERA CHIAMATA API PER LA PASSWORD (Usando il trucco del Login Multiplexer) ---
+  const handleSaveSettings = async (e) => {
     e.preventDefault();
-    alert("✅ Impostazioni salvate con successo!");
+    setStatusMsg({ text: '', type: '' });
+
+    // Se l'utente ha scritto qualcosa nella password, procediamo con l'aggiornamento
+    if (newPassword) {
+      if (newPassword !== confirmPassword) {
+        setStatusMsg({ text: 'Le password non coincidono!', type: 'error' });
+        return;
+      }
+      if (newPassword.length < 6) {
+        setStatusMsg({ text: 'La password deve avere almeno 6 caratteri.', type: 'error' });
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            action: 'update_password', // <--- LA PAROLA D'ORDINE
+            userId: user.id, 
+            newPassword: newPassword 
+          })
+        });
+
+        if (res.ok) {
+          setStatusMsg({ text: 'Password aggiornata con successo!', type: 'success' });
+          setNewPassword('');
+          setConfirmPassword('');
+        } else {
+          const data = await res.text();
+          setStatusMsg({ text: data || 'Errore durante l\'aggiornamento.', type: 'error' });
+        }
+      } catch (err) {
+        setStatusMsg({ text: 'Errore di connessione al server.', type: 'error' });
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // Se non ha toccato la password ma ha premuto salva (es. per le notifiche)
+      setStatusMsg({ text: 'Impostazioni generali aggiornate.', type: 'success' });
+    }
   };
 
-  const handleDeleteAccount = () => {
-    if (window.confirm("Sei sicuro di voler eliminare definitivamente il tuo account? Questa azione non può essere annullata.")) {
-      alert("Account eliminato. (Simulazione)");
-      handleLogout();
+  // --- LA VERA CHIAMATA API PER ELIMINARE L'ACCOUNT (Sempre tramite Multiplexer) ---
+  const handleDeleteAccount = async () => {
+    if (window.confirm("Sei assolutamente sicuro? Tutti i tuoi dati verranno cancellati per sempre.")) {
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            action: 'delete_account', // <--- LA PAROLA D'ORDINE
+            userId: user.id 
+          })
+        });
+
+        if (res.ok) {
+          handleLogout(); // Se il server ha cancellato l'utente, lo buttiamo fuori dall'app
+        } else {
+          alert("Impossibile eliminare l'account in questo momento. Riprova più tardi.");
+        }
+      } catch (err) {
+        alert("Errore di connessione al server.");
+      }
     }
   };
 
@@ -42,7 +111,7 @@ export default function Impostazioni() {
   return (
     <div className="min-h-screen bg-[#FEFAF4] pb-20 md:pb-0 font-sans">
       
-      {/* --- TOP NAV (Coerente) --- */}
+      {/* --- TOP NAV --- */}
       <nav className="sticky top-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-white decoration-none">
           Room<span className="text-[#D4835E]">Date</span>
@@ -59,7 +128,7 @@ export default function Impostazioni() {
         <div className="hidden md:flex gap-4 items-center">
           {user ? (
             <>
-              <span className="text-sm text-neutral-300">Ciao, <strong className="text-white">{user.nome}</strong>!</span>
+              <span className="text-sm text-neutral-300">Ciao, <strong className="text-white">{user.nome || user.first_name || 'Utente'}</strong>!</span>
               <button onClick={handleLogout} className="border border-neutral-500 hover:border-[#D4835E] hover:text-[#D4835E] px-4 py-2 rounded-full text-sm transition-colors">Esci</button>
             </>
           ) : (
@@ -83,7 +152,7 @@ export default function Impostazioni() {
         <div className="flex flex-col gap-6 text-lg font-medium text-white">
           {user && (
              <div className="border-b border-neutral-700 pb-4 mb-2">
-               <h3 className="text-xl">👤 Ciao, {user.nome}!</h3>
+               <h3 className="text-xl">👤 Ciao, {user.nome || user.first_name || 'Utente'}!</h3>
              </div>
           )}
           <Link to="/" onClick={() => setIsMenuOpen(false)}>🏠 Home</Link>
@@ -110,13 +179,20 @@ export default function Impostazioni() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 animate-fade-in-up">
         <h1 className="font-serif text-3xl md:text-5xl text-[#2C1A0E] mb-8 font-bold">Impostazioni Account</h1>
         
+        {/* MESSAGGIO DI STATO (Successo o Errore) */}
+        {statusMsg.text && (
+          <div className={`mb-6 p-4 rounded-2xl font-bold flex items-center gap-3 ${statusMsg.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>
+            {statusMsg.type === 'success' ? '✅' : '⚠️'} {statusMsg.text}
+          </div>
+        )}
+
         {/* CARD IMPOSTAZIONI */}
         <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-orange-50 mb-8">
           <form onSubmit={handleSaveSettings} className="flex flex-col gap-8">
             
-            {/* SEZIONE SICUREZZA */}
+            {/* SEZIONE SICUREZZA E ACCESSO */}
             <section>
-              <h3 className="text-[#C4603A] font-bold text-lg border-b border-orange-100 pb-3 mb-6">Sicurezza</h3>
+              <h3 className="text-[#C4603A] font-bold text-lg border-b border-orange-100 pb-3 mb-6">Sicurezza & Accesso</h3>
               
               <div className="flex flex-col gap-2 mb-6">
                 <label className="text-sm font-bold text-[#2C1A0E]">Email dell'account</label>
@@ -129,13 +205,27 @@ export default function Impostazioni() {
                 <small className="text-xs text-[#8A7B6E] mt-1 ml-2">L'email non può essere modificata.</small>
               </div>
 
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-bold text-[#2C1A0E]">Nuova Password</label>
-                <input 
-                  type="password" 
-                  placeholder="Lascia vuoto per non modificare" 
-                  className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-5 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-bold text-[#2C1A0E]">Nuova Password</label>
+                  <input 
+                    type="password" 
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Scrivi qui per cambiare" 
+                    className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-5 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-bold text-[#2C1A0E]">Conferma Nuova Password</label>
+                  <input 
+                    type="password" 
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Ripeti la nuova password" 
+                    className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] rounded-2xl px-5 py-3.5 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors"
+                  />
+                </div>
               </div>
             </section>
 
@@ -168,8 +258,12 @@ export default function Impostazioni() {
 
             {/* PULSANTE SALVATAGGIO */}
             <div className="mt-4 pt-6 border-t border-neutral-100 flex justify-end">
-              <button type="submit" className="w-full md:w-auto bg-[#4CAF50] hover:bg-[#388E3C] text-white px-8 py-4 rounded-full font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
-                Salva Modifiche
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className="w-full md:w-auto bg-[#4CAF50] hover:bg-[#388E3C] disabled:bg-neutral-400 text-white px-8 py-4 rounded-full font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+              >
+                {isLoading ? 'Salvataggio in corso...' : 'Salva Modifiche'}
               </button>
             </div>
           </form>
