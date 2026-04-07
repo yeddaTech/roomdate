@@ -9,13 +9,13 @@ export default function Search() {
   const [loading, setLoading] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // 1. INIZIALIZZAZIONE UTENTE (Eseguita una sola volta al mount)
+  // 1. INIZIALIZZAZIONE UTENTE
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('roomdate_user');
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
-  // 2. LETTURA URL (Sempre sincronizzata)
+  // 2. LETTURA URL
   const currentIntent = searchParams.get('intent') || 'stanza'; 
   const currentCity = searchParams.get('citta') || '';
   const currentBudget = searchParams.get('budget') || '';
@@ -34,9 +34,10 @@ export default function Search() {
     setSearchParams(params);
   };
 
-  // 4. AUTO-REINDIRIZZAMENTO FORZATO (Il Guardiano)
+  // 4. AUTO-REINDIRIZZAMENTO FORZATO (Il Guardiano aggiornato)
   useEffect(() => {
-    if (!user) return; // I visitatori possono navigare liberamente
+    // Se non c'è utente, O se l'utente ha un ruolo speciale come 'admin', lascialo navigare liberamente
+    if (!user || (user.userType !== 'cerca' && user.userType !== 'affitta')) return; 
 
     // Se chi cerca casa prova ad andare sui coinquilini, riportalo alle stanze
     if (user.userType === 'cerca' && currentIntent !== 'stanza') {
@@ -103,7 +104,7 @@ export default function Search() {
     }
   };
 
-  // --- 6. IL FILTRO VERAMENTE BLINDATO ---
+  // --- 6. FILTRO BLINDATO ---
   const filteredResults = results.filter(item => {
     let match = true;
     
@@ -153,7 +154,7 @@ export default function Search() {
         <div className="hidden md:flex gap-4 items-center">
           {user ? (
             <>
-              <span className="text-sm text-neutral-300">Ciao, <strong className="text-white">{user.nome}</strong>!</span>
+              <span className="text-sm text-neutral-300">Ciao, <strong className="text-white">{user.nome || user.username || 'admin'}</strong>!</span>
               <button onClick={handleLogout} className="border border-neutral-500 hover:border-[#D4835E] hover:text-[#D4835E] px-4 py-2 rounded-full text-sm transition-colors">Esci</button>
             </>
           ) : (
@@ -177,7 +178,7 @@ export default function Search() {
         <div className="flex flex-col gap-6 text-lg font-medium text-white">
           {user && (
              <div className="border-b border-neutral-700 pb-4 mb-2">
-               <h3 className="text-xl">👤 Ciao, {user.nome}!</h3>
+               <h3 className="text-xl">👤 Ciao, {user.nome || user.username || 'admin'}!</h3>
              </div>
           )}
           <Link to="/" onClick={() => setIsMenuOpen(false)}>🏠 Home</Link>
@@ -205,8 +206,8 @@ export default function Search() {
         
         <div className="bg-white/95 backdrop-blur-md rounded-3xl p-6 shadow-2xl w-full max-w-3xl relative z-10 border border-white/20">
           
-          {/* I BOTTONI INTELLIGENTI: Toggle per ospiti, Badge fisso per loggati */}
-          {!user ? (
+          {/* I BOTTONI INTELLIGENTI: Toggle per ospiti/admin, Badge fisso per loggati standard */}
+          {!user || (user.userType !== 'cerca' && user.userType !== 'affitta') ? (
             <div className="flex gap-2 bg-neutral-100 p-1.5 rounded-2xl mb-6">
               <button 
                 className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all shadow-sm ${currentIntent === 'stanza' ? 'bg-[#C4603A] text-white shadow-md' : 'text-[#8A7B6E] hover:bg-white hover:text-[#2C1A0E]'}`} 
