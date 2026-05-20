@@ -29,3 +29,7 @@ Se vuoi scaricare il codice e farlo girare sul tuo PC:
    git clone [https://github.com/yeddaTech/roomdate.git](https://github.com/yeddaTech/roomdate.git)
    cd roomdate
    npm install
+
+
+---
+Developed by [Younesse Eddassouli (@yeddaTech)](https://github.com/yeddaTech)
