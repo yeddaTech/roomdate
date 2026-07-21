@@ -2,74 +2,55 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 const Footer = () => {
-  // 1. Mappiamo le colonne di destra con i path reali dell'app
+  // Funzione per tornare in cima quando si clicca un link
+  const handleScrollTop = () => window.scrollTo(0, 0);
+
+  // 1. Mappiamo le colonne di destra
   const menuColumns = [
     {
-      title: 'Servizi',
+      title: 'Piattaforma',
       links: [
-        { text: 'Cerca Stanza', to: '/ricerca', isInternal: true },
-        { text: 'Pubblica Annuncio', to: '#', isInternal: false },
-        { text: 'Trova Coinquilini', to: '/ricerca', isInternal: true },
-        { text: 'Mappa Interattiva', to: '#', isInternal: false },
+        { text: 'Stanze disponibili', to: '/ricerca', isInternal: true },
+        { text: 'Cerca coinquilini', to: '/ricerca?intent=coinquilino', isInternal: true },
+        { text: 'La tua dashboard', to: '/dashboard', isInternal: true },
       ],
     },
     {
-      title: 'Supporto',
+      title: 'Info',
       links: [
-        { text: 'Come Funziona', to: '#', isInternal: false },
-        { text: 'FAQ', to: '#', isInternal: false },
-        { text: 'Sicurezza', to: '/privacy', isInternal: true }, // Collegato alla Privacy Policy!
-        { text: 'Contattaci', to: '#', isInternal: false },
+        { text: 'Linee Guida', to: '#', isInternal: false },
+        { text: 'Sicurezza e Privacy', to: '/privacy', isInternal: true }, // <-- Link corretto alla Privacy
+        { text: 'Supporto Tecnico', to: '#', isInternal: false },
       ],
-    },
-    {
-      title: 'Azienda',
-      links: [
-        { text: 'Chi Siamo', to: '#', isInternal: false },
-        { text: 'Blog', to: '#', isInternal: false },
-        { text: 'Lavora con Noi', to: '#', isInternal: false },
-        { text: 'Press Kit', to: '#', isInternal: false },
-      ],
-    },
+    }
   ];
 
+  // 2. Link della barra in basso
   const bottomLinks = [
-    { text: 'Privacy Policy', to: '/privacy', isInternal: true },
+    { text: 'Privacy Policy', to: '/privacy', isInternal: true }, // <-- Link corretto alla Privacy
     { text: 'Termini di Servizio', to: '#', isInternal: false },
     { text: 'Cookie', to: '#', isInternal: false },
   ];
 
   return (
-    <footer style={{ background: 'var(--warm-dark)', color: 'rgba(255,255,255,0.7)', padding: '4rem 0 2rem' }}>
-      <div className="max-w-7xl mx-auto px-6 lg:px-8">
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
-          {/* Brand */}
-          <div className="lg:col-span-1">
-            <div className="flex items-center gap-2 mb-4">
-              <div style={{ background: 'var(--terra)', width: 32, height: 32, borderRadius: 8, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" fill="white" opacity="0.9"/>
-                </svg>
-              </div>
-              <span className="font-display text-xl font-bold text-white">
-                Room<span style={{ color: 'var(--terra-light)' }}>Date</span>
-              </span>
+    <footer className="bg-[#1A0E07] pt-16 pb-8 px-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+          
+          {/* Colonna 1: Brand e Descrizione */}
+          <div className="col-span-1 md:col-span-2">
+            <div className="font-serif text-2xl font-bold tracking-tight text-white mb-4">
+              Room<span className="text-[#D4835E]">Date</span>
             </div>
-            <p style={{ fontSize: '0.85rem', lineHeight: 1.75, maxWidth: 220 }}>
-              Il modo più semplice per trovare stanze e coinquilini in Italia.
+            <p className="text-white/40 text-sm leading-relaxed max-w-xs mb-6">
+              Il modo più trasparente per trovare stanze e coinquilini in Italia.
             </p>
-            <div className="flex gap-3 mt-5">
+            {/* Icone Social */}
+            <div className="flex gap-3">
               {['📘', '📸', '🐦', '💼'].map((icon, i) => (
-                <button key={i} style={{
-                  width: 36, height: 36, borderRadius: '50%',
-                  background: 'rgba(255,255,255,0.08)', border: 'none',
-                  cursor: 'pointer', fontSize: '1rem', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  transition: 'background 0.2s',
-                }}
-                onMouseEnter={e => e.currentTarget.style.background='rgba(196,96,58,0.4)'}
-                onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.08)'}
+                <button 
+                  key={i} 
+                  className="w-10 h-10 rounded-full bg-white/5 hover:bg-[#C4603A] flex items-center justify-center transition-colors text-white"
                 >
                   {icon}
                 </button>
@@ -77,56 +58,61 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Links a Destra Sistemati */}
+          {/* Colonne dinamiche: Piattaforma e Info */}
           {menuColumns.map(col => (
             <div key={col.title}>
-              <h4 style={{ color: 'white', fontWeight: 600, marginBottom: '1rem', fontSize: '0.9rem', letterSpacing:'0.03em' }}>{col.title}</h4>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                {col.links.map(link => {
-                  const linkProps = {
-                    style: {
-                      fontSize: '0.85rem', textDecoration: 'none', color: 'rgba(255,255,255,0.6)',
-                      transition: 'color 0.2s',
-                    },
-                    onMouseEnter: e => e.currentTarget.style.color='var(--terra-light)',
-                    onMouseLeave: e => e.currentTarget.style.color='rgba(255,255,255,0.6)',
-                    onClick: () => window.scrollTo(0, 0) // <-- Ti porta in cima alla pagina!
-                  };
-
-                  return (
-                    <li key={link.text}>
-                      {link.isInternal ? (
-                        <Link to={link.to} {...linkProps}>{link.text}</Link>
-                      ) : (
-                        <a href={link.to} {...linkProps}>{link.text}</a>
-                      )}
-                    </li>
-                  );
-                })}
+              <h4 className="text-white font-bold mb-4 tracking-wide text-sm">{col.title}</h4>
+              <ul className="flex flex-col gap-3">
+                {col.links.map(link => (
+                  <li key={link.text}>
+                    {link.isInternal ? (
+                      <Link 
+                        to={link.to} 
+                        onClick={handleScrollTop}
+                        className="text-white/40 hover:text-[#D4835E] text-sm transition-colors"
+                      >
+                        {link.text}
+                      </Link>
+                    ) : (
+                      <a 
+                        href={link.to} 
+                        className="text-white/40 hover:text-[#D4835E] text-sm transition-colors"
+                      >
+                        {link.text}
+                      </a>
+                    )}
+                  </li>
+                ))}
               </ul>
             </div>
           ))}
+
         </div>
 
-        {/* Bottom bar */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1.5rem', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.8rem' }}>© 2026 RoomDate. Tutti i diritti riservati.</span>
+        {/* Barra inferiore */}
+        <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+          <span className="text-white/30 text-xs">© 2026 RoomDate MVP. Tutti i diritti riservati.</span>
           <div className="flex gap-4">
-            {bottomLinks.map(item => {
-              const sharedProps = {
-                key: item.text,
-                style: { fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', textDecoration: 'none' },
-                onMouseEnter: e => e.currentTarget.style.color = 'var(--terra-light)',
-                onMouseLeave: e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)',
-                onClick: () => window.scrollTo(0, 0) // <-- Ti porta in cima alla pagina!
-              };
-
-              return item.isInternal ? (
-                <Link to={item.to} {...sharedProps}>{item.text}</Link>
-              ) : (
-                <a href={item.to} {...sharedProps}>{item.text}</a>
-              );
-            })}
+            {bottomLinks.map(link => (
+              <React.Fragment key={link.text}>
+                {link.isInternal ? (
+                  <Link 
+                    to={link.to} 
+                    onClick={handleScrollTop}
+                    className="text-white/40 hover:text-[#D4835E] text-xs transition-colors"
+                  >
+                    {link.text}
+                  </Link>
+                ) : (
+                  <a 
+                    href={link.to} 
+                    className="text-white/40 hover:text-[#D4835E] text-xs transition-colors"
+                  >
+                    {link.text}
+                  </a>
+                )}
+              </React.Fragment>
+            ))}
           </div>
         </div>
       </div>
