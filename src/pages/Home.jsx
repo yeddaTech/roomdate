@@ -103,26 +103,30 @@ export default function Home() {
       </div>
       {isMenuOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] md:hidden" onClick={() => setIsMenuOpen(false)}></div>}
 
-      {/* --- HERO 100% FUNZIONALE (Senza dati fake) --- */}
+      {/* --- HERO OTTMIZZATA PER SEO E AIO --- */}
       <section className="bg-gradient-to-br from-[#2C1A0E] via-[#5A2C1A] to-[#C4603A] text-white py-24 px-6 text-center animate-fade-in-up relative overflow-hidden">
         {/* Pattern di sfondo sottile */}
         <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle, white 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
         
         <div className="max-w-4xl mx-auto relative z-10">
+          
+          {/* MODIFICA 1: H1 descrittivo con parole chiave vere */}
           <h1 className="font-serif text-5xl md:text-7xl font-bold leading-tight mb-6">
-            Il tuo prossimo coinquilino.<br/><em className="text-[#F5E3CC] font-light">La tua prossima casa.</em>
+            Trova stanze in affitto e <br/><em className="text-[#F5E3CC] font-light">coinquilini ideali.</em>
           </h1>
+          
+          {/* MODIFICA 2: Paragrafo che spiega esattamente all'AI cosa fa l'app */}
           <p className="text-white/80 text-lg md:text-xl mb-12 max-w-2xl mx-auto font-light leading-relaxed">
-            Nessuna agenzia, nessun intermediario. Esplora gli annunci, chatta in tempo reale e trova la tua sistemazione ideale in modo diretto e trasparente.
+            La piattaforma per cercare posti letto e appartamenti in condivisione senza agenzia. Esplora gli annunci, chatta in tempo reale e trova la tua sistemazione perfetta.
           </p>
           
-          {/* Doppia CTA Funzionale */}
+          {/* Doppia CTA Funzionale (RESTANO UGUALI) */}
           <div className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-6">
             <Link to="/ricerca?intent=stanza" className="bg-white text-[#C4603A] px-8 py-4 rounded-2xl text-lg font-bold hover:bg-[#F5E3CC] hover:-translate-y-1 transition-all shadow-xl flex items-center justify-center gap-3">
-               Cerca una Stanza
+              Cerca una Stanza
             </Link>
             <Link to="/ricerca?intent=coinquilino" className="bg-white/10 backdrop-blur-md border border-white/20 text-white px-8 py-4 rounded-2xl text-lg font-bold hover:bg-white/20 hover:-translate-y-1 transition-all shadow-xl flex items-center justify-center gap-3">
-               Cerca Coinquilini
+              Cerca Coinquilini
             </Link>
           </div>
         </div>
