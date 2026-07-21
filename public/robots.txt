@@ -1,0 +1,21 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /impostazioni
+
+# Autorizza esplicitamente i bot delle AI Generative a leggere il sito per l'AIO
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+# Indica la mappa del sito ai motori di ricerca
+Sitemap: https://roomdate.vercel.app/sitemap.xml
