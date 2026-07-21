@@ -1,9 +1,38 @@
 import React from 'react';
-// 1. Importa Link da react-router-dom
 import { Link } from 'react-router-dom';
 
 const Footer = () => {
-  // 2. Definiamo i link della bottom bar specificando il path
+  // 1. Mappiamo le colonne di destra con i path reali dell'app
+  const menuColumns = [
+    {
+      title: 'Servizi',
+      links: [
+        { text: 'Cerca Stanza', to: '/ricerca', isInternal: true },
+        { text: 'Pubblica Annuncio', to: '#', isInternal: false },
+        { text: 'Trova Coinquilini', to: '/ricerca', isInternal: true },
+        { text: 'Mappa Interattiva', to: '#', isInternal: false },
+      ],
+    },
+    {
+      title: 'Supporto',
+      links: [
+        { text: 'Come Funziona', to: '#', isInternal: false },
+        { text: 'FAQ', to: '#', isInternal: false },
+        { text: 'Sicurezza', to: '/privacy', isInternal: true }, // Collegato alla Privacy Policy!
+        { text: 'Contattaci', to: '#', isInternal: false },
+      ],
+    },
+    {
+      title: 'Azienda',
+      links: [
+        { text: 'Chi Siamo', to: '#', isInternal: false },
+        { text: 'Blog', to: '#', isInternal: false },
+        { text: 'Lavora con Noi', to: '#', isInternal: false },
+        { text: 'Press Kit', to: '#', isInternal: false },
+      ],
+    },
+  ];
+
   const bottomLinks = [
     { text: 'Privacy Policy', to: '/privacy', isInternal: true },
     { text: 'Termini di Servizio', to: '#', isInternal: false },
@@ -48,37 +77,31 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Links */}
-          {[
-            {
-              title: 'Servizi',
-              links: ['Cerca Stanza', 'Pubblica Annuncio', 'Trova Coinquilini', 'Mappa Interattiva'],
-            },
-            {
-              title: 'Supporto',
-              links: ['Come Funziona', 'FAQ', 'Sicurezza', 'Contattaci'],
-            },
-            {
-              title: 'Azienda',
-              links: ['Chi Siamo', 'Blog', 'Lavora con Noi', 'Press Kit'],
-            },
-          ].map(col => (
+          {/* Links a Destra Sistemati */}
+          {menuColumns.map(col => (
             <div key={col.title}>
               <h4 style={{ color: 'white', fontWeight: 600, marginBottom: '1rem', fontSize: '0.9rem', letterSpacing:'0.03em' }}>{col.title}</h4>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                {col.links.map(link => (
-                  <li key={link}>
-                    <a href="#" style={{
+                {col.links.map(link => {
+                  const linkProps = {
+                    style: {
                       fontSize: '0.85rem', textDecoration: 'none', color: 'rgba(255,255,255,0.6)',
                       transition: 'color 0.2s',
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.color='var(--terra-light)'}
-                    onMouseLeave={e => e.currentTarget.style.color='rgba(255,255,255,0.6)'}
-                    >
-                      {link}
-                    </a>
-                  </li>
-                ))}
+                    },
+                    onMouseEnter: e => e.currentTarget.style.color='var(--terra-light)',
+                    onMouseLeave: e => e.currentTarget.style.color='rgba(255,255,255,0.6)',
+                  };
+
+                  return (
+                    <li key={link.text}>
+                      {link.isInternal ? (
+                        <Link to={link.to} {...linkProps}>{link.text}</Link>
+                      ) : (
+                        <a href={link.to} {...linkProps}>{link.text}</a>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}
@@ -88,7 +111,6 @@ const Footer = () => {
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1.5rem', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center' }}>
           <span style={{ fontSize: '0.8rem' }}>© 2026 RoomDate. Tutti i diritti riservati.</span>
           <div className="flex gap-4">
-            {/* 3. Renderizziamo dinamicamente Link o tag 'a' mantenendo gli stessi identici stili */}
             {bottomLinks.map(item => {
               const sharedProps = {
                 key: item.text,
