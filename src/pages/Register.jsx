@@ -247,10 +247,20 @@ export default function Register() {
                 </div>
               </div>
 
+              {/* --- CHECKBOX TERMINI E PRIVACY AGGIORNATO --- */}
               <div className="flex flex-col gap-3">
                 <label className="flex items-start gap-3 cursor-pointer group">
-                  <input type="checkbox" name="accettaTermini" checked={formData.accettaTermini} onChange={handleChange} required className="mt-1 w-5 h-5 accent-[#C4603A] cursor-pointer" />
-                  <span className="text-sm text-[#8A7B6E]">Accetto i Termini e la Privacy Policy.</span>
+                  <input 
+                    type="checkbox" 
+                    name="accettaTermini" 
+                    checked={formData.accettaTermini} 
+                    onChange={handleChange} 
+                    required 
+                    className="mt-1 w-5 h-5 accent-[#C4603A] cursor-pointer" 
+                  />
+                  <span className="text-sm text-[#8A7B6E] leading-relaxed">
+                    Dichiaro di aver letto e accetto i <Link to="/privacy" className="text-[#C4603A] font-bold hover:underline">Termini di Servizio</Link> e l'<Link to="/privacy" className="text-[#C4603A] font-bold hover:underline">Informativa sulla Privacy</Link>.
+                  </span>
                 </label>
               </div>
 
@@ -258,7 +268,6 @@ export default function Register() {
                 {isSubmitting ? 'Salvataggio...' : 'Crea Account e Profilo 🚀'}
               </button>
             </form>
-
           </div>
         </div>
       </div>

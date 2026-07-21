@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-
+import Footer from './Footer';
 export default function Home() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -276,42 +276,7 @@ export default function Home() {
       </section>
 
       {/* --- FOOTER COMPLETO --- */}
-      <footer className="bg-[#1A0E07] pt-16 pb-8 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-            <div className="col-span-1 md:col-span-1">
-              <div className="font-serif text-2xl font-bold tracking-tight text-white mb-4">
-                Room<span className="text-[#D4835E]">Date</span>
-              </div>
-              <p className="text-white/40 text-sm leading-relaxed">
-                Il modo più trasparente per trovare stanze e coinquilini in Italia.
-              </p>
-            </div>
-            
-            <div>
-              <h4 className="text-white font-bold mb-4 tracking-wide text-sm">Piattaforma</h4>
-              <ul className="flex flex-col gap-3">
-                <li><Link to="/ricerca" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Stanze disponibili</Link></li>
-                <li><Link to="/ricerca?intent=coinquilino" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Cerca coinquilini</Link></li>
-                <li><Link to="/dashboard" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">La tua dashboard</Link></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-white font-bold mb-4 tracking-wide text-sm">Info</h4>
-              <ul className="flex flex-col gap-3">
-                <li><a href="#" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Linee Guida</a></li>
-                <li><a href="#" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Sicurezza e Privacy</a></li>
-                <li><a href="#" className="text-white/40 hover:text-[#D4835E] text-sm transition-colors">Supporto Tecnico</a></li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-            <span className="text-white/30 text-xs">© 2026 RoomDate MVP.</span>
-          </div>
-        </div>
-      </footer>
+      <Footer />
 
     </div>
   );

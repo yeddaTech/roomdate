@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-
+import { Helmet } from 'react-helmet-async';
 export default function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -91,7 +91,8 @@ export default function Dashboard() {
       occupation: formData.get('occupation'),
       birthdate: formData.get('birthdate'),
       bio: formData.get('bio'),
-      tags: tags
+      tags: tags,
+      isPublic: formData.get('isPublic') === 'on' // <-- AGGIUNTO PER IL GDPR
     };
 
     try {
@@ -146,7 +147,10 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#FEFAF4] pb-20 md:pb-0 font-sans">
-      
+    <Helmet>
+      <title>Area Privata | RoomDate</title>
+      <meta name="robots" content="noindex, nofollow" />
+    </Helmet>
       <nav className="sticky top-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-white decoration-none">
           Room<span className="text-[#D4835E]">Date</span>
@@ -311,7 +315,22 @@ export default function Dashboard() {
                     })}
                   </div>
                 </div>
-
+                {/* --- INIZIO NUOVO BLOCCO GDPR --- */}
+                <div className="flex flex-col gap-3 mt-6 pt-6 border-t border-neutral-100">
+                  <label className="text-sm font-bold text-[#2C1A0E]">Privacy e Visibilità (GDPR)</label>
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <input 
+                      type="checkbox" 
+                      name="isPublic" 
+                      defaultChecked={user.is_public !== false} 
+                      className="mt-0.5 w-5 h-5 text-[#C4603A] bg-neutral-50 border-neutral-300 rounded focus:ring-[#C4603A] accent-[#C4603A] cursor-pointer" 
+                    />
+                    <span className="text-sm text-[#8A7B6E] group-hover:text-[#2C1A0E] transition-colors leading-relaxed">
+                      Rendi il mio profilo pubblico. Acconsento alla visibilità sulla piattaforma e all'indicizzazione sui motori di ricerca ai fini del matching.
+                    </span>
+                  </label>
+                </div>
+                {/* --- FINE NUOVO BLOCCO GDPR --- */}
                 <div className="mt-6 pt-6 border-t border-neutral-100">
                   <button type="submit" className="w-full md:w-auto bg-[#C4603A] hover:bg-[#9A4628] text-white px-8 py-4 rounded-full font-bold shadow-md hover:-translate-y-0.5">
                     Salva Modifiche
