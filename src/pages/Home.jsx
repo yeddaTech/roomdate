@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import Footer from './Footer';
+import Footer from '../components/Footer';
 export default function Home() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
