@@ -3,15 +3,68 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RoomDate — Trova la tua stanza</title>
+    
+    <!-- SEO Standard Principale -->
+    <title>Roomdate — Trova Coinquilini e Stanze in Affitto</title>
+    <meta name="description" content="La piattaforma smart per cercare stanze in affitto e trovare il coinquilino ideale. Filtra gli annunci, chatta in tempo reale e trova la tua sistemazione." />
+    <meta name="keywords" content="cercare coinquilino, stanze in affitto, affitto studenti, posto letto, coinquilini milano, roomshare" />
+    <meta name="robots" content="index, follow" />
 
+    <!-- Open Graph (Per la condivisione sui social e anteprime nelle chat/AI) -->
+    <meta property="og:title" content="Roomdate — Trova Coinquilini e Stanze in Affitto" />
+    <meta property="og:description" content="Trova la stanza perfetta e i coinquilini più compatibili con te. Semplice, sicuro e veloce." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://roomdate.vercel.app/" />
+    <!-- <meta property="og:image" content="https://roomdate.vercel.app/og-image.png" /> -->
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Roomdate — Trova Coinquilini e Stanze in Affitto" />
+    <meta name="twitter:description" content="La piattaforma per trovare la stanza ideale e il coinquilino perfetto." />
+
+    <!-- Font e Stili -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet" />
-    <link rel="icon" type="image/png" href="/public/favicon.png" />
+    
+    <!-- Corretto il percorso della Favicon per la produzione su Vercel -->
+    <link rel="icon" type="image/png" href="/favicon.png" />
+
+    <!-- Dati Strutturati di Base (Schema.org per l'AIO) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Roomdate",
+        "url": "https://roomdate.vercel.app/",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "All",
+        "description": "Applicazione web per la ricerca di coinquilini e stanze in affitto.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0"
+        }
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- 
+      Contenuto di ripiego (Fallback HTML): 
+      Visibile ai crawler SEO/AIO prima del rendering di React, invisibile agli utenti finali una volta montata l'app.
+    -->
+    <div id="root">
+      <header style="display:none;">
+        <h1>Roomdate</h1>
+        <nav>
+          <a href="/">Home</a>
+          <a href="/listings">Annunci</a>
+        </nav>
+      </header>
+      <main style="display:none;">
+        <h2>Trova la tua stanza e il tuo coinquilino ideale</h2>
+        <p>Roomdate ti permette di cercare stanze, posti letto e appartamenti in condivisione, mettendoti in contatto diretto con potenziali coinquilini tramite una chat dedicata.</p>
+      </main>
+    </div>
 
     <script type="module" src="/src/main.jsx"></script>
   </body>
