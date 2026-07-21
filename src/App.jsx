@@ -11,7 +11,7 @@ import Chatpage from './pages/Chatpage';
 import ListingDetails from './pages/ListingDetails';
 import Impostazioni from './pages/Impostazioni';
 import RoommateDetails from './pages/RoommateDetails';
-
+import Privacy from './pages/Privacy';
 function App() {
   return (
     <BrowserRouter>
@@ -29,7 +29,7 @@ function App() {
         <Route path="/ricerca" element={<Search />} />
         <Route path="/chat" element={<Chatpage />} />
         <Route path="/coinquilino/:id" element={<RoommateDetails />} />
-
+        <Route path="/privacy" element={<Privacy />} />
         
         {/* --- ROTTA IMPOSTAZIONI AGGIUNTA QUI --- */}
         <Route path="/impostazioni" element={<Impostazioni />} />
