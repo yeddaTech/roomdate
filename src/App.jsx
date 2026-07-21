@@ -13,7 +13,6 @@ import Impostazioni from './pages/Impostazioni';
 import RoommateDetails from './pages/RoommateDetails';
 import Privacy from './pages/Privacy';
 import Guide from './pages/Guide';
-import Footer from './Footer';
 function App() {
   return (
     <BrowserRouter>
