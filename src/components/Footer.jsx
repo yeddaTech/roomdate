@@ -90,6 +90,7 @@ const Footer = () => {
                     },
                     onMouseEnter: e => e.currentTarget.style.color='var(--terra-light)',
                     onMouseLeave: e => e.currentTarget.style.color='rgba(255,255,255,0.6)',
+                    onClick: () => window.scrollTo(0, 0) // <-- Ti porta in cima alla pagina!
                   };
 
                   return (
@@ -116,7 +117,8 @@ const Footer = () => {
                 key: item.text,
                 style: { fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', textDecoration: 'none' },
                 onMouseEnter: e => e.currentTarget.style.color = 'var(--terra-light)',
-                onMouseLeave: e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'
+                onMouseLeave: e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)',
+                onClick: () => window.scrollTo(0, 0) // <-- Ti porta in cima alla pagina!
               };
 
               return item.isInternal ? (
