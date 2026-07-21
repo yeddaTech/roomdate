@@ -18,7 +18,7 @@ const Footer = () => {
     {
       title: 'Info',
       links: [
-        { text: 'Linee Guida', to: '#', isInternal: false },
+        { text: 'Linee Guida', to: '/guida', isInternal: true },
         { text: 'Sicurezza e Privacy', to: '/privacy', isInternal: true }, // <-- Link corretto alla Privacy
         { text: 'Supporto Tecnico', to: '#', isInternal: false },
       ],
