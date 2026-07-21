@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom'; 
-
+import { Helmet } from 'react-helmet-async';
 export default function RoommateDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -83,6 +83,12 @@ export default function RoommateDetails() {
 
   return (
     <div className="min-h-screen bg-[#FEFAF4] pb-20 md:pb-0 font-sans">
+      <Helmet>
+        <title>{roommate.name} | RoomDate</title>
+        <meta name="description" content={`Profilo di ${roommate.name}, ${roommate.age} anni, ${roommate.job}. Cerca coinquilini compatibili su RoomDate.`} />
+        <meta property="og:title" content={`${roommate.name} cerca coinquilini | RoomDate`} />
+        <meta property="og:description" content={`Scopri il profilo di ${roommate.name} e verifica la vostra compatibilità per condividere casa.`} />
+      </Helmet>
       
       {/* TOP NAV SEMPLIFICATA */}
       <nav className="sticky top-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import Pusher from 'pusher-js'; 
-
+import { Helmet } from 'react-helmet-async';
 const QUICK_REPLIES = [
   '📅 Quando sei disponibile?',
   '🏠 Posso visitarla?',
@@ -156,7 +156,10 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-[100dvh] w-full max-w-[100vw] bg-[#FEFAF4] font-sans overflow-hidden">
-      
+    <Helmet>
+      <title>Area Privata | RoomDate</title>
+      <meta name="robots" content="noindex, nofollow" />
+    </Helmet>
       {/* --- TOP NAV --- */}
       <nav className="shrink-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-white decoration-none">
