@@ -1,7 +1,7 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import Footer from './Footer';
+import Footer from '../components/Footer';
 
 export default function Guide() {
   // --- INIZIO SCHEMA MARKUP (La magia per la SEO e le Intelligenze Artificiali) ---
