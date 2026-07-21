@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom'; 
-
+import { Helmet } from 'react-helmet-async';
 export default function ListingDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -108,6 +108,17 @@ export default function ListingDetails() {
   return (
     <div className="min-h-screen bg-[#FEFAF4] pb-20 md:pb-0 font-sans">
       
+      {/* --- ANCORA DI SALVATAGGIO PER SEO E AIO --- */}
+      <Helmet>
+        <title>{listing.title} a {listing.city} | RoomDate</title>
+        <meta name="description" content={`Stanza in affitto (${listing.type}) a ${listing.city}, zona ${listing.zone}. Prezzo: €${listing.price}/mese spese incluse. Contatta subito l'host in chat.`} />
+        
+        {/* Tag Open Graph per le anteprime link nelle chat e per i bot AI */}
+        <meta property="og:title" content={`${listing.title} | RoomDate`} />
+        <meta property="og:description" content={`Cerca casa su RoomDate: ${listing.type} in zona ${listing.zone} a ${listing.city} per €${listing.price}/mese.`} />
+        <meta property="og:type" content="website" />
+      </Helmet>
+
       {/* --- TOP NAV --- */}
       <nav className="sticky top-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-white decoration-none">
