@@ -19,7 +19,7 @@ const Footer = () => {
       title: 'Info',
       links: [
         { text: 'Linee Guida', to: '/guida', isInternal: true },
-        { text: 'Sicurezza e Privacy', to: '/privacy', isInternal: true }, // <-- Link corretto alla Privacy
+        { text: 'Sicurezza e Privacy', to: '/privacy', isInternal: true },
         { text: 'Supporto Tecnico', to: '#', isInternal: false },
       ],
     }
@@ -27,9 +27,17 @@ const Footer = () => {
 
   // 2. Link della barra in basso
   const bottomLinks = [
-    { text: 'Privacy Policy', to: '/privacy', isInternal: true }, // <-- Link corretto alla Privacy
+    { text: 'Privacy Policy', to: '/privacy', isInternal: true },
     { text: 'Termini di Servizio', to: '#', isInternal: false },
     { text: 'Cookie', to: '#', isInternal: false },
+  ];
+
+  // 3. Array strutturato per i Social (Risolve l'errore di accessibilità)
+  const socialNetworks = [
+    { icon: '📘', name: 'Facebook' },
+    { icon: '📸', name: 'Instagram' },
+    { icon: '🐦', name: 'Twitter' },
+    { icon: '💼', name: 'LinkedIn' }
   ];
 
   return (
@@ -42,17 +50,19 @@ const Footer = () => {
             <div className="font-serif text-2xl font-bold tracking-tight text-white mb-4">
               Room<span className="text-[#D4835E]">Date</span>
             </div>
-            <p className="text-white/40 text-sm leading-relaxed max-w-xs mb-6">
+            {/* Contrasto migliorato: text-white/80 */}
+            <p className="text-white/80 text-sm leading-relaxed max-w-xs mb-6">
               Il modo più trasparente per trovare stanze e coinquilini in Italia.
             </p>
-            {/* Icone Social */}
+            {/* Icone Social con aria-label */}
             <div className="flex gap-3">
-              {['📘', '📸', '🐦', '💼'].map((icon, i) => (
+              {socialNetworks.map((social, i) => (
                 <button 
                   key={i} 
+                  aria-label={`Visita la nostra pagina ${social.name}`}
                   className="w-10 h-10 rounded-full bg-white/5 hover:bg-[#C4603A] flex items-center justify-center transition-colors text-white"
                 >
-                  {icon}
+                  {social.icon}
                 </button>
               ))}
             </div>
@@ -69,14 +79,14 @@ const Footer = () => {
                       <Link 
                         to={link.to} 
                         onClick={handleScrollTop}
-                        className="text-white/40 hover:text-[#D4835E] text-sm transition-colors"
+                        className="text-white/80 hover:text-[#D4835E] text-sm transition-colors"
                       >
                         {link.text}
                       </Link>
                     ) : (
                       <a 
                         href={link.to} 
-                        className="text-white/40 hover:text-[#D4835E] text-sm transition-colors"
+                        className="text-white/80 hover:text-[#D4835E] text-sm transition-colors"
                       >
                         {link.text}
                       </a>
@@ -91,7 +101,8 @@ const Footer = () => {
 
         {/* Barra inferiore */}
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <span className="text-white/30 text-xs">© 2026 RoomDate MVP. Tutti i diritti riservati.</span>
+          {/* Contrasto migliorato: text-white/70 */}
+          <span className="text-white/70 text-xs">© 2026 RoomDate MVP. Tutti i diritti riservati.</span>
           <div className="flex gap-4">
             {bottomLinks.map(link => (
               <React.Fragment key={link.text}>
@@ -99,14 +110,14 @@ const Footer = () => {
                   <Link 
                     to={link.to} 
                     onClick={handleScrollTop}
-                    className="text-white/40 hover:text-[#D4835E] text-xs transition-colors"
+                    className="text-white/80 hover:text-[#D4835E] text-xs transition-colors"
                   >
                     {link.text}
                   </Link>
                 ) : (
                   <a 
                     href={link.to} 
-                    className="text-white/40 hover:text-[#D4835E] text-xs transition-colors"
+                    className="text-white/80 hover:text-[#D4835E] text-xs transition-colors"
                   >
                     {link.text}
                   </a>
