@@ -15,7 +15,7 @@ export default function CookieBanner() {
       loadTrackingScripts();
     }
   }, []);
-
+  // Funzioni per gestire le scelte dell'utente
   const handleAcceptAll = () => {
     localStorage.setItem('roomdate_cookie_consent', 'all');
     setIsVisible(false);
