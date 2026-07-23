@@ -19,24 +19,27 @@ const Guide = lazy(() => import('./pages/Guide'));
 function App() {
   return (
     <BrowserRouter>
-      {/* Suspense mostra un caricamento mentre React scarica il file JS della pagina */}
-      <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Caricamento...</div>}>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/accedi" element={<Login />} />
-          <Route path="/registrati" element={<Register />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/ricerca" element={<Search />} />
-          <Route path="/chat" element={<Chatpage />} />
-          <Route path="/coinquilino/:id" element={<RoommateDetails />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/guida" element={<Guide />} />
-          <Route path="/impostazioni" element={<Impostazioni />} />
-          <Route path="/dettagli/:id" element={<ListingDetails />} />
-          <Route path="*" element={<Home />} />
-        </Routes>
-      </Suspense>
+      {/* Aggiunto il tag <main> per definire il punto di riferimento principale */}
+      <main className="flex flex-col min-h-screen">
+        {/* Suspense mostra un caricamento mentre React scarica il file JS della pagina */}
+        <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Caricamento...</div>}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/accedi" element={<Login />} />
+            <Route path="/registrati" element={<Register />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/ricerca" element={<Search />} />
+            <Route path="/chat" element={<Chatpage />} />
+            <Route path="/coinquilino/:id" element={<RoommateDetails />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/guida" element={<Guide />} />
+            <Route path="/impostazioni" element={<Impostazioni />} />
+            <Route path="/dettagli/:id" element={<ListingDetails />} />
+            <Route path="*" element={<Home />} />
+          </Routes>
+        </Suspense>
+      </main>
     </BrowserRouter>
   );
 }
