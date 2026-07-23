@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 // Importa normalmente solo le pagine essenziali (es. la Home)
 import Home from './pages/Home';
+import CookieBanner from './components/CookieBanner'; // ✅ L'import è corretto
 
 // Usa lazy per caricare le altre pagine solo quando servono
 const Login = lazy(() => import('./pages/Login'));
@@ -14,6 +15,7 @@ const ListingDetails = lazy(() => import('./pages/ListingDetails'));
 const Impostazioni = lazy(() => import('./pages/Impostazioni'));
 const RoommateDetails = lazy(() => import('./pages/RoommateDetails'));
 const Privacy = lazy(() => import('./pages/Privacy'));
+const Terms = lazy(() => import('./pages/Terms'));
 const Guide = lazy(() => import('./pages/Guide'));
 
 function App() {
@@ -33,12 +35,18 @@ function App() {
             <Route path="/chat" element={<Chatpage />} />
             <Route path="/coinquilino/:id" element={<RoommateDetails />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/termini" element={<Terms />} />
             <Route path="/guida" element={<Guide />} />
             <Route path="/impostazioni" element={<Impostazioni />} />
             <Route path="/dettagli/:id" element={<ListingDetails />} />
             <Route path="*" element={<Home />} />
           </Routes>
         </Suspense>
+
+        {/* ✅ INSERISCI IL BANNER QUI */}
+        {/* Fuori dal blocco Routes, così sarà presente globalmente in ogni pagina */}
+        <CookieBanner />
+        
       </main>
     </BrowserRouter>
   );
