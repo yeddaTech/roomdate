@@ -95,8 +95,9 @@ export default function RoommateDetails() {
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-white decoration-none">
           Room<span className="text-[#D4835E]">Date</span>
         </Link>
-        <button className="md:hidden flex flex-col gap-1.5 z-[1001]" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-          <div className="w-7 h-0.5 bg-white"></div><div className="w-7 h-0.5 bg-white"></div><div className="w-7 h-0.5 bg-white"></div>
+        <button className="md:hidden flex flex-col gap-1.5 z-[1001]" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label={isMenuOpen ? "Chiudi menu" : "Apri menu di navigazione"}>          
+        <div className="w-7 h-0.5 bg-white"></div>
+        <div className="w-7 h-0.5 bg-white"></div><div className="w-7 h-0.5 bg-white"></div>
         </button>
       </nav>
 
