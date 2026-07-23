@@ -62,6 +62,7 @@ const Navbar = () => {
             className="md:hidden"
             style={{ color: 'var(--warm-brown)' }}
             onClick={() => setMenuOpen(!menuOpen)}
+            aria-label={menuOpen ? "Chiudi menu" : "Apri menu di navigazione"} // <-- LA CORREZIONE È QUI
           >
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               {menuOpen
