@@ -259,7 +259,7 @@ export default function Register() {
                     className="mt-1 w-5 h-5 accent-[#C4603A] cursor-pointer" 
                   />
                   <span className="text-sm text-[#8A7B6E] leading-relaxed">
-                    Dichiaro di aver letto e accetto i <Link to="/privacy" className="text-[#C4603A] font-bold hover:underline">Termini di Servizio</Link> e l'<Link to="/privacy" className="text-[#C4603A] font-bold hover:underline">Informativa sulla Privacy</Link>.
+                    Dichiaro di aver letto e accetto i <Link to="/termini" className="text-[#C4603A] font-bold hover:underline">Termini di Servizio</Link> e l'<Link to="/privacy" className="text-[#C4603A] font-bold hover:underline">Informativa sulla Privacy</Link>.
                   </span>
                 </label>
               </div>
