@@ -10,24 +10,30 @@
     <meta name="keywords" content="cercare coinquilino, stanze in affitto, affitto studenti, posto letto, coinquilini milano, roomshare" />
     <meta name="robots" content="index, follow" />
     <meta name="google-site-verification" content="9F81C9YLmIK7AZ5CilHQPIDPTdA_BNFKkfsdcFG6ijw" />
+    
     <!-- Open Graph (Per la condivisione sui social e anteprime nelle chat/AI) -->
     <meta property="og:title" content="Roomdate — Trova Coinquilini e Stanze in Affitto" />
     <meta property="og:description" content="Trova la stanza perfetta e i coinquilini più compatibili con te. Semplice, sicuro e veloce." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://roomdate.vercel.app/" />
-    <!-- <meta property="og:image" content="https://roomdate.vercel.app/og-image.png" /> -->
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Roomdate — Trova Coinquilini e Stanze in Affitto" />
     <meta name="twitter:description" content="La piattaforma per trovare la stanza ideale e il coinquilino perfetto." />
 
-    <!-- Font e Stili -->
+    <!-- Font e Stili (Fix Render-Blocking) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet" />
+    <!-- Diciamo al browser di precaricare il CSS al massimo della velocità -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" />
+    <!-- Caricamento asincrono: non blocca la pagina e si applica appena pronto -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" media="print" onload="this.media='all'" />
+    <!-- Fallback di sicurezza se JavaScript è disabilitato -->
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" />
+    </noscript>
     
-    <!-- Corretto il percorso della Favicon per la produzione su Vercel -->
     <link rel="icon" type="image/png" href="/favicon.png" />
 
     <!-- Dati Strutturati di Base (Schema.org per l'AIO) -->
@@ -48,10 +54,6 @@
     </script>
   </head>
   <body>
-    <!-- 
-      Contenuto di ripiego (Fallback HTML): 
-      Visibile ai crawler SEO/AIO prima del rendering di React, invisibile agli utenti finali una volta montata l'app.
-    -->
     <div id="root">
       <header style="display:none;">
         <h1>Roomdate</h1>
