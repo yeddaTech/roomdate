@@ -69,7 +69,8 @@ export default function Guide() {
           <h1 className="font-serif text-4xl md:text-6xl font-bold mb-6 leading-tight">
             Tutto quello che devi sapere per <em className="text-[#F5E3CC] font-light">trovare casa.</em>
           </h1>
-          <p className="text-white/80 text-lg md:text-xl leading-relaxed max-w-2xl mx-auto">
+          {/* Contrasto migliorato: text-white/90 invece di text-white/80 */}
+          <p className="text-white/90 text-lg md:text-xl leading-relaxed max-w-2xl mx-auto">
             Dimentica i vecchi gruppi Facebook. Rispondiamo alle domande più cercate online su come affrontare la ricerca di una stanza senza brutte sorprese.
           </p>
         </div>
@@ -85,7 +86,8 @@ export default function Guide() {
             {faqSchema.mainEntity.map((faq, index) => (
               <div key={index} className="border-b border-neutral-100 pb-6 last:border-0 last:pb-0">
                 <h3 className="font-bold text-lg text-[#C4603A] mb-3">{faq.name}</h3>
-                <p className="text-[#8A7B6E] leading-relaxed">{faq.acceptedAnswer.text}</p>
+                {/* Contrasto migliorato: text-[#5C5249] invece di text-[#8A7B6E] */}
+                <p className="text-[#5C5249] leading-relaxed">{faq.acceptedAnswer.text}</p>
               </div>
             ))}
           </div>
@@ -97,7 +99,8 @@ export default function Guide() {
         <div className="max-w-4xl mx-auto text-center bg-[#FEFAF4] border-2 border-[#C4603A] p-12 rounded-3xl shadow-lg relative overflow-hidden">
           <div className="relative z-10">
             <h2 className="font-serif text-3xl font-bold text-[#2C1A0E] mb-4">Pronto a iniziare?</h2>
-            <p className="text-[#8A7B6E] mb-8 max-w-lg mx-auto">
+            {/* Contrasto migliorato: text-[#5C5249] invece di text-[#8A7B6E] */}
+            <p className="text-[#5C5249] mb-8 max-w-lg mx-auto">
               Crea il tuo profilo in meno di due minuti, imposta le tue preferenze e trova il tuo prossimo coinquilino ideale.
             </p>
             <Link to="/registrati" className="bg-[#C4603A] text-white px-8 py-4 rounded-full font-bold shadow-md hover:bg-[#9A4628] transition-all text-lg">
