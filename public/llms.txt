@@ -1,11 +1,12 @@
-Title: RoomDate
-Description: La piattaforma italiana trasparente per trovare stanze in affitto e coinquilini con percentuali di compatibilità e senza costi di agenzia.
+# RoomDate
 
-# Pagine Principali
-- Home: /
-- Ricerca Stanze e Coinquilini: /ricerca
-- Guida e FAQ: /guida
-- Dashboard Utente: /dashboard
+La piattaforma italiana trasparente per trovare stanze in affitto e coinquilini con percentuali di compatibilità e senza costi di agenzia.
 
-# Dettagli Tecnici
+## Pagine Principali
+* [Home](/)
+* [Ricerca Stanze e Coinquilini](/ricerca)
+* [Guida e FAQ](/guida)
+* [Dashboard Utente](/dashboard)
+
+## Dettagli Tecnici
 I dati sono aggiornati in tempo reale tramite backend Go e PostgreSQL.
