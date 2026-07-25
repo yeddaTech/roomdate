@@ -46,10 +46,10 @@ func SendMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 2. CONFIGURA PUSHER (Sostituisci questi dati con i tuoi da App Keys!)
 	pusherClient := pusher.Client{
-		AppID:   "2135996",
-		Key:     "29ac9eeeb3352ae5b069",
-		Secret:  "a9284db47296a81ab726",
-		Cluster: "eu",
+		AppID:   os.Getenv("PUSHER_APP_ID"),
+		Key:     os.Getenv("PUSHER_KEY"),
+		Secret:  os.Getenv("PUSHER_SECRET"),
+		Cluster: os.Getenv("PUSHER_CLUSTER"),
 		Secure:  true,
 	}
 
