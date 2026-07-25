@@ -10,20 +10,24 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Aggiungiamo alla struttura i campi del profilo che React ci sta inviando
 type RegisterRequest struct {
-	Nome     string `json:"nome"`
-	Cognome  string `json:"cognome"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Citta    string `json:"citta"`
-	UserType string `json:"userType"`
-	Nascita  string `json:"nascita"`
-	// --- NUOVI CAMPI PROFILO ---
+	Nome          string `json:"nome"`
+	Cognome       string `json:"cognome"`
+	Email         string `json:"email"`
+	Password      string `json:"password"`
+	Citta         string `json:"citta"`
+	UserType      string `json:"userType"`
+	Nascita       string `json:"nascita"`
 	BudgetMax     int    `json:"budgetMax"`
 	Occupation    string `json:"occupation"`
 	Bio           string `json:"bio"`
 	LifestyleTags string `json:"lifestyle_tags"`
+
+	// --- NUOVI CAMPI CRITTOGRAFICI ---
+	PublicKey           string `json:"publicKey"`
+	EncryptedPrivateKey string `json:"encryptedPrivateKey"`
+	CryptoSalt          string `json:"cryptoSalt"`
+	CryptoIv            string `json:"cryptoIv"`
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -48,8 +52,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	// AGGIORNATA LA QUERY: Inseriamo anche i nuovi campi
 	query := `INSERT INTO roomdate_app.users 
-              (first_name, last_name, email, password_hash, citta, user_type, birthdate, budget_max, occupation, bio, lifestyle_tags) 
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`
+              (first_name, last_name, email, password_hash, citta, user_type, birthdate, budget_max, occupation, bio, lifestyle_tags, public_key, encrypted_private_key, crypto_salt, crypto_iv) 
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id`
 
 	var newID string
 	// AGGIORNATA LA FUNZIONE: Passiamo tutti i nuovi req.Valore alla query
