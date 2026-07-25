@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import Pusher from 'pusher-js'; 
 import { Helmet } from 'react-helmet-async';
+import { encryptMessage, decryptMessage } from '../utils/crypto';
+
 const QUICK_REPLIES = [
   '📅 Quando sei disponibile?',
   '🏠 Posso visitarla?',
@@ -27,6 +29,7 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
+  // 1. Controllo utente loggato
   useEffect(() => {
     const savedUser = localStorage.getItem('roomdate_user');
     if (!savedUser) {
@@ -38,36 +41,65 @@ export default function ChatPage() {
 
   const handleLogout = () => {
     localStorage.removeItem('roomdate_user');
+    sessionStorage.removeItem('roomdate_private_key'); // Rimuovi anche la chiave privata per sicurezza
     setUser(null);
     setIsMenuOpen(false);
     navigate('/');
   };
 
+  // 2. Scarica e DECIFRA le chat
   const fetchChats = async () => {
-      if (!user) return;
-      try {
-        const res = await fetch(`/api/get_chats?userId=${user.id}`);
-        const data = await res.json();
-        if (data) setConversations(data);
-      } catch (err) {
-        console.error("Errore caricamento chat:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    if (!user) return;
+    try {
+      const res = await fetch(`/api/get_chats?userId=${user.id}`);
+      const data = await res.json();
+      
+      if (data) {
+        // Recuperiamo la chiave privata che dovresti aver salvato al login
+        const myPrivateKey = sessionStorage.getItem('roomdate_private_key'); 
 
-  // 👇 IL BLOCCO PUSHER AGGIORNATO E SICURO
+        if (myPrivateKey) {
+          const decryptedData = await Promise.all(data.map(async (conv) => {
+            const decryptedMessages = await Promise.all((conv.messages || []).map(async (msg) => {
+              // Decifriamo i messaggi ricevuti (quelli inviati sono già mostrati in chiaro o andrebbero gestiti)
+              if (msg.type === 'received') {
+                try {
+                  msg.text = await decryptMessage(msg.text, myPrivateKey);
+                } catch (e) {
+                  msg.text = "🔒 [Messaggio non decifrabile]";
+                  console.error("Errore decifratura messaggio:", e);
+                }
+              }
+              return msg;
+            }));
+            return { ...conv, messages: decryptedMessages };
+          }));
+          
+          setConversations(decryptedData);
+        } else {
+          console.warn("Nessuna chiave privata trovata in sessione! I messaggi rimarranno cifrati.");
+          setConversations(data);
+        }
+      }
+    } catch (err) {
+      console.error("Errore caricamento chat:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 3. Configurazione Pusher
   useEffect(() => {
     if (user) {
       fetchChats(); 
 
-      // Peschiamo le variabili d'ambiente nascoste
       const pusher = new Pusher(import.meta.env.VITE_PUSHER_KEY, {
         cluster: import.meta.env.VITE_PUSHER_CLUSTER
       });
 
       const channel = pusher.subscribe('roomdate-channel');
       channel.bind('nuovo-messaggio', function(data) {
+        // Quando arriva un nuovo messaggio, ricarica e decifra
         fetchChats();
       });
 
@@ -77,7 +109,6 @@ export default function ChatPage() {
       };
     }
   }, [user]);
-  // 👆 FINE BLOCCO PUSHER
 
   const activeConv = conversations.find(c => c.id === activeConvId);
 
@@ -104,6 +135,7 @@ export default function ChatPage() {
     setMobileView('chat');
   };
 
+  // 4. CIFRA e invia il messaggio
   const handleSend = async () => {
     if (!inputText.trim() || !activeConvId || !user) return;
     
@@ -111,6 +143,7 @@ export default function ChatPage() {
     setInputText(''); 
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
+    // Mostriamo subito il messaggio in chiaro sulla nostra UI
     const tempMsg = {
       id: Date.now(), 
       type: 'sent',
@@ -126,16 +159,27 @@ export default function ChatPage() {
     }));
 
     try {
+      // Verifica che il backend ti stia passando la public key del destinatario
+      if (!activeConv.targetPublicKey) {
+        console.error("Manca la chiave pubblica del destinatario per cifrare il messaggio!");
+        alert("Errore crittografico: impossibile trovare la chiave del destinatario.");
+        return;
+      }
+
+      // CIFRATURA DEL MESSAGGIO
+      const encryptedText = await encryptMessage(textToSend, activeConv.targetPublicKey);
+
       await fetch('/api/send_message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           conversationId: activeConvId,
           senderId: user.id,
-          text: textToSend
+          text: encryptedText
         })
       });
     } catch (err) {
+      console.error(err);
       alert("Errore di connessione. Il messaggio potrebbe non essere stato inviato.");
     }
   };
@@ -225,7 +269,6 @@ export default function ChatPage() {
       {isMenuOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] md:hidden" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* ── LAYOUT CHAT ── */}
-      {/* SOLUZIONE: pb-16 si attiva SOLO se siamo nella lista. Se siamo nella chat scompare. */}
       <div className={`flex-1 flex overflow-hidden relative w-full ${mobileView === 'list' ? 'pb-16 md:pb-0' : ''}`}>
 
         {/* ── SIDEBAR LISTA CHAT ── */}
@@ -355,7 +398,7 @@ export default function ChatPage() {
                 ))}
               </div>
 
-              {/* Input Area (Rimosso pb-safe finto, aggiunto pb reale per dare spazio) */}
+              {/* Input Area */}
               <div className="shrink-0 bg-white p-3 pb-6 md:p-4 border-t border-neutral-100 flex items-end gap-3 w-full">
                 <textarea
                   ref={textareaRef}
@@ -378,7 +421,6 @@ export default function ChatPage() {
           )}
         </main>
       </div>
-
     </div>
   );
 }
