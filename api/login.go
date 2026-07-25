@@ -10,9 +10,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Una singola struttura "jolly" che accetta tutti i possibili dati da React
 type MultiRequest struct {
-	Action      string `json:"action"` // "login", "update_password", o "delete_account"
+	Action      string `json:"action"`
 	Email       string `json:"email"`
 	Password    string `json:"password"`
 	UserID      string `json:"userId"`
@@ -39,7 +38,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Connessione al DB unica per tutte le operazioni
 	connStr := os.Getenv("DATABASE_URL")
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
@@ -48,12 +46,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// LO SWITCH: Decide quale operazione eseguire!
 	switch req.Action {
 
-	// ==========================================
-	// AZIONE 1: AGGIORNAMENTO PASSWORD
-	// ==========================================
 	case "update_password":
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 		if err != nil {
@@ -70,9 +64,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Password aggiornata con successo"))
 		return
 
-	// ==========================================
-	// AZIONE 2: ELIMINAZIONE ACCOUNT
-	// ==========================================
 	case "delete_account":
 		query := `DELETE FROM roomdate_app.users WHERE id = $1`
 		_, err = db.Exec(query, req.UserID)
@@ -84,15 +75,21 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Account eliminato"))
 		return
 
-	// ==========================================
-	// AZIONE DI DEFAULT: LOGIN NORMALE
-	// ==========================================
 	default:
 		var user UserData
 		var hashedPassword string
+		// --- 🔐 NUOVE VARIABILI PER LA CRITTOGRAFIA ---
+		var encryptedPrivKey, cryptoSalt, cryptoIv string
 
-		query := `SELECT id::text, first_name, last_name, email, password_hash, COALESCE(user_type, '') FROM roomdate_app.users WHERE email = $1`
-		err = db.QueryRow(query, req.Email).Scan(&user.ID, &user.Nome, &user.Cognome, &user.Email, &hashedPassword, &user.UserType)
+		// Modificata la query per estrarre anche i campi crittografici
+		query := `SELECT id::text, first_name, last_name, email, password_hash, COALESCE(user_type, ''), 
+                  COALESCE(encrypted_private_key, ''), COALESCE(crypto_salt, ''), COALESCE(crypto_iv, '') 
+                  FROM roomdate_app.users WHERE email = $1`
+
+		err = db.QueryRow(query, req.Email).Scan(
+			&user.ID, &user.Nome, &user.Cognome, &user.Email, &hashedPassword, &user.UserType,
+			&encryptedPrivKey, &cryptoSalt, &cryptoIv, // <-- Recuperiamo le casseforti
+		)
 
 		if err != nil {
 			if err == sql.ErrNoRows {
@@ -110,9 +107,13 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
+		// Restituiamo a React anche i parametri crittografici
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"message": "Login effettuato con successo",
-			"user":    user,
+			"message":             "Login effettuato con successo",
+			"user":                user,
+			"encryptedPrivateKey": encryptedPrivKey,
+			"cryptoSalt":          cryptoSalt,
+			"cryptoIv":            cryptoIv,
 		})
 	}
 }

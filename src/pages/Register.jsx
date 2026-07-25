@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+// ✅ IMPORTA LE FUNZIONI CRITTOGRAFICHE
+import { generateKeyPair, wrapPrivateKey } from '../utils/crypto';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -7,7 +9,6 @@ export default function Register() {
   const [userType, setUserType] = useState('cerca'); 
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // STATO ESPANSO: Ora include i dati del profilo!
   const [formData, setFormData] = useState({
     nome: '',
     cognome: '',
@@ -15,17 +16,14 @@ export default function Register() {
     password: '',
     citta: '',
     nascita: '',
-    // Nuovi campi per il Profilo:
     budgetMax: '',
     occupation: '',
     bio: '',
-    // Stile di vita (Checkbox)
     fumatore: false,
     animali: false,
     ordinato: false,
     socievole: false,
     vegano: false,
-    // Varie
     accettaTermini: false,
     newsletter: false
   });
@@ -64,7 +62,6 @@ export default function Register() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Compattiamo i tag dello stile di vita in una stringa, come si aspetta il database
     const lifestyleTags = [];
     if (formData.fumatore) lifestyleTags.push('Fumatore');
     else lifestyleTags.push('Non Fumatore');
@@ -74,7 +71,14 @@ export default function Register() {
     if (formData.vegano) lifestyleTags.push('Vegano/Vegetariano');
 
     try {
-      // ORA CHIAMIAMO LA TUA API DI REGISTRAZIONE DEDICATA
+      // --- 🔐 LOGICA CRITTOGRAFICA INIZIO ---
+      // 1. Genera la coppia di chiavi RSA
+      const keys = await generateKeyPair();
+      
+      // 2. Usa la password per "incartare" la chiave privata in modo sicuro con AES-GCM
+      const wrappedData = await wrapPrivateKey(keys.privateKey, formData.password);
+      // --- 🔐 LOGICA CRITTOGRAFICA FINE ---
+
       const response = await fetch('/api/register', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -89,10 +93,15 @@ export default function Register() {
           budgetMax: parseInt(formData.budgetMax) || 0,
           occupation: formData.occupation,
           bio: formData.bio,
-          lifestyle_tags: lifestyleTags.join(', ')
+          lifestyle_tags: lifestyleTags.join(', '),
+          
+          // ✅ AGGIUNTI I CAMPI CRITTOGRAFICI AL PAYLOAD
+          publicKey: keys.publicKey,
+          encryptedPrivateKey: wrappedData.encryptedPrivateKey,
+          cryptoSalt: wrappedData.salt,
+          cryptoIv: wrappedData.iv
         }),
       });
-      // ... (il resto rimane uguale, i vari if/else per il messaggio di successo/errore)
 
       if (response.ok) {
         alert('🎉 Registrazione completata! Ora puoi accedere e vedere il tuo profilo già impostato.');
@@ -102,7 +111,8 @@ export default function Register() {
         alert('❌ Errore: ' + errorMsg);
       }
     } catch (error) {
-      alert('⚠️ Errore di connessione col server.');
+      console.error("Errore di registrazione o crittografia:", error);
+      alert('⚠️ Errore di connessione col server o errore interno.');
     } finally {
       setIsSubmitting(false);
     }
@@ -131,7 +141,6 @@ export default function Register() {
         
         {/* PARTE SINISTRA (Testo) */}
         <div className="hidden lg:flex lg:w-4/12 xl:w-5/12 bg-gradient-to-br from-[#2C1A0E] to-[#5A2C1A] p-12 xl:p-16 flex-col justify-center relative overflow-hidden text-white border-r border-[#C4603A]/20">
-          {/* ... Lascia pure intatto il testo e la grafica a sinistra ... */}
           <div className="relative z-10 max-w-lg mx-auto">
             <div className="text-[#D4835E] text-xs font-bold uppercase tracking-widest mb-3">Unisciti a RoomDate</div>
             <h2 className="font-serif text-5xl xl:text-6xl font-bold leading-tight mb-6">Trova la tua stanza,<br/><em className="text-[#F5E3CC] font-light">trova casa.</em></h2>
@@ -229,7 +238,7 @@ export default function Register() {
                   <textarea name="bio" rows="2" placeholder="Ciao! Sto cercando..." value={formData.bio} onChange={handleChange} className="w-full bg-white border border-neutral-200 rounded-xl px-4 py-2.5 focus:border-[#C4603A] focus:outline-none resize-none"></textarea>
                 </div>
 
-                {/* STILE DI VITA (Lifestyle Tags) */}
+                {/* STILE DI VITA */}
                 <label className="text-xs font-bold text-[#8A7B6E] uppercase mb-2 block">Il tuo Stile di Vita</label>
                 <div className="flex flex-wrap gap-2">
                   {[
@@ -247,7 +256,7 @@ export default function Register() {
                 </div>
               </div>
 
-              {/* --- CHECKBOX TERMINI E PRIVACY AGGIORNATO --- */}
+              {/* CHECKBOX TERMINI E PRIVACY */}
               <div className="flex flex-col gap-3">
                 <label className="flex items-start gap-3 cursor-pointer group">
                   <input 
@@ -265,7 +274,7 @@ export default function Register() {
               </div>
 
               <button type="submit" disabled={isSubmitting} className="w-full text-white py-4 rounded-full font-bold transition-all shadow-md bg-[#C4603A] hover:bg-[#9A4628]">
-                {isSubmitting ? 'Salvataggio...' : 'Crea Account e Profilo 🚀'}
+                {isSubmitting ? 'Salvataggio sicuro in corso...' : 'Crea Account e Profilo 🚀'}
               </button>
             </form>
           </div>
