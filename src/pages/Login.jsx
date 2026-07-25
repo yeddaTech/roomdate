@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+// ✅ IMPORTA LA FUNZIONE DI SPACCHETTAMENTO
+import { unwrapPrivateKey } from '../utils/crypto';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -38,15 +40,34 @@ export default function Login() {
 
         if (response.ok) {
           const data = await response.json();
-          setIsSuccess(true);
           
-          // Salviamo i dati dell'utente nel browser in modo sicuro
-          localStorage.setItem('roomdate_user', JSON.stringify(data.user));
+          try {
+            // --- 🔐 LOGICA CRITTOGRAFICA INIZIO ---
+            // Controlliamo se l'utente ha i dati crittografici (per retrocompatibilità se hai utenti vecchi)
+            if (data.encryptedPrivateKey && data.cryptoSalt && data.cryptoIv) {
+                const privateKey = await unwrapPrivateKey(
+                  data.encryptedPrivateKey,
+                  password, // La chiave per aprire la cassaforte!
+                  data.cryptoSalt,
+                  data.cryptoIv
+                );
+                // Salviamo la chiave spacchettata in locale. Non va MAI su internet!
+                localStorage.setItem('roomdate_private_key', privateKey);
+            }
+            // --- 🔐 LOGICA CRITTOGRAFICA FINE ---
 
-          // Aspettiamo 1.5s per far vedere il banner verde, poi andiamo alla Home
-          setTimeout(() => {
-            navigate('/'); 
-          }, 1500);
+            setIsSuccess(true);
+            localStorage.setItem('roomdate_user', JSON.stringify(data.user));
+
+            setTimeout(() => {
+              navigate('/'); 
+            }, 1500);
+
+          } catch (cryptoError) {
+             console.error("Impossibile decifrare la chiave:", cryptoError);
+             alert('⚠️ Accesso effettuato, ma la chiave di sicurezza non è valida. Potresti non riuscire a leggere i messaggi.');
+             setIsSubmitting(false);
+          }
 
         } else {
           const errorMsg = await response.text();
