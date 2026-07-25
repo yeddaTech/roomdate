@@ -14,6 +14,7 @@ type SendMessageReq struct {
 	ConversationID int    `json:"conversationId"`
 	SenderID       string `json:"senderId"`
 	Text           string `json:"text"`
+	SenderText     string `json:"senderText"` // 🔐 NUOVO: Riceve il testo cifrato per il mittente
 }
 
 func SendMessageHandler(w http.ResponseWriter, r *http.Request) {
@@ -36,15 +37,16 @@ func SendMessageHandler(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	// 1. Salva il messaggio su Neon
-	_, err = db.Exec("INSERT INTO roomdate_app.messages (conversation_id, sender_id, content) VALUES ($1, $2, $3)",
-		req.ConversationID, req.SenderID, req.Text)
+	// 🔐 AGGIORNATO: Ora salva sia "content" che "sender_content"
+	_, err = db.Exec("INSERT INTO roomdate_app.messages (conversation_id, sender_id, content, sender_content) VALUES ($1, $2, $3, $4)",
+		req.ConversationID, req.SenderID, req.Text, req.SenderText)
 
 	if err != nil {
 		http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 2. CONFIGURA PUSHER (Sostituisci questi dati con i tuoi da App Keys!)
+	// 2. CONFIGURA PUSHER (Mantenuto esattamente come il tuo originale)
 	pusherClient := pusher.Client{
 		AppID:   os.Getenv("PUSHER_APP_ID"),
 		Key:     os.Getenv("PUSHER_KEY"),
