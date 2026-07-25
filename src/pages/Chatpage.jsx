@@ -56,12 +56,14 @@ export default function ChatPage() {
       }
     };
 
+  // 👇 IL BLOCCO PUSHER AGGIORNATO E SICURO
   useEffect(() => {
     if (user) {
       fetchChats(); 
 
-      const pusher = new Pusher('29ac9eeeb3352ae5b069', {
-        cluster: 'eu'
+      // Peschiamo le variabili d'ambiente nascoste
+      const pusher = new Pusher(import.meta.env.VITE_PUSHER_KEY, {
+        cluster: import.meta.env.VITE_PUSHER_CLUSTER
       });
 
       const channel = pusher.subscribe('roomdate-channel');
@@ -75,6 +77,7 @@ export default function ChatPage() {
       };
     }
   }, [user]);
+  // 👆 FINE BLOCCO PUSHER
 
   const activeConv = conversations.find(c => c.id === activeConvId);
 
