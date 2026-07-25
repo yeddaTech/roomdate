@@ -58,6 +58,11 @@ export default function Login() {
             setIsSuccess(true);
             localStorage.setItem('roomdate_user', JSON.stringify(data.user));
 
+            // 🔐 ECCO IL PEZZO MANCANTE CHE ABBIAMO AGGIUNTO!
+            if (data.publicKey) {
+                localStorage.setItem('roomdate_public_key', data.publicKey);
+            }
+
             setTimeout(() => {
               navigate('/'); 
             }, 1500);

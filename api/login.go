@@ -79,16 +79,17 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		var user UserData
 		var hashedPassword string
 		// --- 🔐 NUOVE VARIABILI PER LA CRITTOGRAFIA ---
-		var encryptedPrivKey, cryptoSalt, cryptoIv string
+		var encryptedPrivKey, cryptoSalt, cryptoIv, pubKey string // 👈 Aggiunta pubKey
 
-		// Modificata la query per estrarre anche i campi crittografici
+		// Modificata la query per estrarre anche i campi crittografici e public_key
 		query := `SELECT id::text, first_name, last_name, email, password_hash, COALESCE(user_type, ''), 
-                  COALESCE(encrypted_private_key, ''), COALESCE(crypto_salt, ''), COALESCE(crypto_iv, '') 
+                  COALESCE(encrypted_private_key, ''), COALESCE(crypto_salt, ''), COALESCE(crypto_iv, ''),
+                  COALESCE(public_key, '') -- 👈 AGGIUNTO QUESTO!
                   FROM roomdate_app.users WHERE email = $1`
 
 		err = db.QueryRow(query, req.Email).Scan(
 			&user.ID, &user.Nome, &user.Cognome, &user.Email, &hashedPassword, &user.UserType,
-			&encryptedPrivKey, &cryptoSalt, &cryptoIv, // <-- Recuperiamo le casseforti
+			&encryptedPrivKey, &cryptoSalt, &cryptoIv, &pubKey, // 👈 Aggiunto &pubKey
 		)
 
 		if err != nil {
@@ -107,13 +108,14 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		// Restituiamo a React anche i parametri crittografici
+		// Restituiamo a React anche i parametri crittografici e la chiave pubblica
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"message":             "Login effettuato con successo",
 			"user":                user,
 			"encryptedPrivateKey": encryptedPrivKey,
 			"cryptoSalt":          cryptoSalt,
 			"cryptoIv":            cryptoIv,
+			"publicKey":           pubKey, // 👈 AGGIUNTO QUESTO!
 		})
 	}
 }
