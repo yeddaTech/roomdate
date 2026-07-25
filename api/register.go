@@ -70,6 +70,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		req.Occupation,
 		req.Bio,
 		req.LifestyleTags,
+		req.PublicKey,
+		req.EncryptedPrivateKey,
+		req.CryptoSalt,
+		req.CryptoIv,
 	).Scan(&newID)
 
 	if err != nil {
