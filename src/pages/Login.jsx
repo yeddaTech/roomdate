@@ -42,8 +42,7 @@ export default function Login() {
           const data = await response.json();
           
           try {
-            // --- 🔐 LOGICA CRITTOGRAFICA INIZIO ---
-            // Controlliamo se l'utente ha i dati crittografici (per retrocompatibilità se hai utenti vecchi)
+          // --- 🔐 LOGICA CRITTOGRAFICA INIZIO ---
             if (data.encryptedPrivateKey && data.cryptoSalt && data.cryptoIv) {
                 const privateKey = await unwrapPrivateKey(
                   data.encryptedPrivateKey,
@@ -51,8 +50,8 @@ export default function Login() {
                   data.cryptoSalt,
                   data.cryptoIv
                 );
-                // Salviamo la chiave spacchettata in locale. Non va MAI su internet!
-                localStorage.setItem('roomdate_private_key', privateKey);
+                // CORREZIONE: Usiamo sessionStorage per abbinarlo a ChatPage.jsx e migliorare la sicurezza
+                sessionStorage.setItem('roomdate_private_key', privateKey);
             }
             // --- 🔐 LOGICA CRITTOGRAFICA FINE ---
 
