@@ -24,13 +24,14 @@ type UIListing struct {
 }
 
 type UIConversation struct {
-	ID       int         `json:"id"`
-	Name     string      `json:"name"`
-	Emoji    string      `json:"emoji"`
-	Color1   string      `json:"color1"`
-	Color2   string      `json:"color2"`
-	Listing  UIListing   `json:"listing"`
-	Messages []UIMessage `json:"messages"`
+	ID              int         `json:"id"`
+	Name            string      `json:"name"`
+	Emoji           string      `json:"emoji"`
+	Color1          string      `json:"color1"`
+	Color2          string      `json:"color2"`
+	Listing         UIListing   `json:"listing"`
+	TargetPublicKey string      `json:"targetPublicKey"` // 🔐 Nuovo campo aggiunto!
+	Messages        []UIMessage `json:"messages"`
 }
 
 func GetChatsHandler(w http.ResponseWriter, r *http.Request) {
@@ -47,25 +48,32 @@ func GetChatsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// MAGIA SQL: Usa LEFT JOIN così non va in crash se la chat è senza stanza
+	// 🔐 Aggiornata la query SQL per estrarre anche la public_key dell'interlocutore
 	queryChats := `
-		SELECT 
-			c.id, 
-			COALESCE(l.title, 'Chat Diretta') as title, 
-			COALESCE(l.price, 0) as price,
-			CASE 
-				WHEN c.listing_id IS NOT NULL THEN
-					CASE WHEN c.tenant_id::text = $1 THEN owner.first_name ELSE tenant.first_name END
-				ELSE
-					CASE WHEN c.tenant_id::text = $1 THEN u2.first_name ELSE tenant.first_name END
-			END as other_user_name
-		FROM roomdate_app.conversations c
-		LEFT JOIN roomdate_app.listings l ON c.listing_id = l.id
-		LEFT JOIN roomdate_app.users owner ON l.user_id = owner.id
-		LEFT JOIN roomdate_app.users tenant ON c.tenant_id = tenant.id
-		LEFT JOIN roomdate_app.users u2 ON c.user2_id = u2.id
-		WHERE c.tenant_id::text = $1 OR l.user_id::text = $1 OR c.user2_id::text = $1
-	`
+        SELECT 
+            c.id, 
+            COALESCE(l.title, 'Chat Diretta') as title, 
+            COALESCE(l.price, 0) as price,
+            CASE 
+                WHEN c.listing_id IS NOT NULL THEN
+                    CASE WHEN c.tenant_id::text = $1 THEN owner.first_name ELSE tenant.first_name END
+                ELSE
+                    CASE WHEN c.tenant_id::text = $1 THEN u2.first_name ELSE tenant.first_name END
+            END as other_user_name,
+            -- Nuovo blocco CASE per la chiave pubblica
+            CASE 
+                WHEN c.listing_id IS NOT NULL THEN
+                    CASE WHEN c.tenant_id::text = $1 THEN owner.public_key ELSE tenant.public_key END
+                ELSE
+                    CASE WHEN c.tenant_id::text = $1 THEN u2.public_key ELSE tenant.public_key END
+            END as target_public_key
+        FROM roomdate_app.conversations c
+        LEFT JOIN roomdate_app.listings l ON c.listing_id = l.id
+        LEFT JOIN roomdate_app.users owner ON l.user_id = owner.id
+        LEFT JOIN roomdate_app.users tenant ON c.tenant_id = tenant.id
+        LEFT JOIN roomdate_app.users u2 ON c.user2_id = u2.id
+        WHERE c.tenant_id::text = $1 OR l.user_id::text = $1 OR c.user2_id::text = $1
+    `
 
 	rows, err := db.Query(queryChats, userId)
 	if err != nil {
@@ -82,15 +90,17 @@ func GetChatsHandler(w http.ResponseWriter, r *http.Request) {
 		var chat UIConversation
 		chat.Messages = []UIMessage{}
 		var name sql.NullString
+		var pubKey sql.NullString // Variabile temporanea per gestire eventuali valori nulli nel DB
 
-		rows.Scan(&chat.ID, &chat.Listing.Title, &chat.Listing.Price, &name)
+		// Aggiunto pubKey allo Scan
+		rows.Scan(&chat.ID, &chat.Listing.Title, &chat.Listing.Price, &name, &pubKey)
 
 		chat.Emoji = "👤"
 		chat.Color1 = colors[i%len(colors)][0]
 		chat.Color2 = colors[i%len(colors)][1]
 
 		if chat.Listing.Price == 0 {
-			chat.Listing.Emoji = "💬" // Icona diversa per le chat dirette
+			chat.Listing.Emoji = "💬"
 		} else {
 			chat.Listing.Emoji = "🏠"
 		}
@@ -99,6 +109,11 @@ func GetChatsHandler(w http.ResponseWriter, r *http.Request) {
 			chat.Name = name.String
 		} else {
 			chat.Name = "Utente Sconosciuto"
+		}
+
+		// 🔐 Se la chiave pubblica esiste, la assegnamo all'oggetto che va al frontend
+		if pubKey.Valid {
+			chat.TargetPublicKey = pubKey.String
 		}
 
 		msgRows, _ := db.Query("SELECT id, sender_id, content, created_at FROM roomdate_app.messages WHERE conversation_id = $1 ORDER BY created_at ASC", chat.ID)
