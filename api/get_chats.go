@@ -116,8 +116,27 @@ func GetChatsHandler(w http.ResponseWriter, r *http.Request) {
 			chat.TargetPublicKey = pubKey.String
 		}
 
-		msgRows, _ := db.Query("SELECT id, sender_id, content, created_at FROM roomdate_app.messages WHERE conversation_id = $1 ORDER BY created_at ASC", chat.ID)
+		// 🔐 Nuova query: sceglie dinamicamente quale "cassaforte" leggere
+		queryMessages := `
+            SELECT 
+                id, 
+                sender_id, 
+                CASE 
+                    WHEN sender_id::text = $2 THEN COALESCE(sender_content, content) 
+                    ELSE content 
+                END as content_to_read,
+                created_at 
+            FROM roomdate_app.messages 
+            WHERE conversation_id = $1 
+            ORDER BY created_at ASC
+        `
+		// Passiamo chat.ID come $1 e userId come $2
+		msgRows, err := db.Query(queryMessages, chat.ID, userId)
 
+		if err != nil {
+			// È sempre buona pratica gestire gli errori delle query!
+			continue
+		}
 		for msgRows.Next() {
 			var msg UIMessage
 			var sender string

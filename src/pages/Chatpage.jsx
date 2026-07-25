@@ -61,14 +61,13 @@ export default function ChatPage() {
         if (myPrivateKey) {
           const decryptedData = await Promise.all(data.map(async (conv) => {
             const decryptedMessages = await Promise.all((conv.messages || []).map(async (msg) => {
-              // Decifriamo i messaggi ricevuti (quelli inviati sono già mostrati in chiaro o andrebbero gestiti)
-              if (msg.type === 'received') {
-                try {
-                  msg.text = await decryptMessage(msg.text, myPrivateKey);
-                } catch (e) {
-                  msg.text = "🔒 [Messaggio non decifrabile]";
-                  console.error("Errore decifratura messaggio:", e);
-                }
+              // 🔐 MODIFICA: Ora decifriamo TUTTI i messaggi dal server (sia inviati che ricevuti)
+              // perché il server ci manderà i nostri messaggi cifrati con la nostra chiave!
+              try {
+                msg.text = await decryptMessage(msg.text, myPrivateKey);
+              } catch (e) {
+                msg.text = "🔒 [Messaggio non decifrabile]";
+                console.error("Errore decifratura messaggio:", e);
               }
               return msg;
             }));
@@ -135,7 +134,7 @@ export default function ChatPage() {
     setMobileView('chat');
   };
 
-  // 4. CIFRA e invia il messaggio
+  // 4. DOPPIA CIFRATURA e invio del messaggio
   const handleSend = async () => {
     if (!inputText.trim() || !activeConvId || !user) return;
     
@@ -143,7 +142,7 @@ export default function ChatPage() {
     setInputText(''); 
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
-    // Mostriamo subito il messaggio in chiaro sulla nostra UI
+    // Mostriamo subito il messaggio in chiaro sulla nostra UI per reattività
     const tempMsg = {
       id: Date.now(), 
       type: 'sent',
@@ -159,15 +158,26 @@ export default function ChatPage() {
     }));
 
     try {
-      // Verifica che il backend ti stia passando la public key del destinatario
       if (!activeConv.targetPublicKey) {
         console.error("Manca la chiave pubblica del destinatario per cifrare il messaggio!");
         alert("Errore crittografico: impossibile trovare la chiave del destinatario.");
         return;
       }
 
-      // CIFRATURA DEL MESSAGGIO
-      const encryptedText = await encryptMessage(textToSend, activeConv.targetPublicKey);
+      // 🔐 NUOVO: Recuperiamo la NOSTRA chiave pubblica dal localStorage
+      const myPublicKey = localStorage.getItem('roomdate_public_key');
+      if (!myPublicKey) {
+        console.error("Manca la tua chiave pubblica!");
+        alert("Errore crittografico: impossibile trovare la tua chiave pubblica. Fai di nuovo il login.");
+        return;
+      }
+
+      // 🔐 LA DOPPIA CIFRATURA
+      // 1. Cifriamo per il destinatario
+      const encryptedForTarget = await encryptMessage(textToSend, activeConv.targetPublicKey);
+      
+      // 2. Cifriamo per noi stessi
+      const encryptedForMe = await encryptMessage(textToSend, myPublicKey);
 
       await fetch('/api/send_message', {
         method: 'POST',
@@ -175,7 +185,8 @@ export default function ChatPage() {
         body: JSON.stringify({
           conversationId: activeConvId,
           senderId: user.id,
-          text: encryptedText
+          text: encryptedForTarget,  // Questo andrà nella colonna 'content'
+          senderText: encryptedForMe // Questo andrà nella colonna 'sender_content'
         })
       });
     } catch (err) {
