@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Footer from '../components/Footer';
+// ✅ IMPORTIAMO L'API SICURA
+import { fetchAPI } from '../utils/api';
+
 export default function Home() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -15,13 +18,15 @@ export default function Home() {
     const savedUser = localStorage.getItem('roomdate_user');
     if (savedUser) setUser(JSON.parse(savedUser));
 
-    fetch('/api/get_listings')
+    // ✅ USIAMO fetchAPI AL POSTO DI fetch
+    fetchAPI('/api/get_listings')
       .then(res => res.json())
       .then(data => { if (data) setListings(data); })
       .catch(() => setListings([]))
       .finally(() => setIsLoadingListings(false));
 
-    fetch('/api/get_roommates')
+    // ✅ USIAMO fetchAPI AL POSTO DI fetch
+    fetchAPI('/api/get_roommates')
       .then(res => res.json())
       .then(data => { if (data) setRoommates(data); })
       .catch(() => setRoommates([]))
@@ -123,7 +128,7 @@ export default function Home() {
           {/* Doppia CTA Funzionale (RESTANO UGUALI) */}
           <div className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-6">
             <Link to="/ricerca?intent=stanza" className="bg-white text-[#C4603A] px-8 py-4 rounded-2xl text-lg font-bold hover:bg-[#F5E3CC] hover:-translate-y-1 transition-all shadow-xl flex items-center justify-center gap-3">
-              Cerca una Stanza
+               Cerca una Stanza
             </Link>
             <Link to="/ricerca?intent=coinquilino" className="bg-white/10 backdrop-blur-md border border-white/20 text-white px-8 py-4 rounded-2xl text-lg font-bold hover:bg-white/20 hover:-translate-y-1 transition-all shadow-xl flex items-center justify-center gap-3">
               Cerca Coinquilini
