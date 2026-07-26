@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+// ✅ IMPORTIAMO L'API SICURA
+import { fetchAPI } from '../utils/api';
 
 export default function Search() {
   const navigate = useNavigate();
@@ -46,7 +48,8 @@ export default function Search() {
     setLoading(true);
     const apiEndpoint = currentIntent === 'coinquilino' ? '/api/get_roommates' : '/api/get_listings';
 
-    fetch(apiEndpoint)
+    // ✅ USIAMO fetchAPI AL POSTO DI fetch
+    fetchAPI(apiEndpoint)
       .then(res => {
         if (!res.ok) throw new Error('Errore di rete');
         return res.json();
@@ -76,9 +79,10 @@ export default function Search() {
       return;
     }
     try {
-      const res = await fetch('/api/start_chat', {
+      // ✅ USIAMO fetchAPI AL POSTO DI fetch
+      const res = await fetchAPI('/api/start_chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // Rimosso l'header Content-Type, lo gestisce api.js
         body: JSON.stringify({ tenantId: user.id, targetId: targetUserId })
       });
 

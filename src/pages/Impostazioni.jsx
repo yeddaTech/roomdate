@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+// ✅ IMPORTIAMO LA NOSTRA FUNZIONE SICURA
+import { fetchAPI } from '../utils/api'; 
 
 export default function Impostazioni() {
   const navigate = useNavigate();
@@ -53,9 +55,10 @@ export default function Impostazioni() {
 
       setIsLoading(true);
       try {
-        const res = await fetch('/api/login', {
+        // ✅ USIAMO fetchAPI AL POSTO DI fetch
+        const res = await fetchAPI('/api/login', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          // Rimosso Content-Type, lo gestisce api.js in automatico
           body: JSON.stringify({ 
             action: 'update_password', // <--- LA PAROLA D'ORDINE
             userId: user.id, 
@@ -86,9 +89,10 @@ export default function Impostazioni() {
   const handleDeleteAccount = async () => {
     if (window.confirm("Sei assolutamente sicuro? Tutti i tuoi dati verranno cancellati per sempre.")) {
       try {
-        const res = await fetch('/api/login', {
+        // ✅ USIAMO fetchAPI AL POSTO DI fetch
+        const res = await fetchAPI('/api/login', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          // Rimosso Content-Type
           body: JSON.stringify({ 
             action: 'delete_account', // <--- LA PAROLA D'ORDINE
             userId: user.id 

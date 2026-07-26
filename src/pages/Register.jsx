@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-// ✅ IMPORTA LE FUNZIONI CRITTOGRAFICHE
+// ✅ IMPORTA LE FUNZIONI CRITTOGRAFICHE E L'API SICURA
 import { generateKeyPair, wrapPrivateKey } from '../utils/crypto';
+import { fetchAPI } from '../utils/api'; 
 
 export default function Register() {
   const navigate = useNavigate();
@@ -72,16 +73,13 @@ export default function Register() {
 
     try {
       // --- 🔐 LOGICA CRITTOGRAFICA INIZIO ---
-      // 1. Genera la coppia di chiavi RSA
       const keys = await generateKeyPair();
-      
-      // 2. Usa la password per "incartare" la chiave privata in modo sicuro con AES-GCM
       const wrappedData = await wrapPrivateKey(keys.privateKey, formData.password);
       // --- 🔐 LOGICA CRITTOGRAFICA FINE ---
 
-      const response = await fetch('/api/register', { 
+      // ✅ USIAMO fetchAPI AL POSTO DI fetch
+      const response = await fetchAPI('/api/register', { 
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nome: formData.nome,
           cognome: formData.cognome,
@@ -95,7 +93,6 @@ export default function Register() {
           bio: formData.bio,
           lifestyle_tags: lifestyleTags.join(', '),
           
-          // ✅ AGGIUNTI I CAMPI CRITTOGRAFICI AL PAYLOAD
           publicKey: keys.publicKey,
           encryptedPrivateKey: wrappedData.encryptedPrivateKey,
           cryptoSalt: wrappedData.salt,
