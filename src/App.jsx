@@ -5,7 +5,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import CookieBanner from './components/CookieBanner'; // ✅ L'import è corretto
 
-// Usa lazy per caricare le altre pagine solo quando servono
+// Usa lazy e Suspense per caricare le altre pagine solo quando servono
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
