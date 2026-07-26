@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -27,14 +29,13 @@ type UserData struct {
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	// --- 🛡️ INIZIO GESTIONE CORS PREFLIGHT ---
+	// --- 1. GESTIONE CORS PREFLIGHT ---
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	// ------------------------------------------
 
-	// Ora controlliamo che sia una POST per il login effettivo
+	// --- 2. BLOCCA METODI NON CONSENTITI ---
 	if r.Method != http.MethodPost {
 		http.Error(w, "Metodo non consentito", http.StatusMethodNotAllowed)
 		return
@@ -86,10 +87,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	default:
 		var user UserData
 		var hashedPassword string
-		// --- 🔐 NUOVE VARIABILI PER LA CRITTOGRAFIA ---
 		var encryptedPrivKey, cryptoSalt, cryptoIv, pubKey string
 
-		// Modificata la query per estrarre anche i campi crittografici e public_key
 		query := `SELECT id::text, first_name, last_name, email, password_hash, COALESCE(user_type, ''), 
                   COALESCE(encrypted_private_key, ''), COALESCE(crypto_salt, ''), COALESCE(crypto_iv, ''),
                   COALESCE(public_key, '')
@@ -115,8 +114,36 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// --- 🛡️ 3. GENERAZIONE JWT ---
+		jwtSecret := os.Getenv("JWT_SECRET")
+		if jwtSecret == "" {
+			http.Error(w, "Errore configurazione server", http.StatusInternalServerError)
+			return
+		}
+
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+			"user_id": user.ID,
+			"exp":     time.Now().Add(24 * time.Hour).Unix(), // Scade in 24 ore
+		})
+
+		tokenString, err := token.SignedString([]byte(jwtSecret))
+		if err != nil {
+			http.Error(w, "Errore generazione token", http.StatusInternalServerError)
+			return
+		}
+
+		// --- 🍪 4. SETTAGGIO COOKIE HTTPONLY ---
+		http.SetCookie(w, &http.Cookie{
+			Name:     "roomdate_session",
+			Value:    tokenString,
+			Expires:  time.Now().Add(24 * time.Hour),
+			Path:     "/",
+			HttpOnly: true,                    // La VERA armatura: invisibile a JS
+			Secure:   true,                    // Richiede HTTPS (perfetto per Vercel)
+			SameSite: http.SameSiteStrictMode, // Blocca attacchi CSRF
+		})
+
 		w.Header().Set("Content-Type", "application/json")
-		// Restituiamo a React anche i parametri crittografici e la chiave pubblica
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"message":             "Login effettuato con successo",
 			"user":                user,

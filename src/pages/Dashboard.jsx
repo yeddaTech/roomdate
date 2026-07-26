@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+// ✅ IMPORTIAMO LA NOSTRA FUNZIONE SICURA
+import { fetchAPI } from '../utils/api'; 
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
-  const [activeView, setActiveView] = useState('editProfile'); // Apriamo subito il profilo per comodità
+  const [activeView, setActiveView] = useState('editProfile');
   const [myListings, setMyListings] = useState([]);
 
-  // 1. CARICAMENTO BASE DA LOCALSTORAGE
   useEffect(() => {
     try {
       const savedUser = localStorage.getItem('roomdate_user');
@@ -18,7 +20,6 @@ export default function Dashboard() {
       } else {
         const parsedUser = JSON.parse(savedUser);
         setUser(parsedUser);
-        // SCARICA DATI FRESCHI DAL DB
         fetchFreshProfile(parsedUser.id);
       }
     } catch {
@@ -26,14 +27,14 @@ export default function Dashboard() {
     }
   }, [navigate]);
 
-  // 2. FUNZIONE PER SINCRONIZZARE REACT CON IL DATABASE
   const fetchFreshProfile = async (userId) => {
     try {
-      const res = await fetch(`/api/profile?userId=${userId}`);
+      // ✅ USIAMO fetchAPI AL POSTO DI fetch
+      const res = await fetchAPI(`/api/profile?userId=${userId}`);
       if (res.ok) {
         const freshData = await res.json();
-        setUser(prev => ({ ...prev, ...freshData })); // Aggiorna i campi a schermo
-        localStorage.setItem('roomdate_user', JSON.stringify(freshData)); // Ripara la memoria vecchia!
+        setUser(prev => ({ ...prev, ...freshData })); 
+        localStorage.setItem('roomdate_user', JSON.stringify(freshData)); 
       }
     } catch (err) {
       console.error("Errore fetch profilo:", err);
@@ -49,7 +50,8 @@ export default function Dashboard() {
   const fetchMyListings = async () => {
     if (!user) return;
     try {
-      const res = await fetch(`/api/get_my_listings?userId=${user.id}`);
+      // ✅ USIAMO fetchAPI AL POSTO DI fetch
+      const res = await fetchAPI(`/api/get_my_listings?userId=${user.id}`);
       const data = await res.json();
       if (data) setMyListings(data);
     } catch (err) {
@@ -64,7 +66,8 @@ export default function Dashboard() {
   const handleDeleteListing = async (id) => {
     if (window.confirm("Sei sicuro di voler eliminare questo annuncio?")) {
       try {
-        const res = await fetch(`/api/delete_listing?id=${id}`, { method: 'DELETE' });
+        // ✅ USIAMO fetchAPI AL POSTO DI fetch
+        const res = await fetchAPI(`/api/delete_listing?id=${id}`, { method: 'DELETE' });
         if (res.ok) {
           alert("✅ Annuncio eliminato.");
           fetchMyListings();
@@ -92,18 +95,18 @@ export default function Dashboard() {
       birthdate: formData.get('birthdate'),
       bio: formData.get('bio'),
       tags: tags,
-      isPublic: formData.get('isPublic') === 'on' // <-- AGGIUNTO PER IL GDPR
+      isPublic: formData.get('isPublic') === 'on' 
     };
 
     try {
-      const res = await fetch('/api/profile', {
+      // ✅ USIAMO fetchAPI AL POSTO DI fetch
+      const res = await fetchAPI('/api/profile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload) // Non serve più specificare l'header Content-Type, lo fa api.js!
       });
       if (res.ok) {
         alert("✅ Profilo aggiornato con successo!");
-        fetchFreshProfile(user.id); // Ricarica istantaneamente dal DB
+        fetchFreshProfile(user.id); 
         setActiveView('myListings');
       } else {
         const errorMsg = await res.text();
@@ -128,10 +131,10 @@ export default function Dashboard() {
     };
 
     try {
-      const res = await fetch('/api/create_listing', {
+      // ✅ USIAMO fetchAPI AL POSTO DI fetch
+      const res = await fetchAPI('/api/create_listing', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify(data) // Come sopra, header automatico
       });
       if (res.ok) {
         alert("🎉 Annuncio pubblicato!");

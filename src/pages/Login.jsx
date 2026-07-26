@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-// ✅ IMPORTA LA FUNZIONE DI SPACCHETTAMENTO
 import { unwrapPrivateKey } from '../utils/crypto';
+// ✅ IMPORTIAMO LA NOSTRA FUNZIONE SICURA
+import { fetchAPI } from '../utils/api';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -32,10 +33,10 @@ export default function Login() {
       setIsSubmitting(true);
       
       try {
-        const response = await fetch('/api/login', {
+        // ✅ USIAMO fetchAPI AL POSTO DI fetch
+        const response = await fetchAPI('/api/login', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({ email, password }) // Anche qui l'header Content-Type è automatico!
         });
 
         if (response.ok) {
@@ -44,14 +45,12 @@ export default function Login() {
           try {
           // --- 🔐 LOGICA CRITTOGRAFICA INIZIO ---
             if (data.encryptedPrivateKey && data.cryptoSalt && data.cryptoIv) {
-                // 1. Salviamo la cassaforte blindata nel localStorage (sopravvive al riavvio)
                 localStorage.setItem('roomdate_crypto', JSON.stringify({
                   encryptedPrivateKey: data.encryptedPrivateKey,
                   cryptoSalt: data.cryptoSalt,
                   cryptoIv: data.cryptoIv
                 }));
 
-                // 2. Apriamo la chiave solo per la sessione corrente
                 const privateKey = await unwrapPrivateKey(
                   data.encryptedPrivateKey,
                   password,
@@ -65,7 +64,6 @@ export default function Login() {
             setIsSuccess(true);
             localStorage.setItem('roomdate_user', JSON.stringify(data.user));
 
-            // 🔐 ECCO IL PEZZO MANCANTE CHE ABBIAMO AGGIUNTO!
             if (data.publicKey) {
                 localStorage.setItem('roomdate_public_key', data.publicKey);
             }

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom'; 
 import { Helmet } from 'react-helmet-async';
+// ✅ IMPORTIAMO L'API SICURA
+import { fetchAPI } from '../utils/api'; 
+
 export default function ListingDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -26,8 +29,8 @@ export default function ListingDetails() {
   };
 
   useEffect(() => {
-      // CHIAMATA REALE AL DATABASE
-      fetch(`/api/get_listing?id=${id}`)
+      // ✅ USIAMO fetchAPI AL POSTO DI fetch
+      fetchAPI(`/api/get_listing?id=${id}`)
         .then(res => {
           if (!res.ok) throw new Error('Annuncio non trovato');
           return res.json();
@@ -64,9 +67,10 @@ export default function ListingDetails() {
     }
 
     try {
-      const res = await fetch('/api/start_chat', {
+      // ✅ USIAMO fetchAPI AL POSTO DI fetch
+      const res = await fetchAPI('/api/start_chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // Rimosso l'header Content-Type, lo gestisce api.js
         body: JSON.stringify({
           listingId: parseInt(id),
           tenantId: user.id

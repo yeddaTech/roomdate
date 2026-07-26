@@ -3,6 +3,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import Pusher from 'pusher-js'; 
 import { Helmet } from 'react-helmet-async';
 import { encryptMessage, decryptMessage, unwrapPrivateKey } from '../utils/crypto';
+// ✅ IMPORTIAMO L'API SICURA
+import { fetchAPI } from '../utils/api'; 
 
 const QUICK_REPLIES = [
   '📅 Quando sei disponibile?',
@@ -61,7 +63,8 @@ export default function ChatPage() {
   const fetchChats = async () => {
     if (!user) return;
     try {
-      const res = await fetch(`/api/get_chats?userId=${user.id}`);
+      // ✅ USIAMO fetchAPI AL POSTO DI fetch
+      const res = await fetchAPI(`/api/get_chats?userId=${user.id}`);
       const data = await res.json();
       
       if (data) {
@@ -217,9 +220,10 @@ export default function ChatPage() {
       // 2. Cifriamo per noi stessi
       const encryptedForMe = await encryptMessage(textToSend, myPublicKey);
 
-      await fetch('/api/send_message', {
+      // ✅ USIAMO fetchAPI AL POSTO DI fetch
+      await fetchAPI('/api/send_message', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // Rimosso l'header Content-Type, lo gestisce api.js
         body: JSON.stringify({
           conversationId: activeConvId,
           senderId: user.id,
