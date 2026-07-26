@@ -23,7 +23,7 @@ const Guide = lazy(() => import('./pages/Guide'));
 
 function App() {
 
-  // --- ZERO-TRUST: VALIDAZIONE DELLA SESSIONE ALL'AVVIO ---
+  // ---a ZERO-TRUST: VALIDAZIONE DELLA SESSIONE ALL'AVVIO ---
   useEffect(() => {
     const verifySession = async () => {
       try {
