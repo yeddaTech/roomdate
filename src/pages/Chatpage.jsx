@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import Pusher from 'pusher-js'; 
 import { Helmet } from 'react-helmet-async';
-import { encryptMessage, decryptMessage } from '../utils/crypto';
 import { encryptMessage, decryptMessage, unwrapPrivateKey } from '../utils/crypto';
+
 const QUICK_REPLIES = [
   '📅 Quando sei disponibile?',
   '🏠 Posso visitarla?',
@@ -32,6 +32,7 @@ export default function ChatPage() {
   const [isLocked, setIsLocked] = useState(false);
   const [unlockPassword, setUnlockPassword] = useState('');
   const [unlockError, setUnlockError] = useState('');
+
   // 1. Controllo utente loggato
   useEffect(() => {
     const savedUser = localStorage.getItem('roomdate_user');
@@ -43,8 +44,14 @@ export default function ChatPage() {
   }, [navigate]);
 
   const handleLogout = () => {
+    // 1. Rimuovi i dati dell'utente
     localStorage.removeItem('roomdate_user');
-    sessionStorage.removeItem('roomdate_private_key'); // Rimuovi anche la chiave privata per sicurezza
+    
+    // 2. Rimuovi le chiavi e la cassaforte
+    sessionStorage.removeItem('roomdate_private_key'); 
+    localStorage.removeItem('roomdate_crypto');
+    localStorage.removeItem('roomdate_public_key');
+    
     setUser(null);
     setIsMenuOpen(false);
     navigate('/');
@@ -86,6 +93,7 @@ export default function ChatPage() {
       setIsLoading(false);
     }
   };
+
   const handleUnlock = async (e) => {
     e.preventDefault();
     setUnlockError('');
@@ -116,6 +124,7 @@ export default function ChatPage() {
       setUnlockError('Password errata. Riprova.');
     }
   };
+
   // 3. Configurazione Pusher
   useEffect(() => {
     if (user) {
@@ -243,10 +252,11 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-[100dvh] w-full max-w-[100vw] bg-[#FEFAF4] font-sans overflow-hidden">
-    <Helmet>
-      <title>Area Privata | RoomDate</title>
-      <meta name="robots" content="noindex, nofollow" />
-    </Helmet>
+      <Helmet>
+        <title>Area Privata | RoomDate</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
+      
       {/* --- TOP NAV --- */}
       <nav className="shrink-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-white decoration-none">
@@ -274,7 +284,7 @@ export default function ChatPage() {
           )}
         </div>
 
-          <button className="md:hidden flex flex-col gap-1.5 z-[1001]" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label={isMenuOpen ? "Chiudi menu" : "Apri menu di navigazione"}>          
+        <button className="md:hidden flex flex-col gap-1.5 z-[1001]" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label={isMenuOpen ? "Chiudi menu" : "Apri menu di navigazione"}>          
           <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
           <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></div>
           <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
@@ -460,40 +470,41 @@ export default function ChatPage() {
             </>
           )}
         </main>
+        
         {/* 🔐 OVERLAY SBLOCCO CHAT */}
-      {isLocked && (
-        <div className="absolute inset-0 z-[1100] bg-[#FEFAF4]/60 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl max-w-sm w-full text-center border border-neutral-100 animate-fade-in-up">
-            <div className="text-6xl mb-6 drop-shadow-md">🔐</div>
-            <h3 className="font-serif text-3xl font-bold text-[#2C1A0E] mb-3">Chat Protetta</h3>
-            <p className="text-sm text-[#8A7B6E] mb-8 leading-relaxed">
-              La tua privacy è al sicuro. Inserisci la password per decifrare i messaggi localmente.
-            </p>
-            
-            <form onSubmit={handleUnlock} className="flex flex-col gap-4">
-              <input
-                type="password"
-                placeholder="La tua password"
-                value={unlockPassword}
-                onChange={(e) => {
-                  setUnlockPassword(e.target.value);
-                  setUnlockError('');
-                }}
-                className={`w-full bg-neutral-50 border text-center text-[#2C1A0E] rounded-2xl px-5 py-4 focus:outline-none transition-colors ${unlockError ? 'border-red-500 focus:ring-1 focus:ring-red-500' : 'border-neutral-200 focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]'}`}
-              />
-              {unlockError && <div className="text-red-500 text-xs font-medium -mt-2">{unlockError}</div>}
+        {isLocked && (
+          <div className="absolute inset-0 z-[1100] bg-[#FEFAF4]/60 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl max-w-sm w-full text-center border border-neutral-100 animate-fade-in-up">
+              <div className="text-6xl mb-6 drop-shadow-md">🔐</div>
+              <h3 className="font-serif text-3xl font-bold text-[#2C1A0E] mb-3">Chat Protetta</h3>
+              <p className="text-sm text-[#8A7B6E] mb-8 leading-relaxed">
+                La tua privacy è al sicuro. Inserisci la password per decifrare i messaggi localmente.
+              </p>
               
-              <button
-                type="submit"
-                disabled={!unlockPassword}
-                className="w-full bg-[#C4603A] text-white py-4 rounded-full font-bold hover:bg-[#9A4628] disabled:bg-neutral-300 disabled:cursor-not-allowed transition-all shadow-md mt-2"
-              >
-                Sblocca Messaggi
-              </button>
-            </form>
+              <form onSubmit={handleUnlock} className="flex flex-col gap-4">
+                <input
+                  type="password"
+                  placeholder="La tua password"
+                  value={unlockPassword}
+                  onChange={(e) => {
+                    setUnlockPassword(e.target.value);
+                    setUnlockError('');
+                  }}
+                  className={`w-full bg-neutral-50 border text-center text-[#2C1A0E] rounded-2xl px-5 py-4 focus:outline-none transition-colors ${unlockError ? 'border-red-500 focus:ring-1 focus:ring-red-500' : 'border-neutral-200 focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]'}`}
+                />
+                {unlockError && <div className="text-red-500 text-xs font-medium -mt-2">{unlockError}</div>}
+                
+                <button
+                  type="submit"
+                  disabled={!unlockPassword}
+                  className="w-full bg-[#C4603A] text-white py-4 rounded-full font-bold hover:bg-[#9A4628] disabled:bg-neutral-300 disabled:cursor-not-allowed transition-all shadow-md mt-2"
+                >
+                  Sblocca Messaggi
+                </button>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
       </div>
     </div>
   );
