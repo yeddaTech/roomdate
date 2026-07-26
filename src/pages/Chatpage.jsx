@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import Pusher from 'pusher-js'; 
 import { Helmet } from 'react-helmet-async';
 import { encryptMessage, decryptMessage } from '../utils/crypto';
-
+import { encryptMessage, decryptMessage, unwrapPrivateKey } from '../utils/crypto';
 const QUICK_REPLIES = [
   '📅 Quando sei disponibile?',
   '🏠 Posso visitarla?',
@@ -29,6 +29,9 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
+  const [isLocked, setIsLocked] = useState(false);
+  const [unlockPassword, setUnlockPassword] = useState('');
+  const [unlockError, setUnlockError] = useState('');
   // 1. Controllo utente loggato
   useEffect(() => {
     const savedUser = localStorage.getItem('roomdate_user');
@@ -55,28 +58,25 @@ export default function ChatPage() {
       const data = await res.json();
       
       if (data) {
-        // Recuperiamo la chiave privata che dovresti aver salvato al login
         const myPrivateKey = sessionStorage.getItem('roomdate_private_key'); 
 
         if (myPrivateKey) {
+          setIsLocked(false);
           const decryptedData = await Promise.all(data.map(async (conv) => {
             const decryptedMessages = await Promise.all((conv.messages || []).map(async (msg) => {
-              // 🔐 MODIFICA: Ora decifriamo TUTTI i messaggi dal server (sia inviati che ricevuti)
-              // perché il server ci manderà i nostri messaggi cifrati con la nostra chiave!
               try {
                 msg.text = await decryptMessage(msg.text, myPrivateKey);
               } catch (e) {
                 msg.text = "🔒 [Messaggio non decifrabile]";
-                console.error("Errore decifratura messaggio:", e);
               }
               return msg;
             }));
             return { ...conv, messages: decryptedMessages };
           }));
-          
           setConversations(decryptedData);
         } else {
-          console.warn("Nessuna chiave privata trovata in sessione! I messaggi rimarranno cifrati.");
+          // 🔐 CHAT BLOCCATA: Mostriamo i dati cifrati e attiviamo il blocco
+          setIsLocked(true);
           setConversations(data);
         }
       }
@@ -86,7 +86,36 @@ export default function ChatPage() {
       setIsLoading(false);
     }
   };
+  const handleUnlock = async (e) => {
+    e.preventDefault();
+    setUnlockError('');
+    
+    const cryptoDataStr = localStorage.getItem('roomdate_crypto');
+    if (!cryptoDataStr) {
+      setUnlockError('Dati di sicurezza mancanti. Fai il logout e riaccedi.');
+      return;
+    }
 
+    try {
+      const cryptoData = JSON.parse(cryptoDataStr);
+      // Riapriamo la cassaforte con la password appena inserita
+      const privateKey = await unwrapPrivateKey(
+        cryptoData.encryptedPrivateKey,
+        unlockPassword,
+        cryptoData.cryptoSalt,
+        cryptoData.cryptoIv
+      );
+      
+      // Salviamo in sessione e ricarichiamo!
+      sessionStorage.setItem('roomdate_private_key', privateKey);
+      setIsLocked(false);
+      setUnlockPassword('');
+      fetchChats(); 
+      
+    } catch (err) {
+      setUnlockError('Password errata. Riprova.');
+    }
+  };
   // 3. Configurazione Pusher
   useEffect(() => {
     if (user) {
@@ -431,6 +460,40 @@ export default function ChatPage() {
             </>
           )}
         </main>
+        {/* 🔐 OVERLAY SBLOCCO CHAT */}
+      {isLocked && (
+        <div className="absolute inset-0 z-[1100] bg-[#FEFAF4]/60 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl max-w-sm w-full text-center border border-neutral-100 animate-fade-in-up">
+            <div className="text-6xl mb-6 drop-shadow-md">🔐</div>
+            <h3 className="font-serif text-3xl font-bold text-[#2C1A0E] mb-3">Chat Protetta</h3>
+            <p className="text-sm text-[#8A7B6E] mb-8 leading-relaxed">
+              La tua privacy è al sicuro. Inserisci la password per decifrare i messaggi localmente.
+            </p>
+            
+            <form onSubmit={handleUnlock} className="flex flex-col gap-4">
+              <input
+                type="password"
+                placeholder="La tua password"
+                value={unlockPassword}
+                onChange={(e) => {
+                  setUnlockPassword(e.target.value);
+                  setUnlockError('');
+                }}
+                className={`w-full bg-neutral-50 border text-center text-[#2C1A0E] rounded-2xl px-5 py-4 focus:outline-none transition-colors ${unlockError ? 'border-red-500 focus:ring-1 focus:ring-red-500' : 'border-neutral-200 focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]'}`}
+              />
+              {unlockError && <div className="text-red-500 text-xs font-medium -mt-2">{unlockError}</div>}
+              
+              <button
+                type="submit"
+                disabled={!unlockPassword}
+                className="w-full bg-[#C4603A] text-white py-4 rounded-full font-bold hover:bg-[#9A4628] disabled:bg-neutral-300 disabled:cursor-not-allowed transition-all shadow-md mt-2"
+              >
+                Sblocca Messaggi
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
