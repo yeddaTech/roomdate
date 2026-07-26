@@ -3,6 +3,7 @@ package handler
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -57,6 +58,75 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch req.Action {
 
+	// --- NUOVO CASO: VALIDAZIONE DELLA SESSIONE (ZERO-TRUST) ---
+	case "validate_session":
+		// 1. Estraiamo il cookie
+		cookie, err := r.Cookie("roomdate_session")
+		if err != nil {
+			http.Error(w, "Sessione inesistente o scaduta", http.StatusUnauthorized)
+			return
+		}
+
+		// 2. Parsiamo e validiamo il JWT
+		jwtSecret := os.Getenv("JWT_SECRET")
+		if jwtSecret == "" {
+			http.Error(w, "Errore configurazione server", http.StatusInternalServerError)
+			return
+		}
+
+		token, err := jwt.Parse(cookie.Value, func(token *jwt.Token) (interface{}, error) {
+			// Verifica che l'algoritmo di firma sia corretto
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("metodo di firma inatteso: %v", token.Header["alg"])
+			}
+			return []byte(jwtSecret), nil
+		})
+
+		if err != nil || !token.Valid {
+			http.Error(w, "Token non valido o scaduto", http.StatusUnauthorized)
+			return
+		}
+
+		// 3. Estraiamo l'ID utente dai claims
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			http.Error(w, "Errore nella lettura dei claims", http.StatusUnauthorized)
+			return
+		}
+
+		// JWT converte i numeri in float64, mentre il tuo ID potrebbe essere salvato come stringa.
+		// Gestiamo entrambi i casi in modo sicuro:
+		var userIDStr string
+		switch v := claims["user_id"].(type) {
+		case string:
+			userIDStr = v
+		case float64:
+			userIDStr = fmt.Sprintf("%.0f", v)
+		default:
+			http.Error(w, "Formato ID utente non valido nel token", http.StatusUnauthorized)
+			return
+		}
+
+		// 4. Eseguiamo la query per ottenere i dati sempre aggiornati
+		var user UserData
+		query := `SELECT id::text, first_name, last_name, email, COALESCE(user_type, '')
+                  FROM roomdate_app.users WHERE id = $1`
+
+		err = db.QueryRow(query, userIDStr).Scan(&user.ID, &user.Nome, &user.Cognome, &user.Email, &user.UserType)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				http.Error(w, "Utente non trovato", http.StatusUnauthorized)
+				return
+			}
+			http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// 5. Rispondiamo con i dati utente
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(user)
+		return
+
 	case "update_password":
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 		if err != nil {
@@ -84,6 +154,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Account eliminato"))
 		return
 
+	// LOGIN STANDARD
 	default:
 		var user UserData
 		var hashedPassword string
