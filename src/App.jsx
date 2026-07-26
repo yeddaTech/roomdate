@@ -1,9 +1,12 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+// ✅ IMPORTIAMO LA NOSTRA UTILITY PER LE CHIAMATE API
+import { fetchAPI } from './utils/api';
 
 // Importa normalmente solo le pagine essenziali (es. la Home)
 import Home from './pages/Home';
-import CookieBanner from './components/CookieBanner'; // ✅ L'import è corretto
+import CookieBanner from './components/CookieBanner';
 
 // Usa lazy e Suspense per caricare le altre pagine solo quando servono
 const Login = lazy(() => import('./pages/Login'));
@@ -19,6 +22,33 @@ const Terms = lazy(() => import('./pages/Terms'));
 const Guide = lazy(() => import('./pages/Guide'));
 
 function App() {
+
+  // --- ZERO-TRUST: VALIDAZIONE DELLA SESSIONE ALL'AVVIO ---
+  useEffect(() => {
+    const verifySession = async () => {
+      try {
+        const res = await fetchAPI('/api/login', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'validate_session' })
+        });
+
+        if (res.ok) {
+          const userData = await res.json();
+          // Il token è valido: aggiorniamo i dati dell'utente nella cache locale
+          localStorage.setItem('roomdate_user', JSON.stringify(userData));
+        } else {
+          // Token inesistente, scaduto o non valido: puliamo la cache per evitare dati "fantasma"
+          localStorage.removeItem('roomdate_user');
+        }
+      } catch (err) {
+        console.error("Errore durante la validazione della sessione:", err);
+      }
+    };
+
+    // Lanciamo il controllo in background
+    verifySession();
+  }, []); // L'array vuoto garantisce che venga eseguito solo al montaggio iniziale dell'app
+
   return (
     <BrowserRouter>
       {/* Aggiunto il tag <main> per definire il punto di riferimento principale */}
@@ -43,7 +73,7 @@ function App() {
           </Routes>
         </Suspense>
 
-        {/* ✅ INSERISCI IL BANNER QUI */}
+        {/* BANNER COOKIE GLOBAL */}
         {/* Fuori dal blocco Routes, così sarà presente globalmente in ogni pagina */}
         <CookieBanner />
         
