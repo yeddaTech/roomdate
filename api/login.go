@@ -27,6 +27,14 @@ type UserData struct {
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	// --- 🛡️ INIZIO GESTIONE CORS PREFLIGHT ---
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	// ------------------------------------------
+
+	// Ora controlliamo che sia una POST per il login effettivo
 	if r.Method != http.MethodPost {
 		http.Error(w, "Metodo non consentito", http.StatusMethodNotAllowed)
 		return
@@ -79,17 +87,17 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		var user UserData
 		var hashedPassword string
 		// --- 🔐 NUOVE VARIABILI PER LA CRITTOGRAFIA ---
-		var encryptedPrivKey, cryptoSalt, cryptoIv, pubKey string // 👈 Aggiunta pubKey
+		var encryptedPrivKey, cryptoSalt, cryptoIv, pubKey string
 
 		// Modificata la query per estrarre anche i campi crittografici e public_key
 		query := `SELECT id::text, first_name, last_name, email, password_hash, COALESCE(user_type, ''), 
                   COALESCE(encrypted_private_key, ''), COALESCE(crypto_salt, ''), COALESCE(crypto_iv, ''),
-                  COALESCE(public_key, '') -- 👈 AGGIUNTO QUESTO!
+                  COALESCE(public_key, '')
                   FROM roomdate_app.users WHERE email = $1`
 
 		err = db.QueryRow(query, req.Email).Scan(
 			&user.ID, &user.Nome, &user.Cognome, &user.Email, &hashedPassword, &user.UserType,
-			&encryptedPrivKey, &cryptoSalt, &cryptoIv, &pubKey, // 👈 Aggiunto &pubKey
+			&encryptedPrivKey, &cryptoSalt, &cryptoIv, &pubKey,
 		)
 
 		if err != nil {
@@ -115,7 +123,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			"encryptedPrivateKey": encryptedPrivKey,
 			"cryptoSalt":          cryptoSalt,
 			"cryptoIv":            cryptoIv,
-			"publicKey":           pubKey, // 👈 AGGIUNTO QUESTO!
+			"publicKey":           pubKey,
 		})
 	}
 }
