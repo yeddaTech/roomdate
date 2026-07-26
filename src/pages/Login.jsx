@@ -44,16 +44,23 @@ export default function Login() {
           try {
           // --- 🔐 LOGICA CRITTOGRAFICA INIZIO ---
             if (data.encryptedPrivateKey && data.cryptoSalt && data.cryptoIv) {
+                // 1. Salviamo la cassaforte blindata nel localStorage (sopravvive al riavvio)
+                localStorage.setItem('roomdate_crypto', JSON.stringify({
+                  encryptedPrivateKey: data.encryptedPrivateKey,
+                  cryptoSalt: data.cryptoSalt,
+                  cryptoIv: data.cryptoIv
+                }));
+
+                // 2. Apriamo la chiave solo per la sessione corrente
                 const privateKey = await unwrapPrivateKey(
                   data.encryptedPrivateKey,
-                  password, // La chiave per aprire la cassaforte!
+                  password,
                   data.cryptoSalt,
                   data.cryptoIv
                 );
-                // CORREZIONE: Usiamo sessionStorage per abbinarlo a ChatPage.jsx e migliorare la sicurezza
                 sessionStorage.setItem('roomdate_private_key', privateKey);
             }
-            // --- 🔐 LOGICA CRITTOGRAFICA FINE ---
+          // --- 🔐 LOGICA CRITTOGRAFICA FINE ---
 
             setIsSuccess(true);
             localStorage.setItem('roomdate_user', JSON.stringify(data.user));
