@@ -40,7 +40,7 @@ func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
         FROM roomdate_app.users 
         LIMIT 8
     `
-	rows, err := db.Query(query)
+	rows, err := DB.Query(query)
 	if err != nil {
 		http.Error(w, "Errore query", http.StatusInternalServerError)
 		return
