@@ -16,7 +16,7 @@ func GetMyListingsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Usiamo secureUserID per la query
-	rows, err := db.Query("SELECT id, title, city, price, room_type FROM roomdate_app.listings WHERE user_id = $1 ORDER BY created_at DESC", secureUserID)
+	rows, err := DB.Query("SELECT id, title, city, price, room_type FROM roomdate_app.listings WHERE user_id = $1 ORDER BY created_at DESC", secureUserID)
 	if err != nil {
 		http.Error(w, "Errore recupero annunci", http.StatusInternalServerError)
 		return

@@ -33,7 +33,7 @@ func DeleteListingHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 🛡️ 3. FIX IDOR: La query ora esige che l'annuncio appartenga a chi fa la richiesta (user_id = $2)
 	query := "DELETE FROM roomdate_app.listings WHERE id = $1 AND user_id = $2"
-	res, err := db.Exec(query, id, secureUserID)
+	res, err := DB.Exec(query, id, secureUserID)
 	if err != nil {
 		http.Error(w, "Errore cancellazione: "+err.Error(), http.StatusInternalServerError)
 		return
