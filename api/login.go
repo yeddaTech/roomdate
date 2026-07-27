@@ -17,7 +17,7 @@ type MultiRequest struct {
 	Action      string `json:"action"`
 	Email       string `json:"email"`
 	Password    string `json:"password"`
-	UserID      string `json:"userId"`
+	UserID      string `json:"userId"` // ⚠️ Lo teniamo per compatibilità col frontend, ma sul backend NON ci fidiamo più di questo campo.
 	NewPassword string `json:"newPassword"`
 }
 
@@ -58,16 +58,14 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch req.Action {
 
-	// --- NUOVO CASO: VALIDAZIONE DELLA SESSIONE (ZERO-TRUST) ---
+	// --- VALIDAZIONE DELLA SESSIONE (ZERO-TRUST) ---
 	case "validate_session":
-		// 1. Estraiamo il cookie
 		cookie, err := r.Cookie("roomdate_session")
 		if err != nil {
 			http.Error(w, "Sessione inesistente o scaduta", http.StatusUnauthorized)
 			return
 		}
 
-		// 2. Parsiamo e validiamo il JWT
 		jwtSecret := os.Getenv("JWT_SECRET")
 		if jwtSecret == "" {
 			http.Error(w, "Errore configurazione server", http.StatusInternalServerError)
@@ -75,7 +73,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		token, err := jwt.Parse(cookie.Value, func(token *jwt.Token) (interface{}, error) {
-			// Verifica che l'algoritmo di firma sia corretto
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("metodo di firma inatteso: %v", token.Header["alg"])
 			}
@@ -87,15 +84,12 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// 3. Estraiamo l'ID utente dai claims
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
 			http.Error(w, "Errore nella lettura dei claims", http.StatusUnauthorized)
 			return
 		}
 
-		// JWT converte i numeri in float64, mentre il tuo ID potrebbe essere salvato come stringa.
-		// Gestiamo entrambi i casi in modo sicuro:
 		var userIDStr string
 		switch v := claims["user_id"].(type) {
 		case string:
@@ -107,7 +101,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// 4. Eseguiamo la query per ottenere i dati sempre aggiornati
 		var user UserData
 		query := `SELECT id::text, first_name, last_name, email, COALESCE(user_type, '')
                   FROM roomdate_app.users WHERE id = $1`
@@ -122,19 +115,26 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// 5. Rispondiamo con i dati utente
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(user)
 		return
 
+	// --- UPDATE PASSWORD: ORA USIAMO L'ID DAL TOKEN ---
 	case "update_password":
+		// Estraggo l'ID in modo sicuro dal cookie, ignorando req.UserID
+		secureUserID := getSecureUserID(r)
+		if secureUserID == "" {
+			http.Error(w, "Accesso negato o sessione non valida", http.StatusUnauthorized)
+			return
+		}
+
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 		if err != nil {
 			http.Error(w, "Errore crittografia", http.StatusInternalServerError)
 			return
 		}
 		query := `UPDATE roomdate_app.users SET password_hash = $1 WHERE id = $2`
-		_, err = db.Exec(query, hashedPassword, req.UserID)
+		_, err = db.Exec(query, hashedPassword, secureUserID) // Uso l'ID sicuro!
 		if err != nil {
 			http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -143,9 +143,16 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Password aggiornata con successo"))
 		return
 
+	// --- DELETE ACCOUNT: ORA USIAMO L'ID DAL TOKEN ---
 	case "delete_account":
+		secureUserID := getSecureUserID(r)
+		if secureUserID == "" {
+			http.Error(w, "Accesso negato o sessione non valida", http.StatusUnauthorized)
+			return
+		}
+
 		query := `DELETE FROM roomdate_app.users WHERE id = $1`
-		_, err = db.Exec(query, req.UserID)
+		_, err = db.Exec(query, secureUserID) // Uso l'ID sicuro!
 		if err != nil {
 			http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -154,7 +161,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Account eliminato"))
 		return
 
-	// LOGIN STANDARD
+	// --- LOGIN STANDARD ---
 	default:
 		var user UserData
 		var hashedPassword string
@@ -185,16 +192,17 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// --- 🛡️ 3. GENERAZIONE JWT ---
 		jwtSecret := os.Getenv("JWT_SECRET")
 		if jwtSecret == "" {
 			http.Error(w, "Errore configurazione server", http.StatusInternalServerError)
 			return
 		}
 
+		// --- 🛡️ 3. GENERAZIONE JWT CON INIEZIONE DEL RUOLO ---
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"user_id": user.ID,
-			"exp":     time.Now().Add(24 * time.Hour).Unix(), // Scade in 24 ore
+			"user_id":   user.ID,
+			"user_type": user.UserType, // ✅ Aggiunto il ruolo
+			"exp":       time.Now().Add(24 * time.Hour).Unix(),
 		})
 
 		tokenString, err := token.SignedString([]byte(jwtSecret))
@@ -203,15 +211,14 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// --- 🍪 4. SETTAGGIO COOKIE HTTPONLY ---
 		http.SetCookie(w, &http.Cookie{
 			Name:     "roomdate_session",
 			Value:    tokenString,
 			Expires:  time.Now().Add(24 * time.Hour),
 			Path:     "/",
-			HttpOnly: true,                    // La VERA armatura: invisibile a JS
-			Secure:   true,                    // Richiede HTTPS (perfetto per Vercel)
-			SameSite: http.SameSiteStrictMode, // Blocca attacchi CSRF
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteStrictMode,
 		})
 
 		w.Header().Set("Content-Type", "application/json")
@@ -224,4 +231,58 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			"publicKey":           pubKey,
 		})
 	}
+}
+
+// =====================================================================
+// 🛡️ HELPER FUNCTIONS (Da copiare in altri file API quando serve)
+// =====================================================================
+
+// getSecureUserID estrae l'ID in modo sicuro dal token senza fidarsi del client
+func getSecureUserID(r *http.Request) string {
+	cookie, err := r.Cookie("roomdate_session")
+	if err != nil {
+		return ""
+	}
+	jwtSecret := os.Getenv("JWT_SECRET")
+	token, err := jwt.Parse(cookie.Value, func(token *jwt.Token) (interface{}, error) {
+		return []byte(jwtSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return ""
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return ""
+	}
+	switch v := claims["user_id"].(type) {
+	case string:
+		return v
+	case float64:
+		return fmt.Sprintf("%.0f", v)
+	}
+	return ""
+}
+
+// checkRole verifica che l'utente abbia uno specifico ruolo (es. "affitta")
+func checkRole(r *http.Request, requiredRole string) bool {
+	cookie, err := r.Cookie("roomdate_session")
+	if err != nil {
+		return false
+	}
+	jwtSecret := os.Getenv("JWT_SECRET")
+	token, err := jwt.Parse(cookie.Value, func(token *jwt.Token) (interface{}, error) {
+		return []byte(jwtSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return false
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return false
+	}
+	userType, ok := claims["user_type"].(string)
+	if !ok || userType != requiredRole {
+		return false
+	}
+	return true
 }
