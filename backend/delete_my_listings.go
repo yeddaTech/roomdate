@@ -1,9 +1,7 @@
-package handler
+package backend
 
 import (
-	"database/sql"
 	"net/http"
-	"os"
 
 	_ "github.com/lib/pq"
 )
@@ -32,13 +30,6 @@ func DeleteListingHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "ID annuncio mancante", http.StatusBadRequest)
 		return
 	}
-
-	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
-	if err != nil {
-		http.Error(w, "Errore DB", http.StatusInternalServerError)
-		return
-	}
-	defer db.Close()
 
 	// 🛡️ 3. FIX IDOR: La query ora esige che l'annuncio appartenga a chi fa la richiesta (user_id = $2)
 	query := "DELETE FROM roomdate_app.listings WHERE id = $1 AND user_id = $2"

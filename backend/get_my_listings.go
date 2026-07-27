@@ -1,31 +1,24 @@
-package handler
+package backend
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
-	"os"
 
 	_ "github.com/lib/pq"
 )
 
 func GetMyListingsHandler(w http.ResponseWriter, r *http.Request) {
-	userId := r.URL.Query().Get("userId")
-	if userId == "" {
-		http.Error(w, "UserID mancante", http.StatusBadRequest)
+	// 🛡️ ZERO-TRUST: Estrazione sicura
+	secureUserID := getSecureUserID(r)
+	if secureUserID == "" {
+		http.Error(w, "Accesso negato: Sessione non valida", http.StatusUnauthorized)
 		return
 	}
 
-	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+	// Usiamo secureUserID per la query
+	rows, err := db.Query("SELECT id, title, city, price, room_type FROM roomdate_app.listings WHERE user_id = $1 ORDER BY created_at DESC", secureUserID)
 	if err != nil {
-		http.Error(w, "Errore DB", http.StatusInternalServerError)
-		return
-	}
-	defer db.Close()
-
-	rows, err := db.Query("SELECT id, title, city, price, room_type FROM roomdate_app.listings WHERE user_id = $1 ORDER BY created_at DESC", userId)
-	if err != nil {
-		http.Error(w, "Errore query", http.StatusInternalServerError)
+		http.Error(w, "Errore recupero annunci", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()

@@ -1,10 +1,8 @@
-package handler
+package backend
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
-	"os"
 
 	_ "github.com/lib/pq"
 )
@@ -23,15 +21,15 @@ type Listing struct {
 }
 
 func GetListingsHandler(w http.ResponseWriter, r *http.Request) {
-	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
-	if err != nil {
-		http.Error(w, "Errore DB", http.StatusInternalServerError)
+	if r.Method != http.MethodGet {
+		http.Error(w, "Metodo non consentito", http.StatusMethodNotAllowed)
 		return
 	}
-	defer db.Close()
 
-	// Peschiamo gli ultimi 6 annunci dal database
-	rows, err := db.Query("SELECT id, title, city, zone, room_type, price FROM roomdate_app.listings ORDER BY created_at DESC LIMIT 6")
+	var err error
+
+	// Peschiamo gli ultimi 6 annunci dal database usando la variabile globale DB
+	rows, err := DB.Query("SELECT id, title, city, zone, room_type, price FROM roomdate_app.listings ORDER BY created_at DESC LIMIT 6")
 	if err != nil {
 		http.Error(w, "Errore query", http.StatusInternalServerError)
 		return

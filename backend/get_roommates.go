@@ -1,10 +1,8 @@
-package handler
+package backend
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
-	"os"
 	"strings"
 
 	_ "github.com/lib/pq"
@@ -27,12 +25,6 @@ type Roommate struct {
 }
 
 func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
-	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
-	if err != nil {
-		http.Error(w, "Errore DB", http.StatusInternalServerError)
-		return
-	}
-	defer db.Close()
 
 	// Estratto anche il budget_max
 	query := `

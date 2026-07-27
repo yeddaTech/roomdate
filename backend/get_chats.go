@@ -1,10 +1,9 @@
-package handler
+package backend
 
 import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"os"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -30,25 +29,25 @@ type UIConversation struct {
 	Color1          string      `json:"color1"`
 	Color2          string      `json:"color2"`
 	Listing         UIListing   `json:"listing"`
-	TargetPublicKey string      `json:"targetPublicKey"` // 🔐 Nuovo campo aggiunto!
+	TargetPublicKey string      `json:"targetPublicKey"`
 	Messages        []UIMessage `json:"messages"`
 }
 
 func GetChatsHandler(w http.ResponseWriter, r *http.Request) {
-	userId := r.URL.Query().Get("userId")
-	if userId == "" {
-		http.Error(w, "User ID mancante", http.StatusBadRequest)
+	if r.Method != http.MethodGet {
+		http.Error(w, "Metodo non consentito", http.StatusMethodNotAllowed)
 		return
 	}
 
-	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
-	if err != nil {
-		http.Error(w, "Errore DB", http.StatusInternalServerError)
+	// 🛡️ ZERO-TRUST: Ignoriamo r.URL.Query().Get("userId")
+	secureUserID := getSecureUserID(r)
+	if secureUserID == "" {
+		http.Error(w, "Accesso negato: Sessione non valida", http.StatusUnauthorized)
 		return
 	}
-	defer db.Close()
 
-	// 🔐 Aggiornata la query SQL per estrarre anche la public_key dell'interlocutore
+	var err error // ✅ DICHIARATA CORRETTAMENTE QUI
+
 	queryChats := `
         SELECT 
             c.id, 
@@ -60,7 +59,6 @@ func GetChatsHandler(w http.ResponseWriter, r *http.Request) {
                 ELSE
                     CASE WHEN c.tenant_id::text = $1 THEN u2.first_name ELSE tenant.first_name END
             END as other_user_name,
-            -- Nuovo blocco CASE per la chiave pubblica
             CASE 
                 WHEN c.listing_id IS NOT NULL THEN
                     CASE WHEN c.tenant_id::text = $1 THEN owner.public_key ELSE tenant.public_key END
@@ -75,9 +73,10 @@ func GetChatsHandler(w http.ResponseWriter, r *http.Request) {
         WHERE c.tenant_id::text = $1 OR l.user_id::text = $1 OR c.user2_id::text = $1
     `
 
-	rows, err := db.Query(queryChats, userId)
+	// Passiamo secureUserID alla query
+	rows, err := DB.Query(queryChats, secureUserID)
 	if err != nil {
-		http.Error(w, "Errore query chat", http.StatusInternalServerError)
+		http.Error(w, "Errore caricamento chat", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -90,9 +89,8 @@ func GetChatsHandler(w http.ResponseWriter, r *http.Request) {
 		var chat UIConversation
 		chat.Messages = []UIMessage{}
 		var name sql.NullString
-		var pubKey sql.NullString // Variabile temporanea per gestire eventuali valori nulli nel DB
+		var pubKey sql.NullString
 
-		// Aggiunto pubKey allo Scan
 		rows.Scan(&chat.ID, &chat.Listing.Title, &chat.Listing.Price, &name, &pubKey)
 
 		chat.Emoji = "👤"
@@ -111,12 +109,10 @@ func GetChatsHandler(w http.ResponseWriter, r *http.Request) {
 			chat.Name = "Utente Sconosciuto"
 		}
 
-		// 🔐 Se la chiave pubblica esiste, la assegnamo all'oggetto che va al frontend
 		if pubKey.Valid {
 			chat.TargetPublicKey = pubKey.String
 		}
 
-		// 🔐 Nuova query: sceglie dinamicamente quale "cassaforte" leggere
 		queryMessages := `
             SELECT 
                 id, 
@@ -130,11 +126,8 @@ func GetChatsHandler(w http.ResponseWriter, r *http.Request) {
             WHERE conversation_id = $1 
             ORDER BY created_at ASC
         `
-		// Passiamo chat.ID come $1 e userId come $2
-		msgRows, err := db.Query(queryMessages, chat.ID, userId)
-
+		msgRows, err := DB.Query(queryMessages, chat.ID, secureUserID)
 		if err != nil {
-			// È sempre buona pratica gestire gli errori delle query!
 			continue
 		}
 		for msgRows.Next() {
@@ -143,7 +136,7 @@ func GetChatsHandler(w http.ResponseWriter, r *http.Request) {
 			var createdAt time.Time
 			msgRows.Scan(&msg.ID, &sender, &msg.Text, &createdAt)
 
-			if sender == userId {
+			if sender == secureUserID {
 				msg.Type = "sent"
 			} else {
 				msg.Type = "received"
