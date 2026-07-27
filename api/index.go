@@ -41,6 +41,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	case "send_message":
 		backend.SendMessageHandler(w, r)
 	// Se hai altri endpoint (es. auth_check), aggiungili semplicemente come "case" qui sotto
+	case "get_roommates":
+		backend.GetRoommatesHandler(w, r)
 	default:
 		http.Error(w, "Endpoint non trovato", http.StatusNotFound)
 	}
