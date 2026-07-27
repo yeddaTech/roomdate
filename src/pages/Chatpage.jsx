@@ -59,12 +59,11 @@ export default function ChatPage() {
     navigate('/');
   };
 
-  // 2. Scarica e DECIFRA le chat
+  // 2. Scarica e DECIFRA le chat (Niente più ?userId=...)
   const fetchChats = async () => {
     if (!user) return;
     try {
-      // ✅ USIAMO fetchAPI AL POSTO DI fetch
-      const res = await fetchAPI(`/api/get_chats?userId=${user.id}`);
+      const res = await fetchAPI(`/api/get_chats`); // 🔥 Modificato qui
       const data = await res.json();
       
       if (data) {
@@ -85,7 +84,6 @@ export default function ChatPage() {
           }));
           setConversations(decryptedData);
         } else {
-          // 🔐 CHAT BLOCCATA: Mostriamo i dati cifrati e attiviamo il blocco
           setIsLocked(true);
           setConversations(data);
         }
@@ -226,7 +224,6 @@ export default function ChatPage() {
         // Rimosso l'header Content-Type, lo gestisce api.js
         body: JSON.stringify({
           conversationId: activeConvId,
-          senderId: user.id,
           text: encryptedForTarget,  // Questo andrà nella colonna 'content'
           senderText: encryptedForMe // Questo andrà nella colonna 'sender_content'
         })

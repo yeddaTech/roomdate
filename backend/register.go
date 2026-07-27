@@ -1,10 +1,8 @@
-package handler
+package backend
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
-	"os"
 
 	_ "github.com/lib/pq"
 	"github.com/microcosm-cc/bluemonday"
@@ -30,7 +28,8 @@ type RegisterRequest struct {
 	CryptoIv            string `json:"cryptoIv"`
 }
 
-func Handler(w http.ResponseWriter, r *http.Request) {
+// 🛠️ Nome corretto per essere richiamato da api/index.go
+func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -40,13 +39,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Metodo non consentito", http.StatusMethodNotAllowed)
 		return
 	}
-
-	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
-	if err != nil {
-		http.Error(w, "Errore DB", http.StatusInternalServerError)
-		return
-	}
-	defer db.Close()
 
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -63,6 +55,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	safeBio := p.Sanitize(req.Bio)
 	safeTags := p.Sanitize(req.LifestyleTags)
 
+	var err error
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		http.Error(w, "Errore sicurezza", http.StatusInternalServerError)
@@ -74,11 +67,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id`
 
 	var newID string
-	err = db.QueryRow(
+	err = DB.QueryRow(
 		query,
 		safeNome,
 		safeCognome,
-		req.Email, // Le email sono solitamente validate da regex sul frontend/backend, la sanificazione XSS potrebbe alterare indirizzi particolari
+		req.Email,
 		string(hashedPassword),
 		safeCitta,
 		req.UserType,
@@ -88,7 +81,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		safeBio,
 		safeTags,
 		req.PublicKey,
-		req.EncryptedPrivateKey, // MAI sanitizzare le chiavi crittografiche
+		req.EncryptedPrivateKey,
 		req.CryptoSalt,
 		req.CryptoIv,
 	).Scan(&newID)

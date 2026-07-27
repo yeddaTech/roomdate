@@ -1,7 +1,6 @@
-package handler
+package backend
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -11,10 +10,9 @@ import (
 )
 
 type SendMessageReq struct {
-	ConversationID int `json:"conversationId"`
-	// SenderID è rimosso dal trust del client
-	Text       string `json:"text"`       // Cifrato per il destinatario
-	SenderText string `json:"senderText"` // Cifrato per il mittente
+	ConversationID int    `json:"conversationId"`
+	Text           string `json:"text"`       // Cifrato per il destinatario
+	SenderText     string `json:"senderText"` // Cifrato per il mittente
 }
 
 func SendMessageHandler(w http.ResponseWriter, r *http.Request) {
@@ -36,15 +34,10 @@ func SendMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
-	if err != nil {
-		http.Error(w, "Errore DB", http.StatusInternalServerError)
-		return
-	}
-	defer db.Close()
+	var err error // ✅ DICHIARATA QUI CORRETTAMENTE
 
 	// Salvataggio su DB usando il secureSenderID (No XSS sanitize per non corrompere la cifratura)
-	_, err = db.Exec("INSERT INTO roomdate_app.messages (conversation_id, sender_id, content, sender_content) VALUES ($1, $2, $3, $4)",
+	_, err = DB.Exec("INSERT INTO roomdate_app.messages (conversation_id, sender_id, content, sender_content) VALUES ($1, $2, $3, $4)",
 		req.ConversationID, secureSenderID, req.Text, req.SenderText)
 
 	if err != nil {

@@ -1,10 +1,9 @@
-package handler
+package backend
 
 import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"os"
 
 	_ "github.com/lib/pq"
 )
@@ -29,6 +28,11 @@ type ListingDetail struct {
 }
 
 func GetListingHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Metodo non consentito", http.StatusMethodNotAllowed)
+		return
+	}
+
 	// Prende il numero della stanza dall'URL (es: id=2)
 	id := r.URL.Query().Get("id")
 	if id == "" {
@@ -36,24 +40,18 @@ func GetListingHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
-	if err != nil {
-		http.Error(w, "Errore DB", http.StatusInternalServerError)
-		return
-	}
-	defer db.Close()
-
 	var l ListingDetail
 	var firstName sql.NullString
+	var err error // ✅ DICHIARATA CORRETTAMENTE QUI
 
-	// Cerca la stanza specifica e il nome del proprietario
+	// Cerca la stanza specifica e il nome del proprietario usando la variabile globale DB
 	query := `
-		SELECT l.id, l.title, l.city, l.zone, l.price, l.room_type, l.description, u.first_name
-		FROM roomdate_app.listings l
-		LEFT JOIN roomdate_app.users u ON l.user_id = u.id
-		WHERE l.id = $1
-	`
-	err = db.QueryRow(query, id).Scan(&l.ID, &l.Title, &l.City, &l.Zone, &l.Price, &l.Type, &l.Description, &firstName)
+        SELECT l.id, l.title, l.city, l.zone, l.price, l.room_type, l.description, u.first_name
+        FROM roomdate_app.listings l
+        LEFT JOIN roomdate_app.users u ON l.user_id = u.id
+        WHERE l.id = $1
+    `
+	err = DB.QueryRow(query, id).Scan(&l.ID, &l.Title, &l.City, &l.Zone, &l.Price, &l.Type, &l.Description, &firstName)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
