@@ -1,10 +1,8 @@
-package handler
+package backend
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
-	"os"
 	"strconv"
 
 	_ "github.com/lib/pq"
@@ -12,7 +10,6 @@ import (
 )
 
 type ProfileRequest struct {
-	// L'ID utente per l'update lo prendiamo dal token, non dal JSON
 	UserType   string `json:"userType"`
 	Citta      string `json:"citta"`
 	BudgetMax  string `json:"budgetMax"`
@@ -39,12 +36,6 @@ type UserProfile struct {
 }
 
 func ProfileHandler(w http.ResponseWriter, r *http.Request) {
-	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
-	if err != nil {
-		http.Error(w, "Errore DB", http.StatusInternalServerError)
-		return
-	}
-	defer db.Close()
 
 	// --- 1. GESTIONE GET (Visualizzazione Profili) ---
 	if r.Method == http.MethodGet {
@@ -62,7 +53,7 @@ func ProfileHandler(w http.ResponseWriter, r *http.Request) {
                    COALESCE(is_public, true)
             FROM roomdate_app.users WHERE id = $1
         `
-		err := db.QueryRow(query, userId).Scan(
+		err := DB.QueryRow(query, userId).Scan(
 			&p.ID, &p.Nome, &p.Cognome, &p.Email,
 			&p.UserType, &p.Citta, &p.Nascita, &p.BudgetMax,
 			&p.Occupation, &p.Bio, &p.LifestyleTags,
@@ -80,7 +71,6 @@ func ProfileHandler(w http.ResponseWriter, r *http.Request) {
 
 	// --- 2. GESTIONE POST (Aggiornamento Profilo - ZERO TRUST & XSS) ---
 	if r.Method == http.MethodPost {
-		// 🛡️ ZERO-TRUST: Chi sta cercando di modificare il profilo?
 		secureUserID := getSecureUserID(r)
 		if secureUserID == "" {
 			http.Error(w, "Accesso negato: Sessione non valida", http.StatusUnauthorized)
@@ -93,26 +83,25 @@ func ProfileHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// 🧼 SANITIZZAZIONE XSS per i campi di testo libero
 		p := bluemonday.StrictPolicy()
 		safeCitta := p.Sanitize(req.Citta)
 		safeOccupation := p.Sanitize(req.Occupation)
 		safeBio := p.Sanitize(req.Bio)
 		safeTags := p.Sanitize(req.Tags)
-		// Non sanitizziamo Birthdate e UserType perché dovrebbero avere formati rigidi validati a monte
 
 		budget := 0
 		if req.BudgetMax != "" {
 			budget, _ = strconv.Atoi(req.BudgetMax)
 		}
 
-		// 🛡️ L'UPDATE usa secureUserID, non il dato del client
+		var err error // ✅ DICHIARATA CORRETTAMENTE QUI
+
 		query := `
             UPDATE roomdate_app.users 
             SET user_type = $1, citta = $2, budget_max = $3, occupation = $4, birthdate = $5, bio = $6, lifestyle_tags = $7, is_public = $8
             WHERE id = $9
         `
-		_, err = db.Exec(query, req.UserType, safeCitta, budget, safeOccupation, req.Birthdate, safeBio, safeTags, req.IsPublic, secureUserID)
+		_, err = DB.Exec(query, req.UserType, safeCitta, budget, safeOccupation, req.Birthdate, safeBio, safeTags, req.IsPublic, secureUserID)
 
 		if err != nil {
 			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)

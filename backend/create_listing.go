@@ -1,10 +1,8 @@
-package handler
+package backend
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
-	"os"
 	"strconv"
 
 	_ "github.com/lib/pq"
@@ -40,6 +38,8 @@ func CreateListingHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var err error // ✅ DICHIARATA CORRETTAMENTE QUI
+
 	var req ListingRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Dati non validi", http.StatusBadRequest)
@@ -58,19 +58,12 @@ func CreateListingHandler(w http.ResponseWriter, r *http.Request) {
 	// Convertiamo il prezzo da testo a numero
 	priceInt, _ := strconv.Atoi(req.Price)
 
-	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
-	if err != nil {
-		http.Error(w, "Errore di connessione al DB", http.StatusInternalServerError)
-		return
-	}
-	defer db.Close()
-
-	// 4. Salvataggio nel DB utilizzando SOLO i dati sanitizzati e l'ID sicuro
+	// 4. Salvataggio nel DB utilizzando SOLO i dati sanitizzati e l'ID sicuro (Usando la variabile globale DB maiuscola)
 	query := `
         INSERT INTO roomdate_app.listings (user_id, title, city, zone, room_type, price, description) 
         VALUES ($1, $2, $3, $4, $5, $6, $7)
     `
-	_, err = db.Exec(query, secureUserID, safeTitle, safeCity, safeZone, req.RoomType, priceInt, safeDescription)
+	_, err = DB.Exec(query, secureUserID, safeTitle, safeCity, safeZone, req.RoomType, priceInt, safeDescription)
 	if err != nil {
 		http.Error(w, "Errore salvataggio annuncio: "+err.Error(), http.StatusInternalServerError)
 		return

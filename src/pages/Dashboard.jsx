@@ -20,17 +20,17 @@ export default function Dashboard() {
       } else {
         const parsedUser = JSON.parse(savedUser);
         setUser(parsedUser);
-        fetchFreshProfile(parsedUser.id);
+        fetchFreshProfile();
       }
     } catch {
       navigate('/accedi');
     }
   }, [navigate]);
 
-  const fetchFreshProfile = async (userId) => {
+  const fetchFreshProfile = async () => {
     try {
-      // ✅ USIAMO fetchAPI AL POSTO DI fetch
-      const res = await fetchAPI(`/api/profile?userId=${userId}`);
+      // ✅ Rimosso ?userId=
+      const res = await fetchAPI(`/api/profile`);
       if (res.ok) {
         const freshData = await res.json();
         setUser(prev => ({ ...prev, ...freshData })); 
@@ -50,8 +50,8 @@ export default function Dashboard() {
   const fetchMyListings = async () => {
     if (!user) return;
     try {
-      // ✅ USIAMO fetchAPI AL POSTO DI fetch
-      const res = await fetchAPI(`/api/get_my_listings?userId=${user.id}`);
+      // ✅ Rimosso ?userId=
+      const res = await fetchAPI(`/api/get_my_listings`);
       const data = await res.json();
       if (data) setMyListings(data);
     } catch (err) {
@@ -66,7 +66,6 @@ export default function Dashboard() {
   const handleDeleteListing = async (id) => {
     if (window.confirm("Sei sicuro di voler eliminare questo annuncio?")) {
       try {
-        // ✅ USIAMO fetchAPI AL POSTO DI fetch
         const res = await fetchAPI(`/api/delete_listing?id=${id}`, { method: 'DELETE' });
         if (res.ok) {
           alert("✅ Annuncio eliminato.");
@@ -87,7 +86,7 @@ export default function Dashboard() {
       .join(', ');
 
     const payload = {
-      userId: user.id.toString(),
+      // ✅ Rimosso userId dal payload
       userType: formData.get('userType'),
       citta: formData.get('citta'),
       budgetMax: formData.get('budgetMax'),
@@ -99,14 +98,13 @@ export default function Dashboard() {
     };
 
     try {
-      // ✅ USIAMO fetchAPI AL POSTO DI fetch
       const res = await fetchAPI('/api/profile', {
         method: 'POST',
-        body: JSON.stringify(payload) // Non serve più specificare l'header Content-Type, lo fa api.js!
+        body: JSON.stringify(payload)
       });
       if (res.ok) {
         alert("✅ Profilo aggiornato con successo!");
-        fetchFreshProfile(user.id); 
+        fetchFreshProfile(); 
         setActiveView('myListings');
       } else {
         const errorMsg = await res.text();
@@ -121,7 +119,7 @@ export default function Dashboard() {
     e.preventDefault();
     const formData = new FormData(e.target);
     const data = {
-      userId: user.id,
+      // ✅ Rimosso userId dal payload
       title: formData.get('title'),
       city: formData.get('city'),
       zone: formData.get('zone'),
@@ -131,10 +129,9 @@ export default function Dashboard() {
     };
 
     try {
-      // ✅ USIAMO fetchAPI AL POSTO DI fetch
       const res = await fetchAPI('/api/create_listing', {
         method: 'POST',
-        body: JSON.stringify(data) // Come sopra, header automatico
+        body: JSON.stringify(data)
       });
       if (res.ok) {
         alert("🎉 Annuncio pubblicato!");

@@ -1,4 +1,4 @@
-package handler
+package backend
 
 import (
 	"database/sql"
@@ -48,13 +48,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	connStr := os.Getenv("DATABASE_URL")
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		http.Error(w, "Errore DB", http.StatusInternalServerError)
-		return
-	}
-	defer db.Close()
+	// Variabile err dichiarata a livello di handler per evitare problemi di scope/ridefinizione
+	var err error
 
 	switch req.Action {
 
@@ -105,7 +100,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		query := `SELECT id::text, first_name, last_name, email, COALESCE(user_type, '')
                   FROM roomdate_app.users WHERE id = $1`
 
-		err = db.QueryRow(query, userIDStr).Scan(&user.ID, &user.Nome, &user.Cognome, &user.Email, &user.UserType)
+		err = DB.QueryRow(query, userIDStr).Scan(&user.ID, &user.Nome, &user.Cognome, &user.Email, &user.UserType)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				http.Error(w, "Utente non trovato", http.StatusUnauthorized)
@@ -133,7 +128,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		query := `UPDATE roomdate_app.users SET password_hash = $1 WHERE id = $2`
-		_, err = db.Exec(query, hashedPassword, secureUserID)
+		_, err = DB.Exec(query, hashedPassword, secureUserID)
 		if err != nil {
 			http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -151,7 +146,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		query := `DELETE FROM roomdate_app.users WHERE id = $1`
-		_, err = db.Exec(query, secureUserID)
+		_, err = DB.Exec(query, secureUserID)
 		if err != nil {
 			http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -166,14 +161,14 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		var hashedPassword string
 		var encryptedPrivKey, cryptoSalt, cryptoIv, pubKey string
 		var failedAttempts int
-		var lockedUntil sql.NullTime // Usiamo NullTime perché il campo potrebbe essere NULL
+		var lockedUntil sql.NullTime
 
 		query := `SELECT id::text, first_name, last_name, email, password_hash, COALESCE(user_type, ''), 
                   COALESCE(encrypted_private_key, ''), COALESCE(crypto_salt, ''), COALESCE(crypto_iv, ''),
                   COALESCE(public_key, ''), COALESCE(failed_login_attempts, 0), locked_until
                   FROM roomdate_app.users WHERE email = $1`
 
-		err = db.QueryRow(query, req.Email).Scan(
+		err = DB.QueryRow(query, req.Email).Scan(
 			&user.ID, &user.Nome, &user.Cognome, &user.Email, &hashedPassword, &user.UserType,
 			&encryptedPrivKey, &cryptoSalt, &cryptoIv, &pubKey, &failedAttempts, &lockedUntil,
 		)
@@ -199,24 +194,22 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			failedAttempts++
 
 			if failedAttempts >= 5 {
-				// Blocca l'account per 15 minuti
 				lockQuery := `UPDATE roomdate_app.users SET failed_login_attempts = $1, locked_until = NOW() + INTERVAL '15 minutes' WHERE email = $2`
-				db.Exec(lockQuery, failedAttempts, req.Email)
+				DB.Exec(lockQuery, failedAttempts, req.Email)
 				http.Error(w, "Troppi tentativi falliti. Account bloccato per 15 minuti.", http.StatusTooManyRequests)
 				return
 			}
 
-			// Aggiorna solo il contatore degli errori
 			updateQuery := `UPDATE roomdate_app.users SET failed_login_attempts = $1 WHERE email = $2`
-			db.Exec(updateQuery, failedAttempts, req.Email)
+			DB.Exec(updateQuery, failedAttempts, req.Email)
 			http.Error(w, "Password errata", http.StatusUnauthorized)
 			return
 		}
 
-		// ✅ 3. PASSWORD CORRETTA: RESET CONTATORI (Se c'erano stati errori in precedenza)
+		// ✅ 3. PASSWORD CORRETTA: RESET CONTATORI
 		if failedAttempts > 0 {
 			resetQuery := `UPDATE roomdate_app.users SET failed_login_attempts = 0, locked_until = NULL WHERE email = $1`
-			db.Exec(resetQuery, req.Email)
+			DB.Exec(resetQuery, req.Email)
 		}
 
 		jwtSecret := os.Getenv("JWT_SECRET")
