@@ -11,15 +11,22 @@ import (
 )
 
 type SendMessageReq struct {
-	ConversationID int    `json:"conversationId"`
-	SenderID       string `json:"senderId"`
-	Text           string `json:"text"`
-	SenderText     string `json:"senderText"` // 🔐 NUOVO: Riceve il testo cifrato per il mittente
+	ConversationID int `json:"conversationId"`
+	// SenderID è rimosso dal trust del client
+	Text       string `json:"text"`       // Cifrato per il destinatario
+	SenderText string `json:"senderText"` // Cifrato per il mittente
 }
 
 func SendMessageHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 🛡️ ZERO-TRUST: Identifichiamo il mittente in modo sicuro dal token JWT
+	secureSenderID := getSecureUserID(r)
+	if secureSenderID == "" {
+		http.Error(w, "Accesso negato: Sessione non valida", http.StatusUnauthorized)
 		return
 	}
 
@@ -36,17 +43,15 @@ func SendMessageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// 1. Salva il messaggio su Neon
-	// 🔐 AGGIORNATO: Ora salva sia "content" che "sender_content"
+	// Salvataggio su DB usando il secureSenderID (No XSS sanitize per non corrompere la cifratura)
 	_, err = db.Exec("INSERT INTO roomdate_app.messages (conversation_id, sender_id, content, sender_content) VALUES ($1, $2, $3, $4)",
-		req.ConversationID, req.SenderID, req.Text, req.SenderText)
+		req.ConversationID, secureSenderID, req.Text, req.SenderText)
 
 	if err != nil {
 		http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 2. CONFIGURA PUSHER (Mantenuto esattamente come il tuo originale)
 	pusherClient := pusher.Client{
 		AppID:   os.Getenv("PUSHER_APP_ID"),
 		Key:     os.Getenv("PUSHER_KEY"),
@@ -55,8 +60,6 @@ func SendMessageHandler(w http.ResponseWriter, r *http.Request) {
 		Secure:  true,
 	}
 
-	// 3. Suona il campanello in tempo reale!
-	// Dice a Pusher: "Sulla chat globale, c'è un 'nuovo-messaggio'"
 	data := map[string]interface{}{"conversationId": req.ConversationID}
 	pusherClient.Trigger("roomdate-channel", "nuovo-messaggio", data)
 
