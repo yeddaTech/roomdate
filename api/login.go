@@ -17,7 +17,7 @@ type MultiRequest struct {
 	Action      string `json:"action"`
 	Email       string `json:"email"`
 	Password    string `json:"password"`
-	UserID      string `json:"userId"` // ⚠️ Lo teniamo per compatibilità col frontend, ma sul backend NON ci fidiamo più di questo campo.
+	UserID      string `json:"userId"`
 	NewPassword string `json:"newPassword"`
 }
 
@@ -119,9 +119,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(user)
 		return
 
-	// --- UPDATE PASSWORD: ORA USIAMO L'ID DAL TOKEN ---
+	// --- UPDATE PASSWORD ---
 	case "update_password":
-		// Estraggo l'ID in modo sicuro dal cookie, ignorando req.UserID
 		secureUserID := getSecureUserID(r)
 		if secureUserID == "" {
 			http.Error(w, "Accesso negato o sessione non valida", http.StatusUnauthorized)
@@ -134,7 +133,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		query := `UPDATE roomdate_app.users SET password_hash = $1 WHERE id = $2`
-		_, err = db.Exec(query, hashedPassword, secureUserID) // Uso l'ID sicuro!
+		_, err = db.Exec(query, hashedPassword, secureUserID)
 		if err != nil {
 			http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -143,7 +142,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Password aggiornata con successo"))
 		return
 
-	// --- DELETE ACCOUNT: ORA USIAMO L'ID DAL TOKEN ---
+	// --- DELETE ACCOUNT ---
 	case "delete_account":
 		secureUserID := getSecureUserID(r)
 		if secureUserID == "" {
@@ -152,7 +151,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		query := `DELETE FROM roomdate_app.users WHERE id = $1`
-		_, err = db.Exec(query, secureUserID) // Uso l'ID sicuro!
+		_, err = db.Exec(query, secureUserID)
 		if err != nil {
 			http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -161,20 +160,22 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Account eliminato"))
 		return
 
-	// --- LOGIN STANDARD ---
+	// --- LOGIN STANDARD CON PROTEZIONE BRUTE-FORCE ---
 	default:
 		var user UserData
 		var hashedPassword string
 		var encryptedPrivKey, cryptoSalt, cryptoIv, pubKey string
+		var failedAttempts int
+		var lockedUntil sql.NullTime // Usiamo NullTime perché il campo potrebbe essere NULL
 
 		query := `SELECT id::text, first_name, last_name, email, password_hash, COALESCE(user_type, ''), 
                   COALESCE(encrypted_private_key, ''), COALESCE(crypto_salt, ''), COALESCE(crypto_iv, ''),
-                  COALESCE(public_key, '')
+                  COALESCE(public_key, ''), COALESCE(failed_login_attempts, 0), locked_until
                   FROM roomdate_app.users WHERE email = $1`
 
 		err = db.QueryRow(query, req.Email).Scan(
 			&user.ID, &user.Nome, &user.Cognome, &user.Email, &hashedPassword, &user.UserType,
-			&encryptedPrivKey, &cryptoSalt, &cryptoIv, &pubKey,
+			&encryptedPrivKey, &cryptoSalt, &cryptoIv, &pubKey, &failedAttempts, &lockedUntil,
 		)
 
 		if err != nil {
@@ -186,10 +187,36 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// 🛑 1. CONTROLLO BLOCCO ACCOUNT
+		if lockedUntil.Valid && lockedUntil.Time.After(time.Now()) {
+			http.Error(w, "Account temporaneamente bloccato per troppi tentativi. Riprova tra 15 minuti.", http.StatusTooManyRequests)
+			return
+		}
+
+		// 🛡️ 2. VERIFICA PASSWORD E GESTIONE ERRORI
 		err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(req.Password))
 		if err != nil {
+			failedAttempts++
+
+			if failedAttempts >= 5 {
+				// Blocca l'account per 15 minuti
+				lockQuery := `UPDATE roomdate_app.users SET failed_login_attempts = $1, locked_until = NOW() + INTERVAL '15 minutes' WHERE email = $2`
+				db.Exec(lockQuery, failedAttempts, req.Email)
+				http.Error(w, "Troppi tentativi falliti. Account bloccato per 15 minuti.", http.StatusTooManyRequests)
+				return
+			}
+
+			// Aggiorna solo il contatore degli errori
+			updateQuery := `UPDATE roomdate_app.users SET failed_login_attempts = $1 WHERE email = $2`
+			db.Exec(updateQuery, failedAttempts, req.Email)
 			http.Error(w, "Password errata", http.StatusUnauthorized)
 			return
+		}
+
+		// ✅ 3. PASSWORD CORRETTA: RESET CONTATORI (Se c'erano stati errori in precedenza)
+		if failedAttempts > 0 {
+			resetQuery := `UPDATE roomdate_app.users SET failed_login_attempts = 0, locked_until = NULL WHERE email = $1`
+			db.Exec(resetQuery, req.Email)
 		}
 
 		jwtSecret := os.Getenv("JWT_SECRET")
@@ -198,10 +225,9 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// --- 🛡️ 3. GENERAZIONE JWT CON INIEZIONE DEL RUOLO ---
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"user_id":   user.ID,
-			"user_type": user.UserType, // ✅ Aggiunto il ruolo
+			"user_type": user.UserType,
 			"exp":       time.Now().Add(24 * time.Hour).Unix(),
 		})
 
@@ -234,10 +260,9 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // =====================================================================
-// 🛡️ HELPER FUNCTIONS (Da copiare in altri file API quando serve)
+// 🛡️ HELPER FUNCTIONS
 // =====================================================================
 
-// getSecureUserID estrae l'ID in modo sicuro dal token senza fidarsi del client
 func getSecureUserID(r *http.Request) string {
 	cookie, err := r.Cookie("roomdate_session")
 	if err != nil {
@@ -263,7 +288,6 @@ func getSecureUserID(r *http.Request) string {
 	return ""
 }
 
-// checkRole verifica che l'utente abbia uno specifico ruolo (es. "affitta")
 func checkRole(r *http.Request, requiredRole string) bool {
 	cookie, err := r.Cookie("roomdate_session")
 	if err != nil {
