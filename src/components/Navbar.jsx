@@ -1,93 +1,91 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 
-const Navbar = () => {
+const Navbar = ({ user, handleLogout }) => {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', onScroll);
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          setScrolled(window.scrollY > 20);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  const onLogout = (e) => {
+    e.preventDefault();
+    if (typeof handleLogout === 'function') {
+      handleLogout();
+    }
+  };
+
   return (
-    <nav
-      style={{
-        backgroundColor: scrolled ? 'rgba(254,250,244,0.95)' : 'transparent',
-        backdropFilter: scrolled ? 'blur(12px)' : 'none',
-        boxShadow: scrolled ? '0 1px 20px rgba(122,75,42,0.1)' : 'none',
-        transition: 'all 0.3s ease',
-      }}
-      className="fixed top-0 left-0 right-0 z-50"
-    >
-      <div className="max-w-7xl mx-auto px-6 lg:px-8">
-        <div className="flex justify-between items-center h-18 py-4">
-
-          {/* Logo */}
-          <a href="#" className="flex items-center gap-2">
-            <div
-              style={{ background: 'var(--terra)', width: 32, height: 32, borderRadius: 8 }}
-              className="flex items-center justify-center"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" fill="white" opacity="0.9"/>
-                <path d="M9 22V12h6v10" fill="white" opacity="0.6"/>
-              </svg>
+    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'pt-4' : 'pt-6'}`}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className={`flex justify-between items-center px-6 py-3 rounded-full transition-all duration-300 ${
+          scrolled 
+            ? 'bg-white/80 backdrop-blur-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/50' 
+            : 'bg-transparent'
+        }`}>
+          
+          <Link to="/" className="flex items-center gap-2 group" aria-label="Torna alla Home">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/30 group-hover:scale-105 transition-transform">
+              <span className="font-bold text-xl" aria-hidden="true">R</span>
             </div>
-            <span className="font-display text-2xl font-bold" style={{ color: 'var(--warm-dark)' }}>
-              Room<span style={{ color: 'var(--terra)' }}>Date</span>
+            <span className="font-display text-2xl font-extrabold tracking-tight text-neutral-800">
+              Room<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">Date</span>
             </span>
-          </a>
+          </Link>
 
-          {/* Desktop Menu */}
-          <div className="hidden md:flex items-center gap-8">
-            <a href="#" className="nav-link">Home</a>
-            <a href="#" className="nav-link">Trova Stanza</a>
-            <a href="#" className="nav-link">Cerca Coinquilini</a>
-            <a href="#" className="nav-link">Come Funziona</a>
+          <div className="hidden md:flex items-center gap-8 bg-white/40 px-6 py-2 rounded-full border border-white/60 shadow-sm backdrop-blur-md">
+            <Link to="/" className="text-sm font-medium text-neutral-600 hover:text-orange-500 transition-colors">Home</Link>
+            <Link to="/ricerca" className="text-sm font-medium text-neutral-600 hover:text-orange-500 transition-colors">Trova Stanza</Link>
+            <Link to="/chat" className="text-sm font-medium text-neutral-600 hover:text-orange-500 transition-colors">Chat</Link>
           </div>
 
-          {/* CTA Buttons */}
-          <div className="hidden md:flex items-center gap-3">
-            <button className="btn-outline" style={{ padding: '0.55rem 1.5rem', fontSize: '0.88rem' }}>
-              Accedi
-            </button>
-            <button className="btn-primary" style={{ padding: '0.55rem 1.5rem', fontSize: '0.88rem' }}>
-              Registrati Gratis
-            </button>
+          <div className="hidden md:flex items-center gap-4">
+            {user && user.nome ? (
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium text-neutral-700">Ciao, {String(user.nome).replace(/[<>]/g, '')}</span>
+                <button 
+                  onClick={onLogout} 
+                  className="px-5 py-2.5 rounded-full text-sm font-semibold text-neutral-600 bg-white hover:bg-neutral-50 shadow-sm border border-neutral-100 transition-all"
+                  aria-label="Esci dal profilo"
+                >
+                  Esci
+                </button>
+              </div>
+            ) : (
+              <>
+                <Link to="/accedi" className="text-sm font-semibold text-neutral-700 hover:text-orange-500 transition-colors">Accedi</Link>
+                <Link to="/registrati" className="px-5 py-2.5 rounded-full text-sm font-bold text-white bg-neutral-900 hover:bg-neutral-800 hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                  Registrati Gratis
+                </Link>
+              </>
+            )}
           </div>
 
-          {/* Hamburger */}
-          <button
-            className="md:hidden"
-            style={{ color: 'var(--warm-brown)' }}
+          <button 
+            className="md:hidden p-2" 
             onClick={() => setMenuOpen(!menuOpen)}
-            aria-label={menuOpen ? "Chiudi menu" : "Apri menu di navigazione"} // <-- LA CORREZIONE È QUI
+            aria-expanded={menuOpen}
+            aria-label={menuOpen ? "Chiudi menu" : "Apri menu di navigazione"}
           >
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              {menuOpen
-                ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
-                : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"/>
-              }
-            </svg>
+            <div className="w-6 flex flex-col gap-1.5" aria-hidden="true">
+              <span className={`block h-0.5 bg-neutral-800 transition-all ${menuOpen ? 'rotate-45 translate-y-2' : ''}`}></span>
+              <span className={`block h-0.5 bg-neutral-800 transition-all ${menuOpen ? 'opacity-0' : ''}`}></span>
+              <span className={`block h-0.5 bg-neutral-800 transition-all ${menuOpen ? '-rotate-45 -translate-y-2' : ''}`}></span>
+            </div>
           </button>
         </div>
-
-        {/* Mobile Menu */}
-        {menuOpen && (
-          <div
-            style={{ background: 'var(--cream)', borderTop: '1px solid var(--sand)' }}
-            className="md:hidden py-4 px-2 space-y-3"
-          >
-            {['Home', 'Trova Stanza', 'Cerca Coinquilini', 'Come Funziona'].map(item => (
-              <a key={item} href="#" className="block py-2 px-3 nav-link text-base">{item}</a>
-            ))}
-            <div className="pt-3 flex flex-col gap-2">
-              <button className="btn-outline w-full">Accedi</button>
-              <button className="btn-primary w-full">Registrati Gratis</button>
-            </div>
-          </div>
-        )}
       </div>
     </nav>
   );
