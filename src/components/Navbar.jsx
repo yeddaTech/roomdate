@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 const sanitizeHTML = (str) => {
   if (typeof str !== 'string') return '';
@@ -9,6 +9,16 @@ const sanitizeHTML = (str) => {
 const Navbar = ({ user, handleLogout }) => {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
+
+  // 1. Array unico con le 5 opzioni della Navbar
+  const navLinks = [
+    { name: 'Home', path: '/', icon: '🏠' },
+    { name: 'Trova Stanza', path: '/ricerca', icon: '🔍' },
+    { name: 'Chat', path: '/chat', icon: '💬' },
+    { name: 'Profilo', path: '/dashboard', icon: '👤' },
+    { name: 'Impostazioni', path: '/impostazioni', icon: '⚙️' },
+  ];
 
   // Gestione ottimizzata dello scroll per il design glassmorphism
   useEffect(() => {
@@ -26,7 +36,7 @@ const Navbar = ({ user, handleLogout }) => {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Blocco dello scroll su mobile quando il menu è aperto (Previene i freeze)
+  // Blocco dello scroll su mobile quando il menu è aperto
   useEffect(() => {
     if (menuOpen) {
       document.body.style.overflow = 'hidden';
@@ -48,6 +58,7 @@ const Navbar = ({ user, handleLogout }) => {
               : 'bg-white/70 backdrop-blur-md border border-transparent shadow-sm'
           }`}>
             
+            {/* LOGO */}
             <Link to="/" onClick={chiudiMenu} className="flex items-center gap-2 group" aria-label="Torna alla Home">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/30 group-hover:scale-105 transition-transform">
                 <span className="font-bold text-xl" aria-hidden="true">R</span>
@@ -57,11 +68,22 @@ const Navbar = ({ user, handleLogout }) => {
               </span>
             </Link>
 
-            {/* Menu Desktop */}
-            <div className="hidden md:flex items-center gap-8 bg-neutral-50/50 px-6 py-2 rounded-full border border-neutral-100 shadow-inner">
-              <Link to="/" className="text-sm font-semibold text-neutral-600 hover:text-orange-500 transition-colors">Home</Link>
-              <Link to="/ricerca" className="text-sm font-semibold text-neutral-600 hover:text-orange-500 transition-colors">Trova Stanza</Link>
-              <Link to="/chat" className="text-sm font-semibold text-neutral-600 hover:text-orange-500 transition-colors">Chat</Link>
+            {/* Menu Desktop (Dinamico a 5 opzioni con indicatore attivo) */}
+            <div className="hidden md:flex items-center gap-6 bg-neutral-50/50 px-6 py-2 rounded-full border border-neutral-100 shadow-inner">
+              {navLinks.map((link) => {
+                const isActive = location.pathname === link.path;
+                return (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    className={`text-sm font-semibold transition-colors ${
+                      isActive ? 'text-orange-500' : 'text-neutral-600 hover:text-orange-500'
+                    }`}
+                  >
+                    {link.name}
+                  </Link>
+                );
+              })}
             </div>
 
             {/* CTA Desktop */}
@@ -97,7 +119,7 @@ const Navbar = ({ user, handleLogout }) => {
         </div>
       </nav>
 
-      {/* OVERLAY E MENU MOBILE UNIFICATI */}
+      {/* OVERLAY E MENU MOBILE UNIFICATI (Dinamico a 5 opzioni) */}
       <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-[1001] p-8 pt-28 transform transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${menuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex flex-col gap-6 text-lg font-bold text-neutral-700">
           {user && user.nome && (
@@ -106,10 +128,22 @@ const Navbar = ({ user, handleLogout }) => {
                <h3 className="text-2xl text-neutral-900 truncate">{sanitizeHTML(user.nome)}</h3>
              </div>
           )}
-          <Link to="/" onClick={chiudiMenu} className="hover:text-orange-500 transition-colors flex items-center gap-3"><span className="text-2xl">🏠</span> Home</Link>
-          <Link to="/ricerca" onClick={chiudiMenu} className="hover:text-orange-500 transition-colors flex items-center gap-3"><span className="text-2xl">🔍</span> Cerca Stanza</Link>
-          <Link to="/chat" onClick={chiudiMenu} className="hover:text-orange-500 transition-colors flex items-center gap-3"><span className="text-2xl">💬</span> I tuoi Messaggi</Link>
-          <Link to="/dashboard" onClick={chiudiMenu} className="hover:text-orange-500 transition-colors flex items-center gap-3"><span className="text-2xl">👤</span> Profilo</Link>
+          
+          {navLinks.map((link) => {
+            const isActive = location.pathname === link.path;
+            return (
+              <Link 
+                key={link.path}
+                to={link.path} 
+                onClick={chiudiMenu} 
+                className={`transition-colors flex items-center gap-3 ${
+                  isActive ? 'text-orange-500' : 'hover:text-orange-500'
+                }`}
+              >
+                <span className="text-2xl" aria-hidden="true">{link.icon}</span> {link.name}
+              </Link>
+            );
+          })}
           
           <div className="mt-auto pt-8 border-t border-neutral-100">
             {user ? (
