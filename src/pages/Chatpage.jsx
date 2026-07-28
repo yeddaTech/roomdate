@@ -3,8 +3,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import Pusher from 'pusher-js'; 
 import { Helmet } from 'react-helmet-async';
 import { encryptMessage, decryptMessage, unwrapPrivateKey } from '../utils/crypto';
+// ✅ IMPORTIAMO L'API SICURA
 import { fetchAPI } from '../utils/api'; 
-import Navbar from '../components/Navbar'; // LA NAVBAR GLOBALE
 
 const QUICK_REPLIES = [
   '📅 Quando sei disponibile?',
@@ -19,6 +19,7 @@ export default function ChatPage() {
   const location = useLocation(); 
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   const [conversations, setConversations] = useState([]);
   const [activeConvId, setActiveConvId] = useState(null);
@@ -34,7 +35,7 @@ export default function ChatPage() {
   const [unlockPassword, setUnlockPassword] = useState('');
   const [unlockError, setUnlockError] = useState('');
 
-  // 1. Controllo utente loggato (LOGICA ORIGINALE)
+  // 1. Controllo utente loggato
   useEffect(() => {
     const savedUser = localStorage.getItem('roomdate_user');
     if (!savedUser) {
@@ -45,19 +46,24 @@ export default function ChatPage() {
   }, [navigate]);
 
   const handleLogout = () => {
+    // 1. Rimuovi i dati dell'utente
     localStorage.removeItem('roomdate_user');
+    
+    // 2. Rimuovi le chiavi e la cassaforte
     sessionStorage.removeItem('roomdate_private_key'); 
     localStorage.removeItem('roomdate_crypto');
     localStorage.removeItem('roomdate_public_key');
+    
     setUser(null);
+    setIsMenuOpen(false);
     navigate('/');
   };
 
-  // 2. Scarica e DECIFRA le chat (LOGICA ORIGINALE)
+  // 2. Scarica e DECIFRA le chat (Niente più ?userId=...)
   const fetchChats = async () => {
     if (!user) return;
     try {
-      const res = await fetchAPI(`/api/get_chats`);
+      const res = await fetchAPI(`/api/get_chats`); // 🔥 Modificato qui
       const data = await res.json();
       
       if (data) {
@@ -101,6 +107,7 @@ export default function ChatPage() {
 
     try {
       const cryptoData = JSON.parse(cryptoDataStr);
+      // Riapriamo la cassaforte con la password appena inserita
       const privateKey = await unwrapPrivateKey(
         cryptoData.encryptedPrivateKey,
         unlockPassword,
@@ -108,6 +115,7 @@ export default function ChatPage() {
         cryptoData.cryptoIv
       );
       
+      // Salviamo in sessione e ricarichiamo!
       sessionStorage.setItem('roomdate_private_key', privateKey);
       setIsLocked(false);
       setUnlockPassword('');
@@ -118,7 +126,7 @@ export default function ChatPage() {
     }
   };
 
-  // 3. Configurazione Pusher (LOGICA ORIGINALE)
+  // 3. Configurazione Pusher
   useEffect(() => {
     if (user) {
       fetchChats(); 
@@ -129,6 +137,7 @@ export default function ChatPage() {
 
       const channel = pusher.subscribe('roomdate-channel');
       channel.bind('nuovo-messaggio', function(data) {
+        // Quando arriva un nuovo messaggio, ricarica e decifra
         fetchChats();
       });
 
@@ -164,7 +173,7 @@ export default function ChatPage() {
     setMobileView('chat');
   };
 
-  // 4. DOPPIA CIFRATURA e invio del messaggio (LOGICA ORIGINALE)
+  // 4. DOPPIA CIFRATURA e invio del messaggio
   const handleSend = async () => {
     if (!inputText.trim() || !activeConvId || !user) return;
     
@@ -172,6 +181,7 @@ export default function ChatPage() {
     setInputText(''); 
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
+    // Mostriamo subito il messaggio in chiaro sulla nostra UI per reattività
     const tempMsg = {
       id: Date.now(), 
       type: 'sent',
@@ -193,6 +203,7 @@ export default function ChatPage() {
         return;
       }
 
+      // 🔐 NUOVO: Recuperiamo la NOSTRA chiave pubblica dal localStorage
       const myPublicKey = localStorage.getItem('roomdate_public_key');
       if (!myPublicKey) {
         console.error("Manca la tua chiave pubblica!");
@@ -200,15 +211,21 @@ export default function ChatPage() {
         return;
       }
 
+      // 🔐 LA DOPPIA CIFRATURA
+      // 1. Cifriamo per il destinatario
       const encryptedForTarget = await encryptMessage(textToSend, activeConv.targetPublicKey);
+      
+      // 2. Cifriamo per noi stessi
       const encryptedForMe = await encryptMessage(textToSend, myPublicKey);
 
+      // ✅ USIAMO fetchAPI AL POSTO DI fetch
       await fetchAPI('/api/send_message', {
         method: 'POST',
+        // Rimosso l'header Content-Type, lo gestisce api.js
         body: JSON.stringify({
           conversationId: activeConvId,
-          text: encryptedForTarget,  
-          senderText: encryptedForMe 
+          text: encryptedForTarget,  // Questo andrà nella colonna 'content'
+          senderText: encryptedForMe // Questo andrà nella colonna 'sender_content'
         })
       });
     } catch (err) {
@@ -235,73 +252,128 @@ export default function ChatPage() {
   });
 
   return (
-    <div className="flex flex-col h-[100dvh] w-full max-w-[100vw] bg-[#FAFAFA] font-sans overflow-hidden selection:bg-orange-200">
+    <div className="flex flex-col h-[100dvh] w-full max-w-[100vw] bg-[#FEFAF4] font-sans overflow-hidden">
       <Helmet>
         <title>Area Privata | RoomDate</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       
-      {/* ── NAVBAR GLOBALE ── */}
-      <Navbar user={user} handleLogout={handleLogout} />
+      {/* --- TOP NAV --- */}
+      <nav className="shrink-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">
+        <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-white decoration-none">
+          Room<span className="text-[#D4835E]">Date</span>
+        </Link>
+        
+        <div className="hidden md:flex gap-8 items-center text-sm font-medium text-neutral-300">
+          <Link to="/" className="hover:text-[#D4835E] transition-colors">Home</Link>
+          <Link to="/ricerca" className="hover:text-[#D4835E] transition-colors">Cerca Stanza</Link>
+          <Link to="/chat" className="text-[#D4835E] transition-colors">Chat</Link>
+          <Link to="/dashboard" className="hover:text-[#D4835E] transition-colors">Profilo</Link>
+        </div>
 
-      {/* ── LAYOUT CHAT ── (Padding top aggiunto per evitare che sparisca sotto la Navbar) */}
-      <div className={`flex-1 flex overflow-hidden relative w-full pt-[80px] md:pt-[90px] ${mobileView === 'list' ? 'pb-16 md:pb-0' : ''}`}>
+        <div className="hidden md:flex gap-4 items-center">
+          {user ? (
+            <>
+              <span className="text-sm text-neutral-300">Ciao, <strong className="text-white">{user.nome}</strong>!</span>
+              <button onClick={handleLogout} className="border border-neutral-500 hover:border-[#D4835E] hover:text-[#D4835E] px-4 py-2 rounded-full text-sm transition-colors">Esci</button>
+            </>
+          ) : (
+            <>
+              <Link to="/accedi" className="border border-neutral-500 hover:border-[#D4835E] hover:text-[#D4835E] px-4 py-2 rounded-full text-sm transition-colors">Accedi</Link>
+              <Link to="/registrati" className="bg-[#C4603A] hover:bg-[#9A4628] px-5 py-2 rounded-full text-sm font-bold transition-colors">Registrati Gratis</Link>
+            </>
+          )}
+        </div>
+
+        <button className="md:hidden flex flex-col gap-1.5 z-[1001]" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label={isMenuOpen ? "Chiudi menu" : "Apri menu di navigazione"}>          
+          <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
+          <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></div>
+          <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
+        </button>
+      </nav>
+
+      {/* --- MOBILE SIDEBAR APP MENU --- */}
+      <div className={`fixed inset-y-0 right-0 w-72 bg-[#2C1A0E] shadow-2xl z-[1000] p-8 pt-24 transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className="flex flex-col gap-6 text-lg font-medium text-white">
+          {user && (
+             <div className="border-b border-neutral-700 pb-4 mb-2">
+               <h3 className="text-xl">👤 Ciao, {user.nome}!</h3>
+             </div>
+          )}
+          <Link to="/" onClick={() => setIsMenuOpen(false)}>🏠 Home</Link>
+          <Link to="/ricerca" onClick={() => setIsMenuOpen(false)}>🔍 Cerca Stanza</Link>
+          <Link to="/chat" onClick={() => setIsMenuOpen(false)}>💬 Chat</Link>
+          <Link to="/dashboard" onClick={() => setIsMenuOpen(false)}>👤 Il mio Profilo</Link>
+          
+          <div className="mt-8 flex flex-col gap-3">
+            {user ? (
+              <button onClick={handleLogout} className="bg-[#C4603A] w-full py-3 rounded-full font-bold">Esci</button>
+            ) : (
+              <>
+                <Link to="/accedi" className="border border-neutral-500 text-center py-3 rounded-full" onClick={() => setIsMenuOpen(false)}>Accedi</Link>
+                <Link to="/registrati" className="bg-[#C4603A] text-center py-3 rounded-full font-bold" onClick={() => setIsMenuOpen(false)}>Registrati</Link>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      {isMenuOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] md:hidden" onClick={() => setIsMenuOpen(false)}></div>}
+
+      {/* ── LAYOUT CHAT ── */}
+      <div className={`flex-1 flex overflow-hidden relative w-full ${mobileView === 'list' ? 'pb-16 md:pb-0' : ''}`}>
 
         {/* ── SIDEBAR LISTA CHAT ── */}
-        <aside className={`${mobileView === 'chat' ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[380px] bg-white border-r border-neutral-200 flex-col h-full shrink-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]`}>
-          <div className="p-5 border-b border-neutral-100 shrink-0 bg-white">
-            <h2 className="font-extrabold text-2xl text-neutral-900 mb-4 tracking-tight">Messaggi</h2>
+        <aside className={`${mobileView === 'chat' ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[380px] bg-white border-r border-neutral-200 flex-col h-full shrink-0`}>
+          <div className="p-4 border-b border-neutral-100 shrink-0">
+            <h2 className="font-serif text-2xl text-[#2C1A0E] font-bold mb-4">Messaggi</h2>
             <div className="relative">
-              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-              </svg>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">🔍</span>
               <input
                 type="text"
                 placeholder="Cerca conversazioni..."
-                className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 transition-all placeholder:text-neutral-400"
+                className="w-full bg-neutral-50 border border-neutral-200 text-[#2C1A0E] text-base md:text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-[#C4603A] transition-colors"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto hide-scrollbar bg-white">
+          <div className="flex-1 overflow-y-auto hide-scrollbar">
             {isLoading ? (
-              [1, 2, 3, 4].map(n => (
-                <div key={n} className="flex gap-4 p-5 border-b border-neutral-50 pointer-events-none">
-                  <div className="w-12 h-12 bg-neutral-100 animate-pulse rounded-full shrink-0"></div>
+              [1, 2, 3, 4, 5].map(n => (
+                <div key={n} className="flex gap-4 p-4 border-b border-neutral-50 pointer-events-none">
+                  <div className="w-12 h-12 bg-neutral-200 animate-pulse rounded-full shrink-0"></div>
                   <div className="flex flex-col gap-2 w-full justify-center">
-                    <div className="h-4 w-3/5 bg-neutral-100 animate-pulse rounded"></div>
-                    <div className="h-3 w-2/5 bg-neutral-100 animate-pulse rounded"></div>
+                    <div className="h-4 w-3/5 bg-neutral-200 animate-pulse rounded"></div>
+                    <div className="h-3 w-2/5 bg-neutral-200 animate-pulse rounded"></div>
                   </div>
                 </div>
               ))
             ) : filteredConvs.length === 0 ? (
-              <div className="p-12 text-center text-neutral-400 flex flex-col items-center">
-                <div className="text-5xl mb-4 opacity-50">📭</div>
-                <p className="font-medium">Nessuna conversazione attiva.</p>
+              <div className="p-12 text-center text-[#8A7B6E] flex flex-col items-center">
+                <div className="text-5xl mb-4">📭</div>
+                <p>Non hai ancora nessuna conversazione attiva.</p>
               </div>
             ) : filteredConvs.map(conv => {
               const lastMsg = conv.messages && conv.messages.length > 0 ? conv.messages[conv.messages.length - 1].text : 'Nessun messaggio';
               const isActive = conv.id === activeConvId;
-              
               return (
                 <div 
                   key={conv.id} 
-                  className={`flex gap-4 p-4 border-b border-neutral-50 cursor-pointer transition-all ${isActive ? 'bg-orange-50/50 border-r-4 border-r-orange-500' : 'hover:bg-neutral-50'}`} 
+                  className={`flex gap-4 p-4 border-b border-neutral-50 cursor-pointer transition-colors ${isActive ? 'bg-orange-50/50 border-r-4 border-r-[#C4603A]' : 'hover:bg-neutral-50'}`} 
                   onClick={() => handleSelectConv(conv)}
                 >
                   <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl shrink-0 shadow-sm" style={{ background: `linear-gradient(135deg, ${conv.color1}, ${conv.color2})` }}>
-                    <span role="img" aria-label="Avatar">{conv.emoji}</span>
+                    {conv.emoji}
                   </div>
                   <div className="flex flex-col justify-center overflow-hidden w-full">
-                    <div className="font-bold text-neutral-900 text-sm truncate">{conv.name}</div>
+                    <div className="font-bold text-[#2C1A0E] text-sm truncate">{conv.name}</div>
                     {conv.listing && (
-                      <div className="text-[10px] text-orange-600 font-bold mb-0.5 truncate uppercase tracking-wider">
+                      <div className="text-[10px] text-[#C4603A] font-bold mb-0.5 truncate uppercase tracking-wider">
                         🏠 {conv.listing.title}
                       </div>
                     )}
-                    <div className={`text-xs truncate ${isActive ? 'text-orange-600 font-semibold' : 'text-neutral-500 font-medium'}`}>{lastMsg}</div>
+                    <div className={`text-xs truncate ${isActive ? 'text-[#C4603A] font-medium' : 'text-[#8A7B6E]'}`}>{lastMsg}</div>
                   </div>
                 </div>
               );
@@ -310,59 +382,52 @@ export default function ChatPage() {
         </aside>
 
         {/* ── CHAT MAIN AREA ── */}
-        <main className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 flex-col h-full bg-[#FAFAFA] w-full max-w-full relative`}>
+        <main className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 flex-col h-full bg-[#FEFAF4] w-full max-w-full relative`}>
           {!activeConv ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-neutral-400">
-              <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-sm border border-neutral-100 mb-6 text-4xl">💬</div>
-              <h3 className="text-xl text-neutral-800 mb-2 font-bold tracking-tight">I tuoi messaggi protetti</h3>
-              <p className="text-sm max-w-xs font-medium">Seleziona una chat dalla lista per iniziare a comunicare in modo sicuro tramite crittografia End-to-End.</p>
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-[#8A7B6E]">
+              <div className="text-6xl mb-4">💬</div>
+              <h3 className="font-serif text-2xl text-[#2C1A0E] mb-2 font-bold">Nessuna chat selezionata</h3>
+              <p>Scegli una conversazione dalla lista a sinistra per iniziare a chattare.</p>
             </div>
           ) : (
             <>
               {/* Header Chat Attiva */}
-              <div className="bg-white/90 backdrop-blur-md px-4 md:px-6 py-3 md:py-4 border-b border-neutral-200 flex items-center gap-4 shrink-0 shadow-sm z-10 w-full">
-                <button className="md:hidden text-neutral-500 hover:text-neutral-800 transition-colors p-1" onClick={() => setMobileView('list')} aria-label="Torna alla lista">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/>
-                  </svg>
-                </button>
-                <div className="w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center text-lg shadow-sm shrink-0" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
-                  <span role="img" aria-hidden="true">{activeConv.emoji}</span>
+              <div className="bg-white px-4 md:px-6 py-3 md:py-4 border-b border-neutral-200 flex items-center gap-4 shrink-0 shadow-sm z-10 w-full">
+                <button className="md:hidden text-2xl text-[#8A7B6E] px-2" onClick={() => setMobileView('list')}>←</button>
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-xl shadow-sm shrink-0" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
+                  {activeConv.emoji}
                 </div>
                 <div className="overflow-hidden">
-                  <h3 className="font-bold text-neutral-900 leading-tight truncate">{activeConv.name}</h3>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-                    <p className="text-[11px] text-neutral-500 font-medium uppercase tracking-wide truncate">Chat Sicura E2E</p>
-                  </div>
+                  <h3 className="font-bold text-[#2C1A0E] leading-tight truncate">{activeConv.name}</h3>
+                  <p className="text-xs text-[#8A7B6E] truncate">Inquilino/Proprietario</p>
                 </div>
               </div>
 
               {/* Area Messaggi */}
-              <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 flex flex-col gap-5 w-full">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 flex flex-col gap-4 w-full">
                 {!activeConv.messages || activeConv.messages.length === 0 ? (
-                  <div className="text-center p-6 text-neutral-500 text-sm bg-white rounded-2xl border border-neutral-100 shadow-sm self-center my-auto font-medium">
-                    👋 Nessun messaggio. Rompi il ghiaccio!
+                  <div className="text-center p-8 text-[#8A7B6E] text-sm bg-white rounded-2xl border border-neutral-100 shadow-sm self-center my-auto">
+                    👋 Invia il primo messaggio per iniziare!
                   </div>
                 ) : (
                   activeConv.messages.map(msg => {
                     const isMine = msg.type === 'sent';
                     return (
-                      <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end gap-2.5 w-full`}>
+                      <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end gap-2 w-full`}>
                         {!isMine && (
-                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 shadow-sm" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
-                             <span role="img" aria-hidden="true">{activeConv.emoji}</span>
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 shadow-sm" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
+                            {activeConv.emoji}
                           </div>
                         )}
-                        <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[75%] md:max-w-[65%]`}>
-                          <div className={`px-4 py-2.5 text-sm md:text-base shadow-sm break-words whitespace-pre-wrap w-full font-medium ${
+                        <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[80%] md:max-w-[70%]`}>
+                          <div className={`px-4 py-2.5 text-sm md:text-base shadow-sm break-words whitespace-pre-wrap w-full ${
                             isMine 
-                              ? 'bg-gradient-to-br from-orange-500 to-rose-500 text-white rounded-2xl rounded-br-sm' 
-                              : 'bg-white border border-neutral-100 text-neutral-800 rounded-2xl rounded-bl-sm'
+                              ? 'bg-[#C4603A] text-white rounded-2xl rounded-br-sm' 
+                              : 'bg-white border border-neutral-100 text-[#2C1A0E] rounded-2xl rounded-bl-sm'
                           }`}>
                             {msg.text}
                           </div>
-                          <span className="text-[10px] text-neutral-400 mt-1.5 px-1 font-semibold tracking-wide">{msg.time}</span>
+                          <span className="text-[10px] text-neutral-400 mt-1 px-1">{msg.time}</span>
                         </div>
                       </div>
                     );
@@ -372,11 +437,11 @@ export default function ChatPage() {
               </div>
 
               {/* Quick Replies */}
-              <div className="shrink-0 bg-transparent p-2 md:px-6 pb-2 overflow-x-auto hide-scrollbar flex gap-2 w-full">
+              <div className="shrink-0 bg-white border-t border-neutral-100 p-2 md:p-3 overflow-x-auto hide-scrollbar flex gap-2 w-full">
                 {QUICK_REPLIES.map(qr => (
                   <button 
                     key={qr} 
-                    className="shrink-0 bg-white border border-neutral-200 text-neutral-600 text-xs font-semibold px-4 py-2 rounded-full hover:border-orange-400 hover:text-orange-500 shadow-sm transition-all" 
+                    className="shrink-0 bg-orange-50 border border-orange-100 text-[#C4603A] text-xs font-semibold px-4 py-2 rounded-full hover:bg-[#C4603A] hover:text-white transition-colors" 
                     onClick={() => handleQuickReply(qr)}
                   >
                     {qr}
@@ -385,61 +450,57 @@ export default function ChatPage() {
               </div>
 
               {/* Input Area */}
-              <div className="shrink-0 bg-white p-3 md:p-4 border-t border-neutral-100 flex items-end gap-3 w-full shadow-[0_-10px_30px_rgba(0,0,0,0.02)]">
+              <div className="shrink-0 bg-white p-3 pb-6 md:p-4 border-t border-neutral-100 flex items-end gap-3 w-full">
                 <textarea
                   ref={textareaRef}
-                  className="flex-1 bg-neutral-50 border border-neutral-200 text-neutral-900 text-sm md:text-base rounded-2xl px-4 py-3 focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 transition-all resize-none max-h-[120px] w-full placeholder:text-neutral-400"
+                  className="flex-1 bg-neutral-50 border border-neutral-200 text-[#2C1A0E] text-base md:text-sm rounded-2xl px-4 py-3 focus:outline-none focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A] transition-colors resize-none max-h-[120px] w-full"
                   placeholder="Scrivi un messaggio..."
                   value={inputText}
                   onChange={handleTextareaChange}
                   onKeyDown={handleKeyDown}
                   rows={1}
-                  aria-label="Scrivi un messaggio"
                 />
                 <button 
-                  className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-white font-bold transition-all ${!inputText.trim() ? 'bg-neutral-200 cursor-not-allowed' : 'bg-neutral-900 hover:bg-neutral-800 hover:scale-105 shadow-[0_8px_20px_rgb(0,0,0,0.12)]'}`}
+                  className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-white font-bold transition-all ${!inputText.trim() ? 'bg-neutral-300 cursor-not-allowed' : 'bg-[#C4603A] hover:bg-[#9A4628] hover:scale-105 shadow-md'}`}
                   onClick={handleSend} 
                   disabled={!inputText.trim()}
-                  aria-label="Invia messaggio"
                 >
-                  <svg className="w-5 h-5 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                  </svg>
+                  <svg className="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
                 </button>
               </div>
             </>
           )}
         </main>
         
-        {/* 🔐 OVERLAY SBLOCCO CHAT GLASSMORPHISM */}
+        {/* 🔐 OVERLAY SBLOCCO CHAT */}
         {isLocked && (
-          <div className="absolute inset-0 z-[1100] bg-white/40 backdrop-blur-xl flex items-center justify-center p-4 transition-all">
-            <div className="bg-white/95 p-8 md:p-10 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.1)] max-w-sm w-full text-center border border-white/50 animate-fade-in-up">
-              <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center text-4xl mx-auto mb-6 shadow-inner border border-orange-100">🔐</div>
-              <h3 className="text-2xl font-extrabold text-neutral-900 mb-2 tracking-tight">Chat Protetta</h3>
-              <p className="text-sm text-neutral-500 mb-8 leading-relaxed font-medium">
-                La tua privacy è garantita dalla crittografia End-to-End. Inserisci la password per sbloccare la tua chiave privata.
+          <div className="absolute inset-0 z-[1100] bg-[#FEFAF4]/60 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl max-w-sm w-full text-center border border-neutral-100 animate-fade-in-up">
+              <div className="text-6xl mb-6 drop-shadow-md">🔐</div>
+              <h3 className="font-serif text-3xl font-bold text-[#2C1A0E] mb-3">Chat Protetta</h3>
+              <p className="text-sm text-[#8A7B6E] mb-8 leading-relaxed">
+                La tua privacy è al sicuro. Inserisci la password per decifrare i messaggi localmente.
               </p>
               
               <form onSubmit={handleUnlock} className="flex flex-col gap-4">
                 <input
                   type="password"
-                  placeholder="La tua password di sblocco"
+                  placeholder="La tua password"
                   value={unlockPassword}
                   onChange={(e) => {
                     setUnlockPassword(e.target.value);
                     setUnlockError('');
                   }}
-                  className={`w-full bg-neutral-50 border text-center text-neutral-900 rounded-2xl px-5 py-4 focus:outline-none transition-colors placeholder:text-neutral-400 font-medium ${unlockError ? 'border-red-400 focus:ring-2 focus:ring-red-400/20' : 'border-neutral-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20'}`}
+                  className={`w-full bg-neutral-50 border text-center text-[#2C1A0E] rounded-2xl px-5 py-4 focus:outline-none transition-colors ${unlockError ? 'border-red-500 focus:ring-1 focus:ring-red-500' : 'border-neutral-200 focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]'}`}
                 />
-                {unlockError && <div className="text-red-500 text-xs font-bold -mt-2">{unlockError}</div>}
+                {unlockError && <div className="text-red-500 text-xs font-medium -mt-2">{unlockError}</div>}
                 
                 <button
                   type="submit"
                   disabled={!unlockPassword}
-                  className="w-full bg-neutral-900 text-white py-4 rounded-2xl font-bold hover:bg-neutral-800 disabled:bg-neutral-200 disabled:text-neutral-400 disabled:cursor-not-allowed transition-all shadow-md mt-2"
+                  className="w-full bg-[#C4603A] text-white py-4 rounded-full font-bold hover:bg-[#9A4628] disabled:bg-neutral-300 disabled:cursor-not-allowed transition-all shadow-md mt-2"
                 >
-                  Sblocca Cassaforte
+                  Sblocca Messaggi
                 </button>
               </form>
             </div>
