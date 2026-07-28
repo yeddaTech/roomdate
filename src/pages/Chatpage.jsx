@@ -13,6 +13,20 @@ const QUICK_REPLIES = [
   '🚇 Linea metro vicina?',
 ];
 
+// Array unico centralizzato a 5 opzioni per mantenere la coerenza
+const NAV_LINKS = [
+  { name: 'Home', path: '/', icon: '🏠' },
+  { name: 'Cerca Stanza', path: '/ricerca', icon: '🔍' },
+  { name: 'Chat', path: '/chat', icon: '💬' },
+  { name: 'Profilo', path: '/dashboard', icon: '👤' },
+  { name: 'Impostazioni', path: '/impostazioni', icon: '⚙️' },
+];
+
+const sanitizeHTML = (str) => {
+  if (typeof str !== 'string') return '';
+  return str.replace(/[<>]/g, '');
+};
+
 export default function ChatPage() {
   const navigate = useNavigate();
   const location = useLocation(); 
@@ -349,23 +363,32 @@ export default function ChatPage() {
         `}
       </style>
       
-      {/* --- TOP NAV (MODERNA E PULITA) --- */}
+      {/* --- TOP NAV GENERATA DINAMICAMENTE (5 OPZIONI) --- */}
       <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-sm border-b border-neutral-100 sticky top-0">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900 decoration-none">
           Room<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">Date</span>
         </Link>
         
-        <div className="hidden md:flex gap-8 items-center text-sm font-medium text-neutral-500">
-          <Link to="/" className="hover:text-neutral-900 transition-colors">Home</Link>
-          <Link to="/ricerca" className="hover:text-neutral-900 transition-colors">Cerca Stanza</Link>
-          <Link to="/chat" className="text-orange-500 font-bold transition-colors">Chat</Link>
-          <Link to="/dashboard" className="hover:text-neutral-900 transition-colors">Profilo</Link>
+        {/* Menu Desktop integrato con l'array a 5 elementi */}
+        <div className="hidden md:flex gap-8 items-center text-sm font-medium">
+          {NAV_LINKS.map((link) => {
+            const isActive = location.pathname === link.path;
+            return (
+              <Link 
+                key={link.path} 
+                to={link.path} 
+                className={`transition-colors ${isActive ? 'text-orange-500 font-bold' : 'text-neutral-500 hover:text-neutral-900'}`}
+              >
+                {link.name}
+              </Link>
+            );
+          })}
         </div>
 
         <div className="hidden md:flex gap-4 items-center">
-          {user ? (
+          {user && user.nome ? (
             <>
-              <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{user.nome}</strong>!</span>
+              <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{sanitizeHTML(user.nome)}</strong>!</span>
               <button onClick={handleLogout} className="border border-neutral-200 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 px-4 py-2 rounded-full text-sm transition-colors cursor-pointer font-medium">Esci</button>
             </>
           ) : (
@@ -383,18 +406,28 @@ export default function ChatPage() {
         </button>
       </nav>
 
-      {/* --- MOBILE SIDEBAR APP MENU --- */}
+      {/* --- MOBILE SIDEBAR APP MENU (5 OPZIONI AGGIORNATE) --- */}
       <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-[1000] p-8 pt-24 transform transition-transform duration-300 ease-in-out border-l border-neutral-100 ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex flex-col gap-6 text-lg font-medium text-neutral-600">
           {user && (
              <div className="border-b border-neutral-100 pb-4 mb-2">
-               <h3 className="text-xl text-neutral-900 font-bold">👤 Ciao, {user.nome}!</h3>
+               <h3 className="text-xl text-neutral-900 font-bold">👤 Ciao, {sanitizeHTML(user.nome)}!</h3>
              </div>
           )}
-          <Link to="/" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">🏠 Home</Link>
-          <Link to="/ricerca" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">🔍 Cerca Stanza</Link>
-          <Link to="/chat" onClick={() => setIsMenuOpen(false)} className="text-orange-500 font-bold">💬 Chat</Link>
-          <Link to="/dashboard" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">👤 Il mio Profilo</Link>
+          
+          {NAV_LINKS.map((link) => {
+            const isActive = location.pathname === link.path;
+            return (
+              <Link 
+                key={link.path} 
+                to={link.path} 
+                onClick={() => setIsMenuOpen(false)} 
+                className={`transition-colors flex items-center gap-3 ${isActive ? 'text-orange-500 font-bold' : 'hover:text-orange-500'}`}
+              >
+                <span>{link.icon}</span> {link.name}
+              </Link>
+            );
+          })}
           
           <div className="mt-8 flex flex-col gap-3">
             {user ? (
@@ -410,7 +443,7 @@ export default function ChatPage() {
       </div>
       {isMenuOpen && <div className="fixed inset-0 bg-neutral-900/20 backdrop-blur-sm z-[999] md:hidden transition-opacity" onClick={() => setIsMenuOpen(false)}></div>}
 
-      {/* ── LAYOUT CHAT CONTAINER (ORA FULL BLEED) ── */}
+      {/* ── LAYOUT CHAT CONTAINER ── */}
       <div className={`flex-1 flex overflow-hidden relative w-full bg-white border-t border-neutral-100 ${mobileView === 'list' ? 'pb-16 md:pb-0' : ''}`}>
 
         {/* ── SIDEBAR LISTA CHAT ── */}
@@ -467,7 +500,6 @@ export default function ChatPage() {
                       </div>
                     )}
                     <div className={`text-sm truncate mt-0.5 ${isActive ? 'text-orange-600 font-medium' : 'text-neutral-500'}`}>
-                      {/* PUNTINI ANIMATI NELLA SIDEBAR */}
                       {typingUsers[conv.id] ? (
                         <div className="flex gap-0.5 items-center mt-1">
                           <span className="typing-dot-sidebar"></span>
@@ -542,7 +574,7 @@ export default function ChatPage() {
                   })
                 )}
                 
-                {/* 🔴 BOLLA PUNTINI ANIMATI NELLA CHAT (WHATSAPP STYLE) */}
+                {/* Bolla Puntini Scrittura */}
                 {typingUsers[activeConv.id] && (
                   <div className="flex justify-start items-end gap-3 w-full mt-2 animate-fade-in-up">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 shadow-sm opacity-60 relative bottom-1" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
@@ -595,7 +627,7 @@ export default function ChatPage() {
           )}
         </main>
         
-        {/* 🔐 OVERLAY SBLOCCO (GLASSMORPHISM) */}
+        {/* 🔐 OVERLAY SBLOCCO CRITTOGRAFIA */}
         {isLocked && (
           <div className="absolute inset-0 z-[1100] bg-white/60 backdrop-blur-xl flex items-center justify-center p-4">
             <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl max-w-sm w-full text-center border border-neutral-100 animate-fade-in-up">
