@@ -1,23 +1,20 @@
-
-// Imposta l'URL base a seconda che tu sia in locale o in produzione
+// Imposta l'URL base a seconda dell'ambiente
 const BASE_URL = import.meta.env.DEV 
   ? "http://localhost:8080" 
-  : "https://roomdate.vercel.app";
+  : ""; // 👈 Vuoto in prod per usare i path relativi sullo stesso dominio
 
 export const fetchAPI = async (endpoint, options = {}) => {
-  // Prepariamo le impostazioni di default per OGNI chiamata
   const defaultOptions = {
     ...options,
-    credentials: "include", // 👈 INIETTATO AUTOMATICAMENTE SEMPRE
+    credentials: "include", // Invia automaticamente i cookie di sessione
     headers: {
       "Content-Type": "application/json",
-      ...options.headers, // Mantiene eventuali altri header che passi
+      ...options.headers, 
     },
   };
 
   const response = await fetch(`${BASE_URL}${endpoint}`, defaultOptions);
   
-  // Opzionale: puoi anche gestire gli errori globalmente qui
   if (!response.ok) {
     console.error(`Errore API su ${endpoint}:`, response.statusText);
   }
