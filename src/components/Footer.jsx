@@ -2,128 +2,69 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 const Footer = () => {
-  // Funzione per tornare in cima quando si clicca un link
-  const handleScrollTop = () => window.scrollTo(0, 0);
-
-  // 1. Mappiamo le colonne di destra
-  const menuColumns = [
-    {
-      title: 'Piattaforma',
-      links: [
-        { text: 'Stanze disponibili', to: '/ricerca', isInternal: true },
-        { text: 'Cerca coinquilini', to: '/ricerca?intent=coinquilino', isInternal: true },
-        { text: 'La tua dashboard', to: '/dashboard', isInternal: true },
-      ],
-    },
-    {
-      title: 'Info',
-      links: [
-        { text: 'Linee Guida', to: '/guida', isInternal: true },
-        { text: 'Sicurezza e Privacy', to: '/privacy', isInternal: true },
-        { text: 'Supporto Tecnico', to: '#', isInternal: false },
-      ],
+  const handleScrollTop = () => {
+    try {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (e) {
+      window.scrollTo(0, 0);
     }
-  ];
-
-  // 2. Link della barra in basso
-  const bottomLinks = [
-    { text: 'Privacy Policy', to: '/privacy', isInternal: true },
-    { text: 'Termini di Servizio', to: '#', isInternal: false },
-    { text: 'Cookie', to: '#', isInternal: false },
-  ];
-
-  // 3. Array strutturato per i Social (Risolve l'errore di accessibilità)
-  const socialNetworks = [
-    { icon: '📘', name: 'Facebook' },
-    { icon: '📸', name: 'Instagram' },
-    { icon: '🐦', name: 'Twitter' },
-    { icon: '💼', name: 'LinkedIn' }
-  ];
+  };
 
   return (
-    <footer className="bg-[#1A0E07] pt-16 pb-8 px-6">
+    <footer className="bg-neutral-900 pt-20 pb-10 px-6 border-t border-neutral-800">
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
           
-          {/* Colonna 1: Brand e Descrizione */}
           <div className="col-span-1 md:col-span-2">
-            <div className="font-serif text-2xl font-bold tracking-tight text-white mb-4">
-              Room<span className="text-[#D4835E]">Date</span>
-            </div>
-            {/* Contrasto migliorato: text-white/80 */}
-            <p className="text-white/80 text-sm leading-relaxed max-w-xs mb-6">
-              Il modo più trasparente per trovare stanze e coinquilini in Italia.
+            <Link to="/" onClick={handleScrollTop} className="inline-block mb-6" aria-label="Torna alla Home">
+              <span className="font-display text-2xl font-extrabold tracking-tight text-white">
+                Room<span className="text-orange-500">Date</span>
+              </span>
+            </Link>
+            <p className="text-neutral-400 text-sm leading-relaxed max-w-sm mb-8">
+              Il modo più trasparente, veloce e sicuro per trovare stanze e coinquilini in Italia, direttamente dal tuo smartphone.
             </p>
-            {/* Icone Social con aria-label */}
             <div className="flex gap-3">
-              {socialNetworks.map((social, i) => (
-                <button 
+              {['Facebook', 'Instagram', 'Twitter'].map((social, i) => (
+                <a 
                   key={i} 
-                  aria-label={`Visita la nostra pagina ${social.name}`}
-                  className="w-10 h-10 rounded-full bg-white/5 hover:bg-[#C4603A] flex items-center justify-center transition-colors text-white"
+                  href={`https://${social.toLowerCase()}.com`} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-orange-500 hover:-translate-y-1 flex items-center justify-center transition-all text-white shadow-sm"
+                  aria-label={`Visita la nostra pagina ${social}`}
                 >
-                  {social.icon}
-                </button>
+                  <span className="text-xs" aria-hidden="true">{social[0]}</span>
+                </a>
               ))}
             </div>
           </div>
 
-          {/* Colonne dinamiche: Piattaforma e Info */}
-          {menuColumns.map(col => (
-            <div key={col.title}>
-              <h4 className="text-white font-bold mb-4 tracking-wide text-sm">{col.title}</h4>
-              <ul className="flex flex-col gap-3">
-                {col.links.map(link => (
-                  <li key={link.text}>
-                    {link.isInternal ? (
-                      <Link 
-                        to={link.to} 
-                        onClick={handleScrollTop}
-                        className="text-white/80 hover:text-[#D4835E] text-sm transition-colors"
-                      >
-                        {link.text}
-                      </Link>
-                    ) : (
-                      <a 
-                        href={link.to} 
-                        className="text-white/80 hover:text-[#D4835E] text-sm transition-colors"
-                      >
-                        {link.text}
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          <div>
+            <h4 className="text-white font-bold mb-6 tracking-wide text-sm">Esplora</h4>
+            <ul className="flex flex-col gap-4">
+              <li><Link to="/ricerca" className="text-neutral-400 hover:text-white transition-colors text-sm">Stanze disponibili</Link></li>
+              <li><Link to="/ricerca?intent=coinquilino" className="text-neutral-400 hover:text-white transition-colors text-sm">Cerca coinquilini</Link></li>
+              <li><Link to="/dashboard" className="text-neutral-400 hover:text-white transition-colors text-sm">Il tuo profilo</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-white font-bold mb-6 tracking-wide text-sm">Supporto</h4>
+            <ul className="flex flex-col gap-4">
+              <li><Link to="/guida" className="text-neutral-400 hover:text-white transition-colors text-sm">Come funziona</Link></li>
+              <li><Link to="/privacy" className="text-neutral-400 hover:text-white transition-colors text-sm">Privacy & Sicurezza</Link></li>
+              <li><a href="mailto:support@roomdate.com" className="text-neutral-400 hover:text-white transition-colors text-sm">Contattaci</a></li>
+            </ul>
+          </div>
 
         </div>
 
-        {/* Barra inferiore */}
-        <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          {/* Contrasto migliorato: text-white/70 */}
-          <span className="text-white/70 text-xs">© 2026 RoomDate MVP. Tutti i diritti riservati.</span>
-          <div className="flex gap-4">
-            {bottomLinks.map(link => (
-              <React.Fragment key={link.text}>
-                {link.isInternal ? (
-                  <Link 
-                    to={link.to} 
-                    onClick={handleScrollTop}
-                    className="text-white/80 hover:text-[#D4835E] text-xs transition-colors"
-                  >
-                    {link.text}
-                  </Link>
-                ) : (
-                  <a 
-                    href={link.to} 
-                    className="text-white/80 hover:text-[#D4835E] text-xs transition-colors"
-                  >
-                    {link.text}
-                  </a>
-                )}
-              </React.Fragment>
-            ))}
+        <div className="border-t border-neutral-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+          <span className="text-neutral-500 text-sm font-medium">&copy; {new Date().getFullYear()} RoomDate. Tutti i diritti riservati.</span>
+          <div className="flex gap-6">
+            <Link to="/privacy" className="text-neutral-500 hover:text-white text-sm transition-colors">Privacy Policy</Link>
+            <Link to="/termini" className="text-neutral-500 hover:text-white text-sm transition-colors">Termini di Servizio</Link>
           </div>
         </div>
       </div>
