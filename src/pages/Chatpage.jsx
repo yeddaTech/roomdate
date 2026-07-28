@@ -17,40 +17,36 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const location = useLocation(); 
   
-  // --- STATI PRINCIPALI ---
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
   const [conversations, setConversations] = useState([]);
   const [activeConvId, setActiveConvId] = useState(null);
   const [inputText, setInputText] = useState('');
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileView, setMobileView] = useState('list'); 
-  
+
   const [isLocked, setIsLocked] = useState(false);
   const [unlockPassword, setUnlockPassword] = useState('');
   const [unlockError, setUnlockError] = useState('');
   const [isSending, setIsSending] = useState(false);
 
-  // --- REFS PER OTTIMIZZAZIONE E RIMOZIONE LAG ---
-  const messagesEndRef = useRef(null);
-  const textareaRef = useRef(null);
-  // Salviamo lo stato nei Ref per usarli nei listener di Pusher senza causare re-render
-  const conversationsRef = useRef(conversations);
-  const activeConvIdRef = useRef(activeConvId);
-  const userRef = useRef(user);
-
-  // Refs per lo "Sta Scrivendo"
   const [typingUsers, setTypingUsers] = useState({});
   const typingTimeoutsRef = useRef({});
   const lastTypedRef = useRef(0);
 
-  // Aggiorna i Refs quando lo stato cambia
+  const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
+  const conversationsRef = useRef(conversations);
+  const activeConvIdRef = useRef(activeConvId);
+  const userRef = useRef(user);
+
   useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
   useEffect(() => { activeConvIdRef.current = activeConvId; }, [activeConvId]);
   useEffect(() => { userRef.current = user; }, [user]);
 
-  // 1. Controllo Autenticazione
   useEffect(() => {
     const savedUser = localStorage.getItem('roomdate_user');
     if (!savedUser) {
@@ -66,10 +62,10 @@ export default function ChatPage() {
     localStorage.removeItem('roomdate_crypto');
     localStorage.removeItem('roomdate_public_key');
     setUser(null);
+    setIsMenuOpen(false);
     navigate('/');
   };
 
-  // 2. Fetch Chat con gestione concorrenza
   const fetchChats = useCallback(async () => {
     const currentUser = userRef.current;
     if (!currentUser) return;
@@ -84,11 +80,9 @@ export default function ChatPage() {
 
         if (myPrivateKey) {
           setIsLocked(false);
-          // Decifrazione parallela per non bloccare il thread
           const decryptedData = await Promise.all(data.map(async (conv) => {
             const decryptedMessages = await Promise.all((conv.messages || []).map(async (msg) => {
               try {
-                // Evita di ridecifrare messaggi temporanei inviati in locale
                 if (msg.isTemp) return msg; 
                 msg.text = await decryptMessage(msg.text, myPrivateKey);
               } catch (e) {
@@ -111,7 +105,6 @@ export default function ChatPage() {
     }
   }, []);
 
-  // 3. Sblocco Cassaforte
   const handleUnlock = async (e) => {
     e.preventDefault();
     setUnlockError('');
@@ -144,7 +137,6 @@ export default function ChatPage() {
     }
   };
 
-  // 4. Inizializzazione WebSocket Pusher (UNA SOLA VOLTA)
   useEffect(() => {
     if (!user) return;
     
@@ -156,11 +148,7 @@ export default function ChatPage() {
 
     const channel = pusher.subscribe('roomdate-channel');
     
-    channel.bind('nuovo-messaggio', (data) => {
-        // Ricarica le chat in background senza bloccare la UI
-        fetchChats();
-    });
-    
+    channel.bind('nuovo-messaggio', () => fetchChats());
     channel.bind('nuova-chat', () => fetchChats());
     
     channel.bind('sta-scrivendo', (data) => {
@@ -186,13 +174,11 @@ export default function ChatPage() {
       channel.unsubscribe();
       pusher.disconnect();
     };
-  }, [user, fetchChats]); // <- Dipendenze sicure, non causerà disconnessioni
+  }, [user, fetchChats]);
 
-  // 5. UX e Navigazione
   const activeConv = conversations.find(c => String(c.id) === String(activeConvId));
 
   useEffect(() => {
-    // Scroll fluido ma forzato solo sui nuovi messaggi
     if (messagesEndRef.current) {
         messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
@@ -213,7 +199,6 @@ export default function ChatPage() {
     }, 100);
   };
 
-  // 6. Input con Debouncing ottimizzato per evitare lag di tastiera
   const handleTextareaChange = (e) => {
     setInputText(e.target.value);
     const ta = e.target;
@@ -223,7 +208,6 @@ export default function ChatPage() {
     const now = Date.now();
     if (activeConvId && user && (now - lastTypedRef.current > 1500)) {
       lastTypedRef.current = now;
-      // Lancia in background, non blocca la tastiera
       fetchAPI('/api/typing', {
         method: 'POST',
         body: JSON.stringify({ conversationId: activeConvId, senderId: user.id })
@@ -231,7 +215,6 @@ export default function ChatPage() {
     }
   };
 
-  // 7. Invio Messaggio (UI Ottimistica + Crittografia asincrona non bloccante)
   const handleSend = () => {
     if (!inputText.trim() || !activeConvId || !user || isSending) return;
     
@@ -240,7 +223,6 @@ export default function ChatPage() {
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     setIsSending(true);
 
-    // 1. UI OTTIMISTICA: Mostra subito il messaggio sulla chat senza aspettare il server
     const tempMsg = {
       id: `temp-${Date.now()}`, 
       type: 'sent',
@@ -256,22 +238,16 @@ export default function ChatPage() {
       return conv;
     }));
 
-    // 2. CRITTOGRAFIA IN BACKGROUND: Usa setTimeout per cedere il controllo al browser
-    // Questo previene il congelamento del tasto "Invia"
     setTimeout(async () => {
       try {
         const targetPubKey = activeConv?.targetPublicKey;
         const myPublicKey = localStorage.getItem('roomdate_public_key');
         
-        if (!targetPubKey || !myPublicKey) {
-            throw new Error("Chiavi crittografiche mancanti.");
-        }
+        if (!targetPubKey || !myPublicKey) throw new Error("Chiavi crittografiche mancanti.");
 
-        // Cifratura E2EE
         const encryptedForTarget = await encryptMessage(textToSend, targetPubKey);
         const encryptedForMe = await encryptMessage(textToSend, myPublicKey);
 
-        // Chiamata API
         await fetchAPI('/api/send_message', {
           method: 'POST',
           body: JSON.stringify({
@@ -280,12 +256,9 @@ export default function ChatPage() {
             senderText: encryptedForMe 
           })
         });
-        
-        // Pusher notificherà e fetchChats ricaricherà automaticamente lo stato reale
       } catch (err) {
         console.error(err);
         alert("Errore durante l'invio sicuro. Riprova.");
-        // Se fallisce, rimuoviamo il messaggio temporaneo
         setConversations(prev => prev.map(conv => {
             if (String(conv.id) === String(activeConvId)) {
               return { ...conv, messages: conv.messages.filter(m => m.id !== tempMsg.id) };
@@ -295,7 +268,7 @@ export default function ChatPage() {
       } finally {
         setIsSending(false);
       }
-    }, 10); // 10ms sono sufficienti per far aggiornare il DOM a React
+    }, 10);
   };
 
   const handleKeyDown = (e) => {
@@ -325,6 +298,38 @@ export default function ChatPage() {
         <title>Area Privata | RoomDate</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
+
+      {/* STILI PER L'ANIMAZIONE DEI 3 PUNTINI (WHATSAPP/IOS) */}
+      <style>
+        {`
+          .typing-dot {
+            width: 6px;
+            height: 6px;
+            background-color: #8A7B6E;
+            border-radius: 50%;
+            display: inline-block;
+            animation: typing-bounce 1.4s infinite ease-in-out both;
+          }
+          .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+          .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+          
+          .typing-dot-sidebar {
+            width: 4px;
+            height: 4px;
+            background-color: #C4603A;
+            border-radius: 50%;
+            display: inline-block;
+            animation: typing-bounce 1.4s infinite ease-in-out both;
+          }
+          .typing-dot-sidebar:nth-child(1) { animation-delay: -0.32s; }
+          .typing-dot-sidebar:nth-child(2) { animation-delay: -0.16s; }
+
+          @keyframes typing-bounce {
+            0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+            40% { transform: scale(1); opacity: 1; }
+          }
+        `}
+      </style>
       
       {/* --- TOP NAV --- */}
       <nav className="shrink-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">
@@ -353,7 +358,7 @@ export default function ChatPage() {
           )}
         </div>
 
-        <button className="md:hidden flex flex-col gap-1.5 z-[1001] cursor-pointer" onClick={() => setIsMenuOpen(!isMenuOpen)}>          
+        <button className="md:hidden flex flex-col gap-1.5 z-[1001] cursor-pointer" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Menu">          
           <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
           <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></div>
           <div className={`w-7 h-0.5 bg-white transition-all duration-300 ${isMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
@@ -374,8 +379,13 @@ export default function ChatPage() {
           <Link to="/dashboard" onClick={() => setIsMenuOpen(false)}>👤 Il mio Profilo</Link>
           
           <div className="mt-8 flex flex-col gap-3">
-            {user && (
+            {user ? (
               <button onClick={handleLogout} className="bg-[#C4603A] w-full py-3 rounded-full font-bold cursor-pointer">Esci</button>
+            ) : (
+              <>
+                <Link to="/accedi" className="border border-neutral-500 text-center py-3 rounded-full" onClick={() => setIsMenuOpen(false)}>Accedi</Link>
+                <Link to="/registrati" className="bg-[#C4603A] text-center py-3 rounded-full font-bold" onClick={() => setIsMenuOpen(false)}>Registrati</Link>
+              </>
             )}
           </div>
         </div>
@@ -429,9 +439,6 @@ export default function ChatPage() {
                 >
                   <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl shrink-0 shadow-sm relative" style={{ background: `linear-gradient(135deg, ${conv.color1}, ${conv.color2})` }}>
                     {conv.emoji}
-                    {typingUsers[conv.id] && (
-                      <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full animate-pulse"></span>
-                    )}
                   </div>
                   <div className="flex flex-col justify-center overflow-hidden w-full">
                     <div className="font-bold text-[#2C1A0E] text-sm truncate">{conv.name}</div>
@@ -440,8 +447,17 @@ export default function ChatPage() {
                         🏠 {conv.listing.title}
                       </div>
                     )}
-                    <div className={`text-xs truncate ${isActive ? 'text-[#C4603A] font-medium' : 'text-[#8A7B6E]'}`}>
-                      {typingUsers[conv.id] ? <span className="text-[#C4603A] animate-pulse font-medium">Sta scrivendo...</span> : lastMsg}
+                    <div className={`text-xs truncate mt-0.5 ${isActive ? 'text-[#C4603A] font-medium' : 'text-[#8A7B6E]'}`}>
+                      {/* PUNTINI ANIMATI NELLA SIDEBAR */}
+                      {typingUsers[conv.id] ? (
+                        <div className="flex gap-0.5 items-center mt-1">
+                          <span className="typing-dot-sidebar"></span>
+                          <span className="typing-dot-sidebar"></span>
+                          <span className="typing-dot-sidebar"></span>
+                        </div>
+                      ) : (
+                        lastMsg
+                      )}
                     </div>
                   </div>
                 </div>
@@ -468,18 +484,14 @@ export default function ChatPage() {
                 </div>
                 <div className="overflow-hidden">
                   <h3 className="font-bold text-[#2C1A0E] leading-tight truncate">{activeConv.name}</h3>
-                  <p className="text-xs text-[#8A7B6E] truncate h-4">
-                    {typingUsers[activeConv.id] ? (
-                      <span className="text-[#C4603A] font-medium animate-pulse">sta scrivendo...</span>
-                    ) : "Inquilino/Proprietario"}
-                  </p>
+                  <p className="text-xs text-[#8A7B6E] truncate h-4">Inquilino/Proprietario</p>
                 </div>
               </div>
 
               {/* Area Messaggi */}
               <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 flex flex-col gap-4 w-full" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                 {!activeConv.messages || activeConv.messages.length === 0 ? (
-                  <div className="text-center p-8 text-[#8A7B6E] text-sm bg-white rounded-2xl border border-neutral-100 shadow-sm self-center my-auto">
+                  <div className="text-center p-8 text-[#8A7B6E] text-sm bg-white rounded-2xl shadow-sm my-auto">
                     👋 Invia il primo messaggio per iniziare!
                   </div>
                 ) : (
@@ -494,9 +506,7 @@ export default function ChatPage() {
                         )}
                         <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[80%] md:max-w-[70%]`}>
                           <div className={`px-4 py-2.5 text-sm md:text-base shadow-sm break-words whitespace-pre-wrap w-full ${
-                            isMine 
-                              ? 'bg-[#C4603A] text-white rounded-2xl rounded-br-sm' 
-                              : 'bg-white border border-neutral-100 text-[#2C1A0E] rounded-2xl rounded-bl-sm'
+                            isMine ? 'bg-[#C4603A] text-white rounded-2xl rounded-br-sm' : 'bg-white border border-neutral-100 text-[#2C1A0E] rounded-2xl rounded-bl-sm'
                           }`}>
                             {msg.text}
                           </div>
@@ -509,16 +519,16 @@ export default function ChatPage() {
                   })
                 )}
                 
-                {/* 🔴 INDICATORE STA SCRIVENDO ANIMATO (IN FONDO) */}
+                {/* 🔴 BOLLA PUNTINI ANIMATI NELLA CHAT (WHATSAPP STYLE) */}
                 {typingUsers[activeConv.id] && (
-                  <div className="flex justify-start items-end gap-2 w-full animate-fade-in-up">
+                  <div className="flex justify-start items-end gap-2 w-full mt-2">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 shadow-sm opacity-60" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
                       {activeConv.emoji}
                     </div>
-                    <div className="bg-white border border-neutral-100 text-[#2C1A0E] px-4 py-3 rounded-2xl rounded-bl-sm shadow-sm flex gap-1.5 items-center h-[42px]">
-                      <div className="w-2 h-2 bg-[#8A7B6E] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                      <div className="w-2 h-2 bg-[#8A7B6E] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                      <div className="w-2 h-2 bg-[#8A7B6E] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    <div className="bg-white border border-neutral-100 px-4 py-3 rounded-2xl rounded-bl-sm shadow-sm flex gap-1 items-center h-[38px]">
+                      <span className="typing-dot"></span>
+                      <span className="typing-dot"></span>
+                      <span className="typing-dot"></span>
                     </div>
                   </div>
                 )}
@@ -530,7 +540,7 @@ export default function ChatPage() {
                 {QUICK_REPLIES.map(qr => (
                   <button 
                     key={qr} 
-                    className="shrink-0 bg-orange-50 border border-orange-100 text-[#C4603A] text-xs font-semibold px-4 py-2 rounded-full hover:bg-[#C4603A] hover:text-white transition-colors cursor-pointer" 
+                    className="shrink-0 bg-orange-50 border border-orange-100 text-[#C4603A] text-xs font-semibold px-4 py-2 rounded-full hover:bg-[#C4603A] hover:text-white transition-colors cursor-pointer whitespace-nowrap" 
                     onClick={() => handleQuickReply(qr)}
                   >
                     {qr}
@@ -561,33 +571,29 @@ export default function ChatPage() {
           )}
         </main>
         
-        {/* 🔐 OVERLAY SBLOCCO CHAT */}
+        {/* 🔐 OVERLAY SBLOCCO */}
         {isLocked && (
           <div className="absolute inset-0 z-[1100] bg-[#FEFAF4]/60 backdrop-blur-md flex items-center justify-center p-4">
-            <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl max-w-sm w-full text-center border border-neutral-100 animate-fade-in-up">
+            <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl max-w-sm w-full text-center border border-neutral-100">
               <div className="text-6xl mb-6 drop-shadow-md">🔐</div>
               <h3 className="font-serif text-3xl font-bold text-[#2C1A0E] mb-3">Chat Protetta</h3>
               <p className="text-sm text-[#8A7B6E] mb-8 leading-relaxed">
                 La tua privacy è al sicuro. Inserisci la password per decifrare i messaggi localmente.
               </p>
               
-              <form onSubmit={handleUnlock} className="flex flex-col gap-4">
+              <form onSubmit={handleUnlock} className="flex flex-col gap-4 mt-6">
                 <input
                   type="password"
                   placeholder="La tua password"
                   value={unlockPassword}
-                  onChange={(e) => {
-                    setUnlockPassword(e.target.value);
-                    setUnlockError('');
-                  }}
-                  className={`w-full bg-neutral-50 border text-center text-[#2C1A0E] rounded-2xl px-5 py-4 focus:outline-none transition-colors ${unlockError ? 'border-red-500 focus:ring-1 focus:ring-red-500' : 'border-neutral-200 focus:border-[#C4603A] focus:ring-1 focus:ring-[#C4603A]'}`}
+                  onChange={(e) => setUnlockPassword(e.target.value)}
+                  className="w-full bg-neutral-50 border text-center text-[#2C1A0E] rounded-2xl px-5 py-4 focus:outline-none focus:border-[#C4603A]"
                 />
                 {unlockError && <div className="text-red-500 text-xs font-medium -mt-2">{unlockError}</div>}
-                
                 <button
                   type="submit"
                   disabled={!unlockPassword || isLoading}
-                  className="w-full bg-[#C4603A] text-white py-4 rounded-full font-bold hover:bg-[#9A4628] disabled:bg-neutral-300 disabled:cursor-not-allowed transition-all shadow-md mt-2 cursor-pointer"
+                  className="w-full bg-[#C4603A] text-white py-4 rounded-full font-bold hover:bg-[#9A4628] disabled:bg-neutral-300 cursor-pointer"
                 >
                   {isLoading ? 'Sblocco in corso...' : 'Sblocca Messaggi'}
                 </button>
