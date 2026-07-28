@@ -48,7 +48,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Variabile err dichiarata a livello di handler per evitare problemi di scope/ridefinizione
 	var err error
 
 	switch req.Action {
@@ -155,7 +154,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Account eliminato"))
 		return
 
-	// --- LOGIN STANDARD CON PROTEZIONE BRUTE-FORCE ---
+	// --- LOGIN STANDARD ---
 	default:
 		var user UserData
 		var hashedPassword string
@@ -182,13 +181,11 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// 🛑 1. CONTROLLO BLOCCO ACCOUNT
 		if lockedUntil.Valid && lockedUntil.Time.After(time.Now()) {
 			http.Error(w, "Account temporaneamente bloccato per troppi tentativi. Riprova tra 15 minuti.", http.StatusTooManyRequests)
 			return
 		}
 
-		// 🛡️ 2. VERIFICA PASSWORD E GESTIONE ERRORI
 		err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(req.Password))
 		if err != nil {
 			failedAttempts++
@@ -206,7 +203,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// ✅ 3. PASSWORD CORRETTA: RESET CONTATORI
 		if failedAttempts > 0 {
 			resetQuery := `UPDATE roomdate_app.users SET failed_login_attempts = 0, locked_until = NULL WHERE email = $1`
 			DB.Exec(resetQuery, req.Email)
@@ -237,7 +233,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			Path:     "/",
 			HttpOnly: true,
 			Secure:   true,
-			SameSite: http.SameSiteStrictMode,
+			SameSite: http.SameSiteLaxMode, // 👈 Modificato da Strict a Lax per stabilità su Vercel
 		})
 
 		w.Header().Set("Content-Type", "application/json")
@@ -251,10 +247,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 }
-
-// =====================================================================
-// 🛡️ HELPER FUNCTIONS
-// =====================================================================
 
 func getSecureUserID(r *http.Request) string {
 	cookie, err := r.Cookie("roomdate_session")

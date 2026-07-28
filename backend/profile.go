@@ -10,14 +10,14 @@ import (
 )
 
 type ProfileRequest struct {
-	UserType   string `json:"userType"`
-	Citta      string `json:"citta"`
-	BudgetMax  string `json:"budgetMax"`
-	Occupation string `json:"occupation"`
-	Birthdate  string `json:"birthdate"`
-	Bio        string `json:"bio"`
-	Tags       string `json:"tags"`
-	IsPublic   bool   `json:"isPublic"`
+	UserType   string      `json:"userType"`
+	Citta      string      `json:"citta"`
+	BudgetMax  interface{} `json:"budgetMax"` // 👈 Flessibile: accetta sia stringhe che int dall'input JSON
+	Occupation string      `json:"occupation"`
+	Birthdate  string      `json:"birthdate"`
+	Bio        string      `json:"bio"`
+	Tags       string      `json:"tags"`
+	IsPublic   bool        `json:"isPublic"`
 }
 
 type UserProfile struct {
@@ -36,12 +36,24 @@ type UserProfile struct {
 }
 
 func ProfileHandler(w http.ResponseWriter, r *http.Request) {
+	// --- GESTIONE CORS PREFLIGHT ---
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 
 	// --- 1. GESTIONE GET (Visualizzazione Profili) ---
 	if r.Method == http.MethodGet {
 		userId := r.URL.Query().Get("userId")
+
+		// 👈 FALLBACK MUTUO: Se la richiesta frontend non passa un'id esplicito (es: caricamento dashboard propria),
+		// leggiamo l'identità dell'utente dal cookie di sessione.
 		if userId == "" {
-			http.Error(w, "Manca userId", http.StatusBadRequest)
+			userId = getSecureUserID(r)
+		}
+
+		if userId == "" {
+			http.Error(w, "Accesso negato: Sessione non valida o userId mancante", http.StatusUnauthorized)
 			return
 		}
 
@@ -79,7 +91,7 @@ func ProfileHandler(w http.ResponseWriter, r *http.Request) {
 
 		var req ProfileRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Dati non validi", http.StatusBadRequest)
+			http.Error(w, "Dati non validi o formato JSON errato", http.StatusBadRequest)
 			return
 		}
 
@@ -89,12 +101,20 @@ func ProfileHandler(w http.ResponseWriter, r *http.Request) {
 		safeBio := p.Sanitize(req.Bio)
 		safeTags := p.Sanitize(req.Tags)
 
+		// Safe parsing del budget a prescindere dal tipo di dato ricevuto (stringa o numero)
 		budget := 0
-		if req.BudgetMax != "" {
-			budget, _ = strconv.Atoi(req.BudgetMax)
+		switch v := req.BudgetMax.(type) {
+		case string:
+			if v != "" {
+				budget, _ = strconv.Atoi(v)
+			}
+		case float64:
+			budget = int(v)
+		case int:
+			budget = v
 		}
 
-		var err error // ✅ DICHIARATA CORRETTAMENTE QUI
+		var err error
 
 		query := `
             UPDATE roomdate_app.users 
