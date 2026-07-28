@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import Pusher from 'pusher-js'; 
 import { Helmet } from 'react-helmet-async';
 import { encryptMessage, decryptMessage, unwrapPrivateKey } from '../utils/crypto';
+// ✅ IMPORTIAMO L'API SICURA
 import { fetchAPI } from '../utils/api'; 
 
 const QUICK_REPLIES = [
@@ -45,24 +46,27 @@ export default function ChatPage() {
   }, [navigate]);
 
   const handleLogout = () => {
+    // 1. Rimuovi i dati dell'utente
     localStorage.removeItem('roomdate_user');
+    
+    // 2. Rimuovi le chiavi e la cassaforte
     sessionStorage.removeItem('roomdate_private_key'); 
     localStorage.removeItem('roomdate_crypto');
     localStorage.removeItem('roomdate_public_key');
+    
     setUser(null);
     setIsMenuOpen(false);
     navigate('/');
   };
 
-  // 2. Scarica e DECIFRA le chat (avvolta in useCallback per evitare closure obsolete)
-  const fetchChats = useCallback(async () => {
+  // 2. Scarica e DECIFRA le chat (Niente più ?userId=...)
+  const fetchChats = async () => {
     if (!user) return;
     try {
-      const res = await fetchAPI(`/api/get_chats`); 
+      const res = await fetchAPI(`/api/get_chats`); // 🔥 Modificato qui
       const data = await res.json();
       
-      // Controllo di sicurezza: verifichiamo che il server abbia risposto con un array
-      if (Array.isArray(data)) {
+      if (data) {
         const myPrivateKey = sessionStorage.getItem('roomdate_private_key'); 
 
         if (myPrivateKey) {
@@ -89,7 +93,7 @@ export default function ChatPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  };
 
   const handleUnlock = async (e) => {
     e.preventDefault();
@@ -103,6 +107,7 @@ export default function ChatPage() {
 
     try {
       const cryptoData = JSON.parse(cryptoDataStr);
+      // Riapriamo la cassaforte con la password appena inserita
       const privateKey = await unwrapPrivateKey(
         cryptoData.encryptedPrivateKey,
         unlockPassword,
@@ -110,6 +115,7 @@ export default function ChatPage() {
         cryptoData.cryptoIv
       );
       
+      // Salviamo in sessione e ricarichiamo!
       sessionStorage.setItem('roomdate_private_key', privateKey);
       setIsLocked(false);
       setUnlockPassword('');
@@ -120,7 +126,7 @@ export default function ChatPage() {
     }
   };
 
-  // 3. Configurazione Pusher (con corretta chiusura connessione)
+  // 3. Configurazione Pusher
   useEffect(() => {
     if (user) {
       fetchChats(); 
@@ -130,18 +136,17 @@ export default function ChatPage() {
       });
 
       const channel = pusher.subscribe('roomdate-channel');
-      channel.bind('nuovo-messaggio', function() {
-        // Ricarica le chat quando arriva il ping dal backend
+      channel.bind('nuovo-messaggio', function(data) {
+        // Quando arriva un nuovo messaggio, ricarica e decifra
         fetchChats();
       });
 
       return () => {
         channel.unbind_all();
         channel.unsubscribe();
-        pusher.disconnect(); // <- Fondamentale per evitare doppie connessioni!
       };
     }
-  }, [user, fetchChats]);
+  }, [user]);
 
   const activeConv = conversations.find(c => c.id === activeConvId);
 
@@ -176,7 +181,7 @@ export default function ChatPage() {
     setInputText(''); 
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
-    // UI Ottimistica: mostriamo subito il messaggio
+    // Mostriamo subito il messaggio in chiaro sulla nostra UI per reattività
     const tempMsg = {
       id: Date.now(), 
       type: 'sent',
@@ -198,6 +203,7 @@ export default function ChatPage() {
         return;
       }
 
+      // 🔐 NUOVO: Recuperiamo la NOSTRA chiave pubblica dal localStorage
       const myPublicKey = localStorage.getItem('roomdate_public_key');
       if (!myPublicKey) {
         console.error("Manca la tua chiave pubblica!");
@@ -205,24 +211,23 @@ export default function ChatPage() {
         return;
       }
 
+      // 🔐 LA DOPPIA CIFRATURA
+      // 1. Cifriamo per il destinatario
       const encryptedForTarget = await encryptMessage(textToSend, activeConv.targetPublicKey);
+      
+      // 2. Cifriamo per noi stessi
       const encryptedForMe = await encryptMessage(textToSend, myPublicKey);
 
+      // ✅ USIAMO fetchAPI AL POSTO DI fetch
       await fetchAPI('/api/send_message', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json' // <- Fondamentale per il backend!
-        },
+        // Rimosso l'header Content-Type, lo gestisce api.js
         body: JSON.stringify({
           conversationId: activeConvId,
-          text: encryptedForTarget,  
-          senderText: encryptedForMe 
+          text: encryptedForTarget,  // Questo andrà nella colonna 'content'
+          senderText: encryptedForMe // Questo andrà nella colonna 'sender_content'
         })
       });
-
-      // Forza un refresh per assicurarsi di scaricare l'ID reale dal database
-      fetchChats();
-
     } catch (err) {
       console.error(err);
       alert("Errore di connessione. Il messaggio potrebbe non essere stato inviato.");
