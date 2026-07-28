@@ -296,13 +296,13 @@ export default function ChatPage() {
   });
 
   return (
-    <div className="flex flex-col h-[100dvh] w-full max-w-[100vw] bg-[#FAFAFA] font-sans overflow-hidden selection:bg-orange-200">
+    <div className="flex flex-col h-[100dvh] w-full max-w-[100vw] bg-white font-sans overflow-hidden selection:bg-orange-200">
       <Helmet>
         <title>Area Privata | RoomDate</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
-      {/* STILI PER L'ANIMAZIONE DEI 3 PUNTINI (WHATSAPP/IOS) */}
+      {/* STILI PER L'ANIMAZIONE DEI 3 PUNTINI E SCROLLBAR */}
       <style>
         {`
           .typing-dot {
@@ -332,7 +332,6 @@ export default function ChatPage() {
             40% { transform: scale(1); opacity: 1; }
           }
           
-          /* Custom Scrollbar for a cleaner look */
           .custom-scrollbar::-webkit-scrollbar {
             width: 6px;
             height: 6px;
@@ -411,12 +410,12 @@ export default function ChatPage() {
       </div>
       {isMenuOpen && <div className="fixed inset-0 bg-neutral-900/20 backdrop-blur-sm z-[999] md:hidden transition-opacity" onClick={() => setIsMenuOpen(false)}></div>}
 
-      {/* ── LAYOUT CHAT CONTAINER ── */}
-      <div className="flex-1 flex overflow-hidden relative w-full max-w-7xl mx-auto md:my-6 md:rounded-3xl md:shadow-lg md:border md:border-neutral-200 bg-white">
+      {/* ── LAYOUT CHAT CONTAINER (ORA FULL BLEED) ── */}
+      <div className={`flex-1 flex overflow-hidden relative w-full bg-white border-t border-neutral-100 ${mobileView === 'list' ? 'pb-16 md:pb-0' : ''}`}>
 
         {/* ── SIDEBAR LISTA CHAT ── */}
         <aside className={`${mobileView === 'chat' ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[380px] bg-white border-r border-neutral-100 flex-col h-full shrink-0 z-10`}>
-          <div className="p-5 border-b border-neutral-100 shrink-0">
+          <div className="p-5 border-b border-neutral-100 shrink-0 bg-white">
             <h2 className="text-2xl text-neutral-900 font-extrabold mb-4 tracking-tight">Messaggi</h2>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400">🔍</span>
@@ -430,7 +429,7 @@ export default function ChatPage() {
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <div className="flex-1 overflow-y-auto custom-scrollbar bg-white">
             {isLoading && conversations.length === 0 ? (
               [1, 2, 3, 4, 5].map(n => (
                 <div key={n} className="flex gap-4 p-5 border-b border-neutral-50 pointer-events-none">
@@ -489,7 +488,7 @@ export default function ChatPage() {
         {/* ── CHAT MAIN AREA ── */}
         <main className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 flex-col h-full bg-[#FAFAFA] w-full max-w-full relative`}>
           {!activeConv ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-neutral-50/50">
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-[#FAFAFA]">
               <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-sm mb-6 border border-neutral-100">
                 <span className="text-4xl opacity-50">💬</span>
               </div>
@@ -511,7 +510,7 @@ export default function ChatPage() {
               </div>
 
               {/* Area Messaggi */}
-              <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 flex flex-col gap-6 w-full custom-scrollbar">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 flex flex-col gap-6 w-full custom-scrollbar bg-[#FAFAFA]">
                 {!activeConv.messages || activeConv.messages.length === 0 ? (
                   <div className="text-center p-6 text-neutral-500 text-sm font-medium bg-white rounded-3xl border border-neutral-100 shadow-sm self-center my-auto">
                     👋 Invia il primo messaggio a {activeConv.name} per iniziare!
@@ -573,7 +572,7 @@ export default function ChatPage() {
               </div>
 
               {/* Input Area */}
-              <div className="shrink-0 bg-white p-4 md:px-6 md:pb-6 border-t border-neutral-100 flex items-end gap-3 w-full">
+              <div className="shrink-0 bg-white p-4 md:px-6 md:pb-6 flex items-end gap-3 w-full border-t border-neutral-50">
                 <textarea
                   ref={textareaRef}
                   className="flex-1 bg-neutral-50 border border-neutral-200 text-neutral-900 text-base rounded-3xl px-5 py-3.5 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all resize-none max-h-[140px] w-full placeholder:text-neutral-400 custom-scrollbar"
