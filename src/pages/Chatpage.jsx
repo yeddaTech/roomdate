@@ -4,7 +4,7 @@ import Pusher from 'pusher-js';
 import { Helmet } from 'react-helmet-async';
 import { encryptMessage, decryptMessage, unwrapPrivateKey } from '../utils/crypto';
 import { fetchAPI } from '../utils/api'; 
-import Navbar from '../components/Navbar'; // <-- IMPORTIAMO LA NAVBAR GLOBALE
+import Navbar from '../components/Navbar'; // LA NAVBAR GLOBALE
 
 const QUICK_REPLIES = [
   '📅 Quando sei disponibile?',
@@ -14,16 +14,9 @@ const QUICK_REPLIES = [
   '🚇 Linea metro vicina?',
 ];
 
-// HELPER DI SICUREZZA: Previene l'iniezione di tag HTML
-const sanitizeHTML = (str) => {
-  if (typeof str !== 'string') return '';
-  return str.replace(/[<>]/g, '');
-};
-
 export default function ChatPage() {
   const navigate = useNavigate();
   const location = useLocation(); 
-  
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -41,49 +34,33 @@ export default function ChatPage() {
   const [unlockPassword, setUnlockPassword] = useState('');
   const [unlockError, setUnlockError] = useState('');
 
-  // 1. Controllo utente loggato con Safe Parsing
+  // 1. Controllo utente loggato (LOGICA ORIGINALE)
   useEffect(() => {
-    try {
-      const savedUser = localStorage.getItem('roomdate_user');
-      if (!savedUser) {
-        navigate('/accedi', { replace: true });
-        return;
-      }
-      
-      const parsedUser = JSON.parse(savedUser);
-      if (typeof parsedUser === 'object' && parsedUser !== null && parsedUser.id) {
-        setUser(parsedUser);
-      } else {
-        throw new Error("Dati utente corrotti");
-      }
-    } catch (e) {
-      console.error("Errore di sicurezza: dati sessione compromessi");
-      localStorage.removeItem('roomdate_user');
-      navigate('/accedi', { replace: true });
+    const savedUser = localStorage.getItem('roomdate_user');
+    if (!savedUser) {
+      navigate('/accedi');
+    } else {
+      setUser(JSON.parse(savedUser));
     }
   }, [navigate]);
 
   const handleLogout = () => {
-    try {
-      localStorage.removeItem('roomdate_user');
-      sessionStorage.removeItem('roomdate_private_key'); 
-      localStorage.removeItem('roomdate_crypto');
-      localStorage.removeItem('roomdate_public_key');
-    } catch (e) {
-      console.error("Errore durante la pulizia dei token");
-    }
+    localStorage.removeItem('roomdate_user');
+    sessionStorage.removeItem('roomdate_private_key'); 
+    localStorage.removeItem('roomdate_crypto');
+    localStorage.removeItem('roomdate_public_key');
     setUser(null);
-    navigate('/', { replace: true });
+    navigate('/');
   };
 
-  // 2. Scarica e DECIFRA le chat in sicurezza
+  // 2. Scarica e DECIFRA le chat (LOGICA ORIGINALE)
   const fetchChats = async () => {
     if (!user) return;
     try {
       const res = await fetchAPI(`/api/get_chats`);
       const data = await res.json();
       
-      if (Array.isArray(data)) {
+      if (data) {
         const myPrivateKey = sessionStorage.getItem('roomdate_private_key'); 
 
         if (myPrivateKey) {
@@ -91,9 +68,7 @@ export default function ChatPage() {
           const decryptedData = await Promise.all(data.map(async (conv) => {
             const decryptedMessages = await Promise.all((conv.messages || []).map(async (msg) => {
               try {
-                // Decifratura del messaggio
-                const clearText = await decryptMessage(msg.text, myPrivateKey);
-                msg.text = sanitizeHTML(clearText); // Sanitizzazione post-decifratura
+                msg.text = await decryptMessage(msg.text, myPrivateKey);
               } catch (e) {
                 msg.text = "🔒 [Messaggio non decifrabile]";
               }
@@ -114,20 +89,18 @@ export default function ChatPage() {
     }
   };
 
-  // 3. Sblocco Cassaforte Crittografica
   const handleUnlock = async (e) => {
     e.preventDefault();
     setUnlockError('');
     
-    try {
-      const cryptoDataStr = localStorage.getItem('roomdate_crypto');
-      if (!cryptoDataStr) throw new Error("Dati crittografici mancanti");
-      
-      const cryptoData = JSON.parse(cryptoDataStr);
-      if (!cryptoData.encryptedPrivateKey || !cryptoData.cryptoSalt || !cryptoData.cryptoIv) {
-        throw new Error("Dati crittografici corrotti");
-      }
+    const cryptoDataStr = localStorage.getItem('roomdate_crypto');
+    if (!cryptoDataStr) {
+      setUnlockError('Dati di sicurezza mancanti. Fai il logout e riaccedi.');
+      return;
+    }
 
+    try {
+      const cryptoData = JSON.parse(cryptoDataStr);
       const privateKey = await unwrapPrivateKey(
         cryptoData.encryptedPrivateKey,
         unlockPassword,
@@ -141,11 +114,11 @@ export default function ChatPage() {
       fetchChats(); 
       
     } catch (err) {
-      setUnlockError('Password errata o dati corrotti. Riprova.');
+      setUnlockError('Password errata. Riprova.');
     }
   };
 
-  // 4. Configurazione WebSockets (Pusher)
+  // 3. Configurazione Pusher (LOGICA ORIGINALE)
   useEffect(() => {
     if (user) {
       fetchChats(); 
@@ -155,7 +128,7 @@ export default function ChatPage() {
       });
 
       const channel = pusher.subscribe('roomdate-channel');
-      channel.bind('nuovo-messaggio', function() {
+      channel.bind('nuovo-messaggio', function(data) {
         fetchChats();
       });
 
@@ -191,18 +164,13 @@ export default function ChatPage() {
     setMobileView('chat');
   };
 
-  // 5. DOPPIA CIFRATURA E2E e invio del messaggio
+  // 4. DOPPIA CIFRATURA e invio del messaggio (LOGICA ORIGINALE)
   const handleSend = async () => {
-    const rawText = inputText.trim();
-    if (!rawText || !activeConvId || !user) return;
+    if (!inputText.trim() || !activeConvId || !user) return;
     
-    // Sanitizziamo prima di crittografare (XSS Prevention)
-    const textToSend = sanitizeHTML(rawText);
+    const textToSend = inputText.trim();
     setInputText(''); 
-    
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
     const tempMsg = {
       id: Date.now(), 
@@ -220,17 +188,18 @@ export default function ChatPage() {
 
     try {
       if (!activeConv.targetPublicKey) {
+        console.error("Manca la chiave pubblica del destinatario per cifrare il messaggio!");
         alert("Errore crittografico: impossibile trovare la chiave del destinatario.");
         return;
       }
 
       const myPublicKey = localStorage.getItem('roomdate_public_key');
       if (!myPublicKey) {
+        console.error("Manca la tua chiave pubblica!");
         alert("Errore crittografico: impossibile trovare la tua chiave pubblica. Fai di nuovo il login.");
         return;
       }
 
-      // Cifratura asimmetrica per il destinatario e per noi stessi
       const encryptedForTarget = await encryptMessage(textToSend, activeConv.targetPublicKey);
       const encryptedForMe = await encryptMessage(textToSend, myPublicKey);
 
@@ -244,7 +213,7 @@ export default function ChatPage() {
       });
     } catch (err) {
       console.error(err);
-      alert("Errore di rete. Il messaggio potrebbe non essere stato inviato.");
+      alert("Errore di connessione. Il messaggio potrebbe non essere stato inviato.");
     }
   };
 
@@ -262,8 +231,7 @@ export default function ChatPage() {
 
   const filteredConvs = conversations.filter(c => {
     const lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1].text : '';
-    const query = sanitizeHTML(searchQuery).toLowerCase();
-    return c.name.toLowerCase().includes(query) || lastMsg.toLowerCase().includes(query);
+    return c.name.toLowerCase().includes(searchQuery.toLowerCase()) || lastMsg.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   return (
@@ -276,7 +244,7 @@ export default function ChatPage() {
       {/* ── NAVBAR GLOBALE ── */}
       <Navbar user={user} handleLogout={handleLogout} />
 
-      {/* ── LAYOUT CHAT ── (Padding top per evitare la sovrapposizione con la Navbar fixed) */}
+      {/* ── LAYOUT CHAT ── (Padding top aggiunto per evitare che sparisca sotto la Navbar) */}
       <div className={`flex-1 flex overflow-hidden relative w-full pt-[80px] md:pt-[90px] ${mobileView === 'list' ? 'pb-16 md:pb-0' : ''}`}>
 
         {/* ── SIDEBAR LISTA CHAT ── */}
@@ -323,17 +291,17 @@ export default function ChatPage() {
                   className={`flex gap-4 p-4 border-b border-neutral-50 cursor-pointer transition-all ${isActive ? 'bg-orange-50/50 border-r-4 border-r-orange-500' : 'hover:bg-neutral-50'}`} 
                   onClick={() => handleSelectConv(conv)}
                 >
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl shrink-0 shadow-sm" style={{ background: `linear-gradient(135deg, ${sanitizeHTML(conv.color1)}, ${sanitizeHTML(conv.color2)})` }}>
-                    <span role="img" aria-label="Avatar">{sanitizeHTML(conv.emoji)}</span>
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl shrink-0 shadow-sm" style={{ background: `linear-gradient(135deg, ${conv.color1}, ${conv.color2})` }}>
+                    <span role="img" aria-label="Avatar">{conv.emoji}</span>
                   </div>
                   <div className="flex flex-col justify-center overflow-hidden w-full">
-                    <div className="font-bold text-neutral-900 text-sm truncate">{sanitizeHTML(conv.name)}</div>
+                    <div className="font-bold text-neutral-900 text-sm truncate">{conv.name}</div>
                     {conv.listing && (
                       <div className="text-[10px] text-orange-600 font-bold mb-0.5 truncate uppercase tracking-wider">
-                        🏠 {sanitizeHTML(conv.listing.title)}
+                        🏠 {conv.listing.title}
                       </div>
                     )}
-                    <div className={`text-xs truncate ${isActive ? 'text-orange-600 font-semibold' : 'text-neutral-500 font-medium'}`}>{sanitizeHTML(lastMsg)}</div>
+                    <div className={`text-xs truncate ${isActive ? 'text-orange-600 font-semibold' : 'text-neutral-500 font-medium'}`}>{lastMsg}</div>
                   </div>
                 </div>
               );
@@ -358,11 +326,11 @@ export default function ChatPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/>
                   </svg>
                 </button>
-                <div className="w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center text-lg shadow-sm shrink-0" style={{ background: `linear-gradient(135deg, ${sanitizeHTML(activeConv.color1)}, ${sanitizeHTML(activeConv.color2)})` }}>
-                  <span role="img" aria-hidden="true">{sanitizeHTML(activeConv.emoji)}</span>
+                <div className="w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center text-lg shadow-sm shrink-0" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
+                  <span role="img" aria-hidden="true">{activeConv.emoji}</span>
                 </div>
                 <div className="overflow-hidden">
-                  <h3 className="font-bold text-neutral-900 leading-tight truncate">{sanitizeHTML(activeConv.name)}</h3>
+                  <h3 className="font-bold text-neutral-900 leading-tight truncate">{activeConv.name}</h3>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
                     <p className="text-[11px] text-neutral-500 font-medium uppercase tracking-wide truncate">Chat Sicura E2E</p>
@@ -382,8 +350,8 @@ export default function ChatPage() {
                     return (
                       <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end gap-2.5 w-full`}>
                         {!isMine && (
-                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 shadow-sm" style={{ background: `linear-gradient(135deg, ${sanitizeHTML(activeConv.color1)}, ${sanitizeHTML(activeConv.color2)})` }}>
-                             <span role="img" aria-hidden="true">{sanitizeHTML(activeConv.emoji)}</span>
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 shadow-sm" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
+                             <span role="img" aria-hidden="true">{activeConv.emoji}</span>
                           </div>
                         )}
                         <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[75%] md:max-w-[65%]`}>
@@ -394,7 +362,7 @@ export default function ChatPage() {
                           }`}>
                             {msg.text}
                           </div>
-                          <span className="text-[10px] text-neutral-400 mt-1.5 px-1 font-semibold tracking-wide">{sanitizeHTML(msg.time)}</span>
+                          <span className="text-[10px] text-neutral-400 mt-1.5 px-1 font-semibold tracking-wide">{msg.time}</span>
                         </div>
                       </div>
                     );
@@ -411,7 +379,7 @@ export default function ChatPage() {
                     className="shrink-0 bg-white border border-neutral-200 text-neutral-600 text-xs font-semibold px-4 py-2 rounded-full hover:border-orange-400 hover:text-orange-500 shadow-sm transition-all" 
                     onClick={() => handleQuickReply(qr)}
                   >
-                    {sanitizeHTML(qr)}
+                    {qr}
                   </button>
                 ))}
               </div>
