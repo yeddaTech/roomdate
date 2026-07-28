@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-// ✅ IMPORTA LE FUNZIONI CRITTOGRAFICHE E L'API SICURA
 import { generateKeyPair, wrapPrivateKey } from '../utils/crypto';
 import { fetchAPI } from '../utils/api'; 
 
@@ -51,10 +50,10 @@ export default function Register() {
   
   const strengthLevels = [
     { text: 'Inserisci una password', color: 'text-neutral-400', barClass: 'bg-neutral-200' },
-    { text: 'Troppo corta', color: 'text-red-500', barClass: 'bg-red-500' },
-    { text: 'Debole', color: 'text-red-500', barClass: 'bg-red-500' },
+    { text: 'Troppo corta', color: 'text-rose-500', barClass: 'bg-rose-500' },
+    { text: 'Debole', color: 'text-rose-500', barClass: 'bg-rose-500' },
     { text: 'Media', color: 'text-orange-400', barClass: 'bg-orange-400' },
-    { text: 'Forte 💪', color: 'text-green-600', barClass: 'bg-green-600' }
+    { text: 'Forte 💪', color: 'text-emerald-500', barClass: 'bg-emerald-500' }
   ];
   
   const currentStrength = strengthLevels[score];
@@ -77,7 +76,6 @@ export default function Register() {
       const wrappedData = await wrapPrivateKey(keys.privateKey, formData.password);
       // --- 🔐 LOGICA CRITTOGRAFICA FINE ---
 
-      // ✅ USIAMO fetchAPI AL POSTO DI fetch
       const response = await fetchAPI('/api/register', { 
         method: 'POST',
         body: JSON.stringify({
@@ -116,113 +114,131 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col font-sans bg-[#FEFAF4]">
+    <div className="min-h-[100dvh] flex flex-col font-sans bg-[#FAFAFA] selection:bg-orange-200">
       
-      <nav className="shrink-0 z-50 bg-[#2C1A0E] text-white px-6 py-4 flex justify-between items-center shadow-md border-b-2 border-[#C4603A]">
+      {/* --- TOP NAV MINIMALE (GLASSMORPHISM) --- */}
+      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-sm border-b border-neutral-100 absolute top-0 w-full">
         <div className="flex items-center gap-6">
-          <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-white decoration-none">
-            Room<span className="text-[#D4835E]">Date</span>
+          <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900 decoration-none">
+            Room<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">Date</span>
           </Link>
-          <Link to="/" className="hidden md:flex text-sm text-[#8A7B6E] hover:text-white transition-colors">
+          <Link to="/" className="hidden md:flex text-sm text-neutral-500 hover:text-neutral-900 font-medium transition-colors">
             ← Torna alla home
           </Link>
         </div>
         
         <div className="flex items-center gap-4">
-          <span className="hidden md:inline text-sm text-neutral-300">Hai già un account?</span>
-          <Link to="/accedi" className="bg-transparent border border-white/20 hover:border-white px-5 py-2 rounded-full text-sm font-bold transition-colors">Accedi</Link>
+          <span className="hidden md:inline text-sm text-neutral-500 font-medium">Hai già un account?</span>
+          <Link to="/accedi" className="bg-white border border-neutral-200 hover:bg-neutral-50 hover:border-neutral-300 text-neutral-700 px-5 py-2 rounded-full text-sm font-bold transition-all shadow-sm">Accedi</Link>
         </div>
       </nav>
 
-      <div className="flex-1 flex flex-col lg:flex-row w-full">
+      {/* --- MAIN LAYOUT SPLIT --- */}
+      <div className="flex-1 flex flex-col lg:flex-row w-full pt-16 md:pt-0">
         
-        {/* PARTE SINISTRA (Testo) */}
-        <div className="hidden lg:flex lg:w-4/12 xl:w-5/12 bg-gradient-to-br from-[#2C1A0E] to-[#5A2C1A] p-12 xl:p-16 flex-col justify-center relative overflow-hidden text-white border-r border-[#C4603A]/20">
+        {/* PARTE SINISTRA (Hero Visivo) */}
+        <div className="hidden lg:flex lg:w-4/12 xl:w-5/12 bg-gradient-to-br from-orange-500 to-rose-500 p-12 xl:p-16 flex-col justify-center relative overflow-hidden text-white border-r border-orange-200/20">
+          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, white 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
+          <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-white/20 blur-[100px] rounded-full pointer-events-none"></div>
+
           <div className="relative z-10 max-w-lg mx-auto">
-            <div className="text-[#D4835E] text-xs font-bold uppercase tracking-widest mb-3">Unisciti a RoomDate</div>
-            <h2 className="font-serif text-5xl xl:text-6xl font-bold leading-tight mb-6">Trova la tua stanza,<br/><em className="text-[#F5E3CC] font-light">trova casa.</em></h2>
-            <p className="text-white/80 text-lg mb-12 leading-relaxed">Migliaia di stanze e coinquilini selezionati in tutta Italia. Registrati gratis e inizia subito a cercare la tua prossima sistemazione.</p>
+            <div className="text-white/80 text-xs font-bold uppercase tracking-widest mb-3">Unisciti a RoomDate</div>
+            <h2 className="font-serif text-5xl xl:text-6xl font-extrabold leading-tight mb-6 tracking-tight">Trova la tua stanza,<br/><em className="font-light opacity-90">trova casa.</em></h2>
+            <p className="text-white/90 text-lg mb-12 leading-relaxed font-medium">Migliaia di stanze e coinquilini selezionati in tutta Italia. Registrati gratis e inizia subito a cercare la tua prossima sistemazione in totale sicurezza.</p>
           </div>
         </div>
 
         {/* PARTE DESTRA (Form) */}
-        <div className="w-full lg:w-8/12 xl:w-7/12 flex flex-col justify-start items-center p-6 md:p-10 overflow-y-auto">
+        <div className="w-full lg:w-8/12 xl:w-7/12 flex flex-col justify-start items-center p-6 md:p-10 lg:py-24 overflow-y-auto relative">
           
-          <div className="w-full max-w-2xl bg-white p-8 md:p-10 rounded-3xl shadow-lg border border-orange-50 animate-fade-in-up my-auto">
+          <div className="absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-orange-400/5 blur-[100px] rounded-full pointer-events-none"></div>
+
+          <div className="w-full max-w-2xl bg-white p-8 md:p-10 rounded-3xl shadow-lg border border-neutral-100 relative z-10 animate-fade-in-up my-auto">
             
-            <h1 className="font-serif text-4xl text-[#2C1A0E] font-bold mb-2">Crea il tuo account</h1>
-            <p className="text-[#8A7B6E] text-sm mb-8">E compila già il tuo profilo per farti notare subito.</p>
+            <h1 className="font-serif text-4xl text-neutral-900 font-extrabold mb-2 tracking-tight">Crea il tuo account</h1>
+            <p className="text-neutral-500 text-sm mb-8 font-medium">Compila il tuo profilo per farti notare subito dalla community.</p>
 
             {/* TIPO UTENTE */}
             <div className="grid grid-cols-2 gap-4 mb-8">
-              <button type="button" className={`flex flex-col items-center text-center p-4 rounded-2xl border-2 transition-all ${userType === 'cerca' ? 'border-[#C4603A] bg-[#FEFAF4]' : 'border-neutral-100 bg-white hover:border-orange-200'}`} onClick={() => setUserType('cerca')}>
-                <span className="text-3xl mb-2">🔍</span>
-                <span className="font-bold text-[#2C1A0E] text-sm mb-1">Cerco stanza</span>
-                <span className="text-xs text-[#8A7B6E]">Voglio trovare dove abitare</span>
+              <button 
+                type="button" 
+                className={`flex flex-col items-center justify-center text-center p-5 rounded-3xl border-2 transition-all cursor-pointer ${userType === 'cerca' ? 'border-orange-500 bg-orange-50/50 shadow-sm' : 'border-neutral-100 bg-white hover:border-orange-200 hover:bg-neutral-50'}`} 
+                onClick={() => setUserType('cerca')}
+              >
+                <span className="text-4xl mb-3 drop-shadow-sm">🔍</span>
+                <span className="font-extrabold text-neutral-900 text-sm mb-1">Cerco stanza</span>
+                <span className="text-xs text-neutral-500 font-medium">Voglio trovare dove abitare</span>
               </button>
-              <button type="button" className={`flex flex-col items-center text-center p-4 rounded-2xl border-2 transition-all ${userType === 'affitta' ? 'border-[#C4603A] bg-[#FEFAF4]' : 'border-neutral-100 bg-white hover:border-orange-200'}`} onClick={() => setUserType('affitta')}>
-                <span className="text-3xl mb-2">🏠</span>
-                <span className="font-bold text-[#2C1A0E] text-sm mb-1">Affitto stanza</span>
-                <span className="text-xs text-[#8A7B6E]">Ho uno spazio da condividere</span>
+              <button 
+                type="button" 
+                className={`flex flex-col items-center justify-center text-center p-5 rounded-3xl border-2 transition-all cursor-pointer ${userType === 'affitta' ? 'border-orange-500 bg-orange-50/50 shadow-sm' : 'border-neutral-100 bg-white hover:border-orange-200 hover:bg-neutral-50'}`} 
+                onClick={() => setUserType('affitta')}
+              >
+                <span className="text-4xl mb-3 drop-shadow-sm">🏠</span>
+                <span className="font-extrabold text-neutral-900 text-sm mb-1">Affitto stanza</span>
+                <span className="text-xs text-neutral-500 font-medium">Ho uno spazio da condividere</span>
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-8">
               
               {/* DATI ANAGRAFICI E ACCESSO */}
-              <div className="p-5 bg-neutral-50 rounded-2xl border border-neutral-100">
-                <h3 className="font-bold text-[#2C1A0E] mb-4">I tuoi dati base</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-[#8A7B6E] uppercase">Nome</label>
-                    <input type="text" name="nome" value={formData.nome} onChange={handleChange} required className="w-full bg-white border border-neutral-200 rounded-xl px-4 py-2.5 focus:border-[#C4603A] focus:outline-none" />
+              <div className="p-6 bg-neutral-50 rounded-3xl border border-neutral-100">
+                <h3 className="font-bold text-neutral-900 mb-5 text-lg">I tuoi dati base</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Nome</label>
+                    <input type="text" name="nome" value={formData.nome} onChange={handleChange} required className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm" />
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-[#8A7B6E] uppercase">Cognome</label>
-                    <input type="text" name="cognome" value={formData.cognome} onChange={handleChange} required className="w-full bg-white border border-neutral-200 rounded-xl px-4 py-2.5 focus:border-[#C4603A] focus:outline-none" />
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Cognome</label>
+                    <input type="text" name="cognome" value={formData.cognome} onChange={handleChange} required className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm" />
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-[#8A7B6E] uppercase">Email</label>
-                    <input type="email" name="email" value={formData.email} onChange={handleChange} required className="w-full bg-white border border-neutral-200 rounded-xl px-4 py-2.5 focus:border-[#C4603A] focus:outline-none" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Email</label>
+                    <input type="email" name="email" value={formData.email} onChange={handleChange} required className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm" />
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-[#8A7B6E] uppercase">Password</label>
-                    <input type="password" name="password" value={formData.password} onChange={handleChange} required className="w-full bg-white border border-neutral-200 rounded-xl px-4 py-2.5 focus:border-[#C4603A] focus:outline-none" />
-                    <div className="flex gap-1 mt-1">
-                      {[1, 2, 3, 4].map(num => <div key={num} className={`h-1 w-full rounded-full ${score >= num ? currentStrength.barClass : 'bg-neutral-200'}`}></div>)}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Password</label>
+                      <span className={`text-[10px] font-bold ${currentStrength.color}`}>{currentStrength.text}</span>
+                    </div>
+                    <input type="password" name="password" value={formData.password} onChange={handleChange} required className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm" />
+                    <div className="flex gap-1.5 mt-2">
+                      {[1, 2, 3, 4].map(num => <div key={num} className={`h-1.5 w-full rounded-full transition-colors duration-300 ${score >= num ? currentStrength.barClass : 'bg-neutral-200'}`}></div>)}
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* DATI DEL PROFILO PUBBLICO */}
-              <div className="p-5 bg-orange-50/50 rounded-2xl border border-[#C4603A]/20">
-                <h3 className="font-bold text-[#C4603A] mb-4">Crea il tuo profilo</h3>
+              <div className="p-6 bg-orange-50/50 rounded-3xl border border-orange-100">
+                <h3 className="font-extrabold text-orange-600 mb-5 text-lg">Personalizza il tuo Profilo</h3>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-[#8A7B6E] uppercase">Città</label>
-                    <select name="citta" value={formData.citta} onChange={handleChange} required className="w-full bg-white border border-neutral-200 rounded-xl px-4 py-2.5 focus:border-[#C4603A] focus:outline-none">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-5">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Città</label>
+                    <select name="citta" value={formData.citta} onChange={handleChange} required className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm cursor-pointer">
                       <option value="">Seleziona...</option>
                       <option>Milano</option><option>Roma</option><option>Torino</option><option>Bologna</option>
                     </select>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-[#8A7B6E] uppercase">Nascita</label>
-                    <input type="date" name="nascita" value={formData.nascita} onChange={handleChange} required className="w-full bg-white border border-neutral-200 rounded-xl px-4 py-2.5 focus:border-[#C4603A] focus:outline-none" />
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Nascita</label>
+                    <input type="date" name="nascita" value={formData.nascita} onChange={handleChange} required className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm" />
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-[#8A7B6E] uppercase">{userType === 'cerca' ? 'Budget Max' : 'Costo Stanza'}</label>
-                    <input type="number" name="budgetMax" placeholder="Es: 500" value={formData.budgetMax} onChange={handleChange} className="w-full bg-white border border-neutral-200 rounded-xl px-4 py-2.5 focus:border-[#C4603A] focus:outline-none" />
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">{userType === 'cerca' ? 'Budget Max' : 'Costo Stanza'}</label>
+                    <input type="number" name="budgetMax" placeholder="Es: 500" value={formData.budgetMax} onChange={handleChange} className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm placeholder:text-neutral-300" />
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1 mb-4">
-                  <label className="text-xs font-bold text-[#8A7B6E] uppercase">Occupazione</label>
-                  <select name="occupation" value={formData.occupation} onChange={handleChange} className="w-full bg-white border border-neutral-200 rounded-xl px-4 py-2.5 focus:border-[#C4603A] focus:outline-none">
+                <div className="flex flex-col gap-1.5 mb-5">
+                  <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Occupazione</label>
+                  <select name="occupation" value={formData.occupation} onChange={handleChange} className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm cursor-pointer">
                     <option value="">Seleziona...</option>
                     <option value="Studente">Studente</option>
                     <option value="Lavoratore">Lavoratore</option>
@@ -230,14 +246,14 @@ export default function Register() {
                   </select>
                 </div>
 
-                <div className="flex flex-col gap-1 mb-4">
-                  <label className="text-xs font-bold text-[#8A7B6E] uppercase">Bio (Parlaci di te)</label>
-                  <textarea name="bio" rows="2" placeholder="Ciao! Sto cercando..." value={formData.bio} onChange={handleChange} className="w-full bg-white border border-neutral-200 rounded-xl px-4 py-2.5 focus:border-[#C4603A] focus:outline-none resize-none"></textarea>
+                <div className="flex flex-col gap-1.5 mb-6">
+                  <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Bio (Parlaci di te)</label>
+                  <textarea name="bio" rows="3" placeholder="Ciao! Sto cercando una stanza comoda e luminosa..." value={formData.bio} onChange={handleChange} className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm resize-none placeholder:text-neutral-300"></textarea>
                 </div>
 
                 {/* STILE DI VITA */}
-                <label className="text-xs font-bold text-[#8A7B6E] uppercase mb-2 block">Il tuo Stile di Vita</label>
-                <div className="flex flex-wrap gap-2">
+                <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider mb-3 block">Il tuo Stile di Vita</label>
+                <div className="flex flex-wrap gap-2.5">
                   {[
                     { id: 'fumatore', label: '🚬 Fumatore' },
                     { id: 'animali', label: '🐶 Ho animali' },
@@ -245,7 +261,7 @@ export default function Register() {
                     { id: 'socievole', label: '🎉 Socievole' },
                     { id: 'vegano', label: '🥦 Vegano/Vegetariano' }
                   ].map(tag => (
-                    <label key={tag.id} className={`cursor-pointer px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${formData[tag.id] ? 'bg-[#C4603A] text-white border-[#C4603A]' : 'bg-white text-[#8A7B6E] border-neutral-200 hover:border-[#C4603A]'}`}>
+                    <label key={tag.id} className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-bold border transition-all shadow-sm ${formData[tag.id] ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-600 border-neutral-200 hover:border-orange-300 hover:text-orange-600'}`}>
                       <input type="checkbox" name={tag.id} checked={formData[tag.id]} onChange={handleChange} className="hidden" />
                       {tag.label}
                     </label>
@@ -262,16 +278,16 @@ export default function Register() {
                     checked={formData.accettaTermini} 
                     onChange={handleChange} 
                     required 
-                    className="mt-1 w-5 h-5 accent-[#C4603A] cursor-pointer" 
+                    className="mt-0.5 w-5 h-5 text-orange-500 bg-neutral-50 border-neutral-300 rounded focus:ring-orange-500 accent-orange-500 cursor-pointer transition-all" 
                   />
-                  <span className="text-sm text-[#8A7B6E] leading-relaxed">
-                    Dichiaro di aver letto e accetto i <Link to="/termini" className="text-[#C4603A] font-bold hover:underline">Termini di Servizio</Link> e l'<Link to="/privacy" className="text-[#C4603A] font-bold hover:underline">Informativa sulla Privacy</Link>.
+                  <span className="text-sm text-neutral-500 leading-relaxed font-medium group-hover:text-neutral-900 transition-colors">
+                    Dichiaro di aver letto e accetto i <Link to="/termini" className="text-orange-500 font-bold hover:text-orange-600 transition-colors">Termini di Servizio</Link> e l'<Link to="/privacy" className="text-orange-500 font-bold hover:text-orange-600 transition-colors">Informativa sulla Privacy</Link>.
                   </span>
                 </label>
               </div>
 
-              <button type="submit" disabled={isSubmitting} className="w-full text-white py-4 rounded-full font-bold transition-all shadow-md bg-[#C4603A] hover:bg-[#9A4628]">
-                {isSubmitting ? 'Salvataggio sicuro in corso...' : 'Crea Account e Profilo 🚀'}
+              <button type="submit" disabled={isSubmitting} className={`w-full mt-2 text-white py-4 rounded-full font-bold transition-all shadow-md flex justify-center items-center ${isSubmitting ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed shadow-none' : 'bg-gradient-to-r from-orange-500 to-rose-500 hover:scale-[1.02] hover:shadow-orange-500/25 cursor-pointer'}`}>
+                {isSubmitting ? 'Creazione in corso...' : 'Crea Account e Profilo 🚀'}
               </button>
             </form>
           </div>
