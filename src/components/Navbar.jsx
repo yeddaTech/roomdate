@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+
+const sanitizeHTML = (str) => {
+  if (typeof str !== 'string') return '';
+  return str.replace(/[<>]/g, '');
+};
 
 const Navbar = ({ user, handleLogout }) => {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // Gestione ottimizzata dello scroll per il design glassmorphism
   useEffect(() => {
     let ticking = false;
     const onScroll = () => {
@@ -20,74 +26,112 @@ const Navbar = ({ user, handleLogout }) => {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const onLogout = (e) => {
-    e.preventDefault();
-    if (typeof handleLogout === 'function') {
-      handleLogout();
+  // Blocco dello scroll su mobile quando il menu è aperto (Previene i freeze)
+  useEffect(() => {
+    if (menuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
     }
-  };
+    return () => { document.body.style.overflow = 'unset'; };
+  }, [menuOpen]);
+
+  const chiudiMenu = () => setMenuOpen(false);
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'pt-4' : 'pt-6'}`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className={`flex justify-between items-center px-6 py-3 rounded-full transition-all duration-300 ${
-          scrolled 
-            ? 'bg-white/80 backdrop-blur-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/50' 
-            : 'bg-transparent'
-        }`}>
-          
-          <Link to="/" className="flex items-center gap-2 group" aria-label="Torna alla Home">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/30 group-hover:scale-105 transition-transform">
-              <span className="font-bold text-xl" aria-hidden="true">R</span>
-            </div>
-            <span className="font-display text-2xl font-extrabold tracking-tight text-neutral-800">
-              Room<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">Date</span>
-            </span>
-          </Link>
-
-          <div className="hidden md:flex items-center gap-8 bg-white/40 px-6 py-2 rounded-full border border-white/60 shadow-sm backdrop-blur-md">
-            <Link to="/" className="text-sm font-medium text-neutral-600 hover:text-orange-500 transition-colors">Home</Link>
-            <Link to="/ricerca" className="text-sm font-medium text-neutral-600 hover:text-orange-500 transition-colors">Trova Stanza</Link>
-            <Link to="/chat" className="text-sm font-medium text-neutral-600 hover:text-orange-500 transition-colors">Chat</Link>
-          </div>
-
-          <div className="hidden md:flex items-center gap-4">
-            {user && user.nome ? (
-              <div className="flex items-center gap-4">
-                <span className="text-sm font-medium text-neutral-700">Ciao, {String(user.nome).replace(/[<>]/g, '')}</span>
-                <button 
-                  onClick={onLogout} 
-                  className="px-5 py-2.5 rounded-full text-sm font-semibold text-neutral-600 bg-white hover:bg-neutral-50 shadow-sm border border-neutral-100 transition-all"
-                  aria-label="Esci dal profilo"
-                >
-                  Esci
-                </button>
+    <>
+      <nav className={`fixed top-0 left-0 right-0 z-[1000] transition-all duration-300 ${scrolled ? 'pt-4' : 'pt-6'}`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className={`flex justify-between items-center px-6 py-3 rounded-full transition-all duration-300 ${
+            scrolled 
+              ? 'bg-white/90 backdrop-blur-lg shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/50' 
+              : 'bg-white/70 backdrop-blur-md border border-transparent shadow-sm'
+          }`}>
+            
+            <Link to="/" onClick={chiudiMenu} className="flex items-center gap-2 group" aria-label="Torna alla Home">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/30 group-hover:scale-105 transition-transform">
+                <span className="font-bold text-xl" aria-hidden="true">R</span>
               </div>
+              <span className="font-display text-2xl font-extrabold tracking-tight text-neutral-800">
+                Room<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">Date</span>
+              </span>
+            </Link>
+
+            {/* Menu Desktop */}
+            <div className="hidden md:flex items-center gap-8 bg-neutral-50/50 px-6 py-2 rounded-full border border-neutral-100 shadow-inner">
+              <Link to="/" className="text-sm font-semibold text-neutral-600 hover:text-orange-500 transition-colors">Home</Link>
+              <Link to="/ricerca" className="text-sm font-semibold text-neutral-600 hover:text-orange-500 transition-colors">Trova Stanza</Link>
+              <Link to="/chat" className="text-sm font-semibold text-neutral-600 hover:text-orange-500 transition-colors">Chat</Link>
+            </div>
+
+            {/* CTA Desktop */}
+            <div className="hidden md:flex items-center gap-4">
+              {user && user.nome ? (
+                <div className="flex items-center gap-4">
+                  <span className="text-sm font-medium text-neutral-600">Ciao, <strong className="text-neutral-900">{sanitizeHTML(user.nome)}</strong></span>
+                  <button onClick={handleLogout} className="px-5 py-2.5 rounded-full text-sm font-bold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-all">Esci</button>
+                </div>
+              ) : (
+                <>
+                  <Link to="/accedi" className="text-sm font-bold text-neutral-700 hover:text-orange-500 transition-colors">Accedi</Link>
+                  <Link to="/registrati" className="px-5 py-2.5 rounded-full text-sm font-bold text-white bg-neutral-900 hover:bg-neutral-800 hover:scale-105 transition-all shadow-md">
+                    Registrati
+                  </Link>
+                </>
+              )}
+            </div>
+
+            {/* Hamburger Mobile */}
+            <button 
+              className="md:hidden p-2 rounded-full hover:bg-neutral-100 transition-colors z-[1002]" 
+              onClick={() => setMenuOpen(!menuOpen)}
+              aria-label="Apri menu"
+            >
+              <div className="w-6 flex flex-col gap-1.5 pointer-events-none">
+                <span className={`block h-0.5 bg-neutral-900 transition-all duration-300 origin-center ${menuOpen ? 'rotate-45 translate-y-2' : ''}`}></span>
+                <span className={`block h-0.5 bg-neutral-900 transition-all duration-300 ${menuOpen ? 'opacity-0' : ''}`}></span>
+                <span className={`block h-0.5 bg-neutral-900 transition-all duration-300 origin-center ${menuOpen ? '-rotate-45 -translate-y-2' : ''}`}></span>
+              </div>
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* OVERLAY E MENU MOBILE UNIFICATI */}
+      <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-[1001] p-8 pt-28 transform transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${menuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className="flex flex-col gap-6 text-lg font-bold text-neutral-700">
+          {user && user.nome && (
+             <div className="border-b border-neutral-100 pb-6 mb-2">
+               <p className="text-xs text-neutral-400 uppercase tracking-wider mb-1">Accesso effettuato</p>
+               <h3 className="text-2xl text-neutral-900 truncate">{sanitizeHTML(user.nome)}</h3>
+             </div>
+          )}
+          <Link to="/" onClick={chiudiMenu} className="hover:text-orange-500 transition-colors flex items-center gap-3"><span className="text-2xl">🏠</span> Home</Link>
+          <Link to="/ricerca" onClick={chiudiMenu} className="hover:text-orange-500 transition-colors flex items-center gap-3"><span className="text-2xl">🔍</span> Cerca Stanza</Link>
+          <Link to="/chat" onClick={chiudiMenu} className="hover:text-orange-500 transition-colors flex items-center gap-3"><span className="text-2xl">💬</span> I tuoi Messaggi</Link>
+          <Link to="/dashboard" onClick={chiudiMenu} className="hover:text-orange-500 transition-colors flex items-center gap-3"><span className="text-2xl">👤</span> Profilo</Link>
+          
+          <div className="mt-auto pt-8 border-t border-neutral-100">
+            {user ? (
+              <button onClick={() => { handleLogout(); chiudiMenu(); }} className="w-full bg-neutral-100 text-neutral-900 py-4 rounded-2xl font-bold hover:bg-neutral-200 transition-all">Esci dall'account</button>
             ) : (
-              <>
-                <Link to="/accedi" className="text-sm font-semibold text-neutral-700 hover:text-orange-500 transition-colors">Accedi</Link>
-                <Link to="/registrati" className="px-5 py-2.5 rounded-full text-sm font-bold text-white bg-neutral-900 hover:bg-neutral-800 hover:shadow-lg hover:-translate-y-0.5 transition-all">
-                  Registrati Gratis
-                </Link>
-              </>
+              <div className="flex flex-col gap-3">
+                <Link to="/accedi" onClick={chiudiMenu} className="w-full border border-neutral-200 text-neutral-900 text-center py-4 rounded-2xl font-bold">Accedi</Link>
+                <Link to="/registrati" onClick={chiudiMenu} className="w-full bg-neutral-900 text-white text-center py-4 rounded-2xl font-bold shadow-lg">Registrati Gratis</Link>
+              </div>
             )}
           </div>
-
-          <button 
-            className="md:hidden p-2" 
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-expanded={menuOpen}
-            aria-label={menuOpen ? "Chiudi menu" : "Apri menu di navigazione"}
-          >
-            <div className="w-6 flex flex-col gap-1.5" aria-hidden="true">
-              <span className={`block h-0.5 bg-neutral-800 transition-all ${menuOpen ? 'rotate-45 translate-y-2' : ''}`}></span>
-              <span className={`block h-0.5 bg-neutral-800 transition-all ${menuOpen ? 'opacity-0' : ''}`}></span>
-              <span className={`block h-0.5 bg-neutral-800 transition-all ${menuOpen ? '-rotate-45 -translate-y-2' : ''}`}></span>
-            </div>
-          </button>
         </div>
       </div>
-    </nav>
+      
+      {/* Sfondo scuro Mobile */}
+      {menuOpen && (
+        <div 
+          className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm z-[1000] md:hidden animate-in fade-in duration-300" 
+          onClick={chiudiMenu}
+        ></div>
+      )}
+    </>
   );
 };
 

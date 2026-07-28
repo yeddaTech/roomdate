@@ -4,6 +4,7 @@ import Pusher from 'pusher-js';
 import { Helmet } from 'react-helmet-async';
 import { encryptMessage, decryptMessage, unwrapPrivateKey } from '../utils/crypto';
 import { fetchAPI } from '../utils/api'; 
+import Navbar from '../components/Navbar'; // <-- IMPORTIAMO LA NAVBAR GLOBALE
 
 const QUICK_REPLIES = [
   '📅 Quando sei disponibile?',
@@ -22,9 +23,9 @@ const sanitizeHTML = (str) => {
 export default function ChatPage() {
   const navigate = useNavigate();
   const location = useLocation(); 
+  
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   const [conversations, setConversations] = useState([]);
   const [activeConvId, setActiveConvId] = useState(null);
@@ -48,6 +49,7 @@ export default function ChatPage() {
         navigate('/accedi', { replace: true });
         return;
       }
+      
       const parsedUser = JSON.parse(savedUser);
       if (typeof parsedUser === 'object' && parsedUser !== null && parsedUser.id) {
         setUser(parsedUser);
@@ -71,7 +73,6 @@ export default function ChatPage() {
       console.error("Errore durante la pulizia dei token");
     }
     setUser(null);
-    setIsMenuOpen(false);
     navigate('/', { replace: true });
   };
 
@@ -198,7 +199,10 @@ export default function ChatPage() {
     // Sanitizziamo prima di crittografare (XSS Prevention)
     const textToSend = sanitizeHTML(rawText);
     setInputText(''); 
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
 
     const tempMsg = {
       id: Date.now(), 
@@ -269,71 +273,20 @@ export default function ChatPage() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       
-      {/* --- TOP NAV GLASSMORPHISM --- */}
-      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-3 flex justify-between items-center shadow-sm border-b border-neutral-200 transition-all">
-        <Link to="/" className="flex items-center gap-2 group decoration-none" aria-label="Torna alla Home">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center text-white shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform">
-            <span className="font-bold text-xl" aria-hidden="true">R</span>
-          </div>
-          <span className="font-display text-2xl font-extrabold tracking-tight text-neutral-800">
-            Room<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">Date</span>
-          </span>
-        </Link>
-        
-        <div className="hidden md:flex gap-8 items-center text-sm font-semibold text-neutral-500">
-          <Link to="/" className="hover:text-orange-500 transition-colors">Home</Link>
-          <Link to="/ricerca" className="hover:text-orange-500 transition-colors">Cerca Stanza</Link>
-          <Link to="/chat" className="text-orange-500 transition-colors">Chat</Link>
-          <Link to="/dashboard" className="hover:text-orange-500 transition-colors">Profilo</Link>
-        </div>
+      {/* ── NAVBAR GLOBALE ── */}
+      <Navbar user={user} handleLogout={handleLogout} />
 
-        <div className="hidden md:flex gap-4 items-center">
-          {user ? (
-            <div className="flex items-center gap-4">
-              <span className="text-sm font-medium text-neutral-600">Ciao, <strong className="text-neutral-900">{sanitizeHTML(user.nome)}</strong></span>
-              <button onClick={handleLogout} className="px-5 py-2 rounded-full text-sm font-semibold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 transition-all">Esci</button>
-            </div>
-          ) : null}
-        </div>
-
-        <button className="md:hidden p-2" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label={isMenuOpen ? "Chiudi menu" : "Apri menu"}>          
-          <div className="w-6 flex flex-col gap-1.5" aria-hidden="true">
-            <span className={`block h-0.5 bg-neutral-800 transition-all ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></span>
-            <span className={`block h-0.5 bg-neutral-800 transition-all ${isMenuOpen ? 'opacity-0' : ''}`}></span>
-            <span className={`block h-0.5 bg-neutral-800 transition-all ${isMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></span>
-          </div>
-        </button>
-      </nav>
-
-      {/* --- MOBILE SIDEBAR APP MENU --- */}
-      <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-[1000] p-8 pt-24 transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="flex flex-col gap-6 text-lg font-bold text-neutral-700">
-          {user && (
-             <div className="border-b border-neutral-100 pb-4 mb-2">
-               <h3 className="text-xl text-neutral-900">👤 Ciao, {sanitizeHTML(user.nome)}!</h3>
-             </div>
-          )}
-          <Link to="/" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">🏠 Home</Link>
-          <Link to="/ricerca" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">🔍 Cerca Stanza</Link>
-          <Link to="/chat" onClick={() => setIsMenuOpen(false)} className="text-orange-500 transition-colors">💬 Chat</Link>
-          <Link to="/dashboard" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">👤 Profilo</Link>
-          
-          <div className="mt-8">
-            <button onClick={handleLogout} className="w-full bg-neutral-900 text-white py-3 rounded-full font-bold hover:bg-neutral-800 transition-all shadow-md">Esci dall'account</button>
-          </div>
-        </div>
-      </div>
-      {isMenuOpen && <div className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm z-[999] md:hidden" onClick={() => setIsMenuOpen(false)}></div>}
-
-      {/* ── LAYOUT CHAT ── */}
-      <div className={`flex-1 flex overflow-hidden relative w-full ${mobileView === 'list' ? 'pb-16 md:pb-0' : ''}`}>
+      {/* ── LAYOUT CHAT ── (Padding top per evitare la sovrapposizione con la Navbar fixed) */}
+      <div className={`flex-1 flex overflow-hidden relative w-full pt-[80px] md:pt-[90px] ${mobileView === 'list' ? 'pb-16 md:pb-0' : ''}`}>
 
         {/* ── SIDEBAR LISTA CHAT ── */}
         <aside className={`${mobileView === 'chat' ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[380px] bg-white border-r border-neutral-200 flex-col h-full shrink-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]`}>
           <div className="p-5 border-b border-neutral-100 shrink-0 bg-white">
             <h2 className="font-extrabold text-2xl text-neutral-900 mb-4 tracking-tight">Messaggi</h2>
             <div className="relative">
-              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
               <input
                 type="text"
                 placeholder="Cerca conversazioni..."
@@ -363,6 +316,7 @@ export default function ChatPage() {
             ) : filteredConvs.map(conv => {
               const lastMsg = conv.messages && conv.messages.length > 0 ? conv.messages[conv.messages.length - 1].text : 'Nessun messaggio';
               const isActive = conv.id === activeConvId;
+              
               return (
                 <div 
                   key={conv.id} 
@@ -400,7 +354,9 @@ export default function ChatPage() {
               {/* Header Chat Attiva */}
               <div className="bg-white/90 backdrop-blur-md px-4 md:px-6 py-3 md:py-4 border-b border-neutral-200 flex items-center gap-4 shrink-0 shadow-sm z-10 w-full">
                 <button className="md:hidden text-neutral-500 hover:text-neutral-800 transition-colors p-1" onClick={() => setMobileView('list')} aria-label="Torna alla lista">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/></svg>
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/>
+                  </svg>
                 </button>
                 <div className="w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center text-lg shadow-sm shrink-0" style={{ background: `linear-gradient(135deg, ${sanitizeHTML(activeConv.color1)}, ${sanitizeHTML(activeConv.color2)})` }}>
                   <span role="img" aria-hidden="true">{sanitizeHTML(activeConv.emoji)}</span>
@@ -478,7 +434,9 @@ export default function ChatPage() {
                   disabled={!inputText.trim()}
                   aria-label="Invia messaggio"
                 >
-                  <svg className="w-5 h-5 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                  <svg className="w-5 h-5 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                  </svg>
                 </button>
               </div>
             </>
