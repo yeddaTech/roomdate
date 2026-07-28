@@ -25,11 +25,8 @@
     <!-- Font e Stili (Fix Render-Blocking) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Diciamo al browser di precaricare il CSS al massimo della velocità -->
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" />
-    <!-- Caricamento asincrono: non blocca la pagina e si applica appena pronto -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" media="print" onload="this.media='all'" />
-    <!-- Fallback di sicurezza se JavaScript è disabilitato -->
     <noscript>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" />
     </noscript>
@@ -55,6 +52,29 @@
   </head>
   <body>
     <div id="root">
+      <!-- INIZIO LOADER PRE-REACT -->
+      <style>
+        body { margin: 0; background-color: #FAFAFA; }
+        .roomdate-loader-container { 
+          display: flex; flex-direction: column; align-items: center; justify-content: center; 
+          height: 100vh; width: 100vw; font-family: 'DM Sans', system-ui, sans-serif; 
+        }
+        .roomdate-spinner { 
+          width: 50px; height: 50px; border: 4px solid #f3e8e0; border-top: 4px solid #F97316; 
+          border-radius: 50%; animation: roomdate-spin 1s linear infinite; margin-bottom: 20px; 
+        }
+        .roomdate-logo { font-size: 26px; font-weight: 800; color: #171717; letter-spacing: -0.5px; font-family: 'Playfair Display', serif; }
+        .roomdate-logo span { color: #F97316; }
+        @keyframes roomdate-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      </style>
+      
+      <div class="roomdate-loader-container">
+        <div class="roomdate-spinner"></div>
+        <div class="roomdate-logo">Room<span>Date</span></div>
+      </div>
+      <!-- FINE LOADER -->
+
+      <!-- CONTENUTO SEO ORIGINALE (Verrà eliminato insieme al loader appena React monta l'app) -->
       <header style="display:none;">
         <h1>Roomdate</h1>
         <nav>
