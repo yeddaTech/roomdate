@@ -208,10 +208,13 @@ export default function ChatPage() {
     const now = Date.now();
     if (activeConvId && user && (now - lastTypedRef.current > 1500)) {
       lastTypedRef.current = now;
-      fetchAPI('/api/typing', {
+        fetchAPI('/api/typing', {
         method: 'POST',
-        body: JSON.stringify({ conversationId: activeConvId, senderId: user.id })
-      }).catch(() => {});
+        body: JSON.stringify({ 
+            conversationId: String(activeConvId), 
+            senderId: String(user.id) 
+        })
+      }).catch(err => console.error("Errore typing:", err));
     }
   };
 
