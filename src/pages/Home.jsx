@@ -4,7 +4,7 @@ import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 import { fetchAPI } from '../utils/api';
 
-// 🛡️ HELPER SICUREZZA: Previene iniezioni HTML/Script
+// 🛡️ HELPER SICUREZZA: Previene iniezioni HTML/Script per i dati grezzi
 const sanitizeHTML = (str) => {
   if (typeof str !== 'string') return '';
   return str.replace(/[<>]/g, '');
@@ -23,7 +23,6 @@ export default function Home() {
       const savedUser = localStorage.getItem('roomdate_user');
       if (savedUser) {
         const parsedUser = JSON.parse(savedUser);
-        // Verifichiamo che sia un oggetto reale e che abbia un ID
         if (parsedUser && typeof parsedUser === 'object' && parsedUser.id) {
           setUser(parsedUser);
         } else {
@@ -34,7 +33,7 @@ export default function Home() {
       localStorage.removeItem('roomdate_user');
     }
 
-    // 🚀 Ottimizzazione: AbortController per evitare memory leak se si cambia pagina velocemente
+    // 🚀 Ottimizzazione: AbortController per evitare memory leak
     const abortController = new AbortController();
 
     const loadData = async () => {
@@ -44,7 +43,7 @@ export default function Home() {
         });
         if (res.ok) {
           const lData = await res.json();
-          // 🛡️ TYPE CHECK: Assicuriamoci che il backend restituisca davvero un array
+          // 🛡️ TYPE CHECK: Assicuriamoci che il backend restituisca un array
           if (Array.isArray(lData)) {
             setListings(lData);
           }
@@ -117,49 +116,57 @@ export default function Home() {
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {isLoading ? (
-            /* 🚀 SKELETON LOADING PER UX PROFESSIONALE */
+            /* 🚀 SKELETON LOADING */
             [1, 2, 3, 4].map((n) => (
-              <div key={n} className="bg-white rounded-3xl p-3 shadow-sm border border-neutral-100 animate-pulse">
-                <div className="h-48 rounded-2xl bg-neutral-200 mb-4 w-full"></div>
-                <div className="px-1">
-                  <div className="h-5 bg-neutral-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-4 bg-neutral-200 rounded w-1/2"></div>
+              <div key={n} className="bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col h-full min-h-[300px]">
+                <div className="h-48 w-full bg-neutral-100 animate-pulse rounded-t-3xl"></div>
+                <div className="p-4 flex flex-col gap-3 grow">
+                  <div className="h-5 w-3/4 bg-neutral-100 animate-pulse rounded-md"></div>
+                  <div className="h-4 w-1/2 bg-neutral-100 animate-pulse rounded-md"></div>
                 </div>
               </div>
             ))
           ) : error ? (
-            <div className="col-span-full text-center py-10 bg-red-50 rounded-2xl text-red-600 font-medium">
+            <div className="col-span-full text-center py-10 bg-red-50 rounded-2xl text-red-600 font-medium border border-red-100">
               {error}
             </div>
           ) : listings.length === 0 ? (
-            <div className="col-span-full text-center py-12 text-neutral-500">
-              <span className="text-4xl block mb-3">📭</span>
-              Nessuna stanza disponibile al momento.
+            <div className="col-span-full text-center py-16 bg-white rounded-3xl border border-dashed border-neutral-200 shadow-sm">
+              <span className="text-5xl block mb-4 opacity-50">📭</span>
+              <p className="text-neutral-500 font-medium">Nessuna stanza disponibile al momento.</p>
             </div>
           ) : (
-            listings.map(l => (
-              <div key={l.id} className="bg-white rounded-3xl p-3 shadow-sm border border-neutral-100 hover:shadow-md hover:border-orange-100 transition-all cursor-pointer group">
-                <div className="h-48 rounded-2xl flex items-center justify-center text-6xl relative overflow-hidden transition-transform duration-300 group-hover:scale-[1.02]" style={{ background: sanitizeHTML(l.color) || '#eee' }}>
-                  <span role="img" aria-label="Icona stanza" className="drop-shadow-sm">{sanitizeHTML(l.emoji)}</span>
-                  <span className={`absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-bold shadow-sm backdrop-blur-sm ${l.avail ? 'bg-white/90 text-green-700' : 'bg-black/70 text-white'}`}>
-                    {l.avail ? 'Disponibile' : 'Occupata'}
+            listings.slice(0, 8).map(l => ( // Mostriamo al massimo 8 stanze nella home
+              /* 🔴 FIX: Trasformato il div in un vero Link cliccabile, allineato allo stile di Search.jsx */
+              <Link 
+                to={`/dettagli/${l.id}`} 
+                key={l.id} 
+                className="w-full bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-orange-100 cursor-pointer overflow-hidden group decoration-none"
+              >
+                <div className="h-48 flex items-center justify-center text-6xl relative transition-transform duration-500 group-hover:scale-105" style={{ background: sanitizeHTML(l.color) || '#f3f4f6' }}>
+                  <span className="drop-shadow-sm">{sanitizeHTML(l.emoji) || '🏠'}</span>
+                  <span className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-[11px] font-bold shadow-sm backdrop-blur-md ${l.avail !== false ? 'bg-white/90 text-green-700' : 'bg-neutral-900/80 text-white'}`}>
+                    {l.avail !== false ? '✅ Disponibile' : 'Occupata'}
                   </span>
-                </div>
-                <div className="p-4">
-                  <div className="flex justify-between items-start mb-1 gap-2">
-                    {/* 🛡️ SANITIZZAZIONE E CASTING APPLICATI QUI */}
-                    <h3 className="font-bold text-lg text-neutral-900 truncate" title={sanitizeHTML(l.title)}>{sanitizeHTML(l.title)}</h3>
-                    <span className="font-extrabold text-orange-500 shrink-0">&euro;{Number(l.price) || 0}</span>
+                  <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-2xl shadow-sm">
+                    <span className="font-extrabold text-lg text-orange-500">€{Number(l.price) || 0}</span><span className="text-[11px] text-neutral-500 font-bold">/mese</span>
                   </div>
-                  <p className="text-sm text-neutral-500 mb-1 truncate">{sanitizeHTML(l.zone)}, {sanitizeHTML(l.city)}</p>
                 </div>
-              </div>
+                <div className="p-5 flex flex-col grow bg-white relative z-10">
+                  <h3 className="font-bold text-lg text-neutral-900 leading-tight mb-2 truncate" title={sanitizeHTML(l.title)}>
+                    {sanitizeHTML(l.title)}
+                  </h3>
+                  <p className="text-sm text-neutral-500 font-medium truncate">
+                    📍 {sanitizeHTML(l.zone)}, {sanitizeHTML(l.city)}
+                  </p>
+                </div>
+              </Link>
             ))
           )}
         </div>
         
         <div className="mt-8 md:hidden">
-            <Link to="/ricerca" className="block text-center bg-orange-50 text-orange-600 font-bold py-4 rounded-2xl hover:bg-orange-100 transition-colors">Vedi tutti gli annunci</Link>
+            <Link to="/ricerca" className="block text-center bg-white border border-neutral-200 text-neutral-900 font-bold py-4 rounded-2xl hover:bg-neutral-50 transition-colors shadow-sm">Vedi tutti gli annunci</Link>
         </div>
       </section>
 
