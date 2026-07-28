@@ -50,8 +50,10 @@ export default function Dashboard() {
     if (!user) return;
     try {
       const res = await fetchAPI(`/api/get_my_listings`);
-      const data = await res.json();
-      if (data) setMyListings(data);
+      if (res.ok) {
+        const data = await res.json();
+        if (data) setMyListings(data);
+      }
     } catch (err) {
       console.error("Errore caricamento annunci", err);
     }
@@ -75,7 +77,6 @@ export default function Dashboard() {
     }
   };
 
-  // Funzione per gestire i Tag in modo controllato (evita problemi di rendering)
   const handleToggleTag = (tagText) => {
     const rawTag = tagText.split(' ')[1] || tagText;
     const currentTagsStr = user.lifestyle_tags || user.tags || '';
@@ -87,20 +88,19 @@ export default function Dashboard() {
       currentTags.push(rawTag);
     }
     
-    setUser({ ...user, lifestyle_tags: currentTags.join(', ') });
+    const updatedTagsStr = currentTags.join(', ');
+    setUser({ ...user, lifestyle_tags: updatedTagsStr, tags: updatedTagsStr });
   };
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    
-    // Recuperiamo i tags direttamente dallo stato controllato
     const tags = user.lifestyle_tags || user.tags || '';
 
     const payload = {
       userType: formData.get('userType'),
       citta: formData.get('citta'),
-      budgetMax: formData.get('budgetMax'),
+      budgetMax: parseInt(formData.get('budgetMax'), 10) || 0,
       occupation: formData.get('occupation'),
       birthdate: formData.get('birthdate'),
       bio: formData.get('bio'),
@@ -134,7 +134,7 @@ export default function Dashboard() {
       city: formData.get('city'),
       zone: formData.get('zone'),
       roomType: formData.get('roomType'),
-      price: formData.get('price'),
+      price: parseInt(formData.get('price'), 10) || 0,
       description: formData.get('description')
     };
 
@@ -155,6 +155,13 @@ export default function Dashboard() {
 
   if (!user) return null;
 
+  // Helper per ripulire la data ISO proveniente da Go
+  const getBirthdateValue = () => {
+    const dateStr = user.nascita || user.birthdate || '';
+    if (!dateStr) return '';
+    return dateStr.split('T')[0];
+  };
+
   return (
     <div className="min-h-screen bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
       <Helmet>
@@ -162,7 +169,7 @@ export default function Dashboard() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
-      {/* --- TOP NAV (STILE GLASSMORPHISM MODERNO) --- */}
+      {/* --- TOP NAV --- */}
       <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-sm border-b border-neutral-100 sticky top-0">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900 decoration-none">
           Room<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">Date</span>
@@ -199,7 +206,7 @@ export default function Dashboard() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         
-        {/* HEADER PROFILO (PULITO E LUMINOSO) */}
+        {/* HEADER PROFILO */}
         <div className="bg-white rounded-3xl p-8 md:p-12 text-center relative shadow-sm border border-neutral-100 mb-8 overflow-hidden">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-orange-400/10 blur-[80px] rounded-full pointer-events-none"></div>
           
@@ -214,7 +221,7 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* STATS (STILE CARDS MINIMALI) */}
+        {/* STATS */}
         <div className="grid grid-cols-3 gap-4 md:gap-6 mb-10">
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100 text-center flex flex-col justify-center transition-transform hover:scale-[1.02]">
             <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">{myListings.length}</div>
@@ -230,7 +237,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* TABS (STILE PILLS) */}
+        {/* TABS */}
         <div className="flex flex-wrap justify-center gap-3 mb-8">
           <button className={`px-6 py-3 rounded-full font-bold text-sm transition-all cursor-pointer ${activeView === 'myListings' ? 'bg-neutral-900 text-white shadow-md' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`} onClick={() => setActiveView('myListings')}>
             📄 I Miei Annunci
@@ -272,7 +279,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* TAB 2: MODIFICA PROFILO (CAMPI CONTROLLATI - MAI VUOTI) */}
+          {/* TAB 2: MODIFICA PROFILO */}
           {activeView === 'editProfile' && (
             <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100">
               <h2 className="text-2xl font-extrabold text-neutral-900 mb-8 tracking-tight">Informazioni Personali</h2>
@@ -284,7 +291,7 @@ export default function Dashboard() {
                     <select 
                       name="userType" 
                       value={user.user_type || user.userType || 'cerca'} 
-                      onChange={e => setUser({...user, user_type: e.target.value})} 
+                      onChange={e => setUser({...user, user_type: e.target.value, userType: e.target.value})} 
                       className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all"
                     >
                       <option value="cerca">🔍 Cerco una stanza</option>
@@ -296,8 +303,8 @@ export default function Dashboard() {
                     <input 
                       name="budgetMax" 
                       type="number" 
-                      value={user.budget_max || ''} 
-                      onChange={e => setUser({...user, budget_max: e.target.value})}
+                      value={user.budget_max || user.budgetMax || ''} 
+                      onChange={e => setUser({...user, budget_max: e.target.value, budgetMax: e.target.value})}
                       className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 
                     />
                   </div>
@@ -323,7 +330,7 @@ export default function Dashboard() {
                     <input 
                       name="citta" 
                       type="text" 
-                      value={user.citta || ''} 
+                      value={user.citta || user.city || ''} 
                       onChange={e => setUser({...user, citta: e.target.value})}
                       className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 
                     />
@@ -333,8 +340,8 @@ export default function Dashboard() {
                     <input 
                       name="birthdate" 
                       type="date" 
-                      value={user.nascita ? user.nascita.split('T')[0] : ''} 
-                      onChange={e => setUser({...user, nascita: e.target.value})}
+                      value={getBirthdateValue()} 
+                      onChange={e => setUser({...user, nascita: e.target.value, birthdate: e.target.value})}
                       className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 
                     />
                   </div>
@@ -383,8 +390,8 @@ export default function Dashboard() {
                     <input 
                       type="checkbox" 
                       name="isPublic" 
-                      checked={user.is_public !== false} 
-                      onChange={e => setUser({...user, is_public: e.target.checked})}
+                      checked={user.is_public !== false && user.isPublic !== false} 
+                      onChange={e => setUser({...user, is_public: e.target.checked, isPublic: e.target.checked})}
                       className="mt-0.5 w-5 h-5 text-orange-500 bg-white border-neutral-300 rounded focus:ring-orange-500 accent-orange-500 cursor-pointer" 
                     />
                     <span className="text-sm text-neutral-600 leading-relaxed font-medium">
@@ -402,7 +409,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* TAB 3: CREA ANNUNCIO (STILE ALLINEATO) */}
+          {/* TAB 3: CREA ANNUNCIO */}
           {activeView === 'createListing' && (
             <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100">
               <h2 className="text-2xl font-extrabold text-neutral-900 mb-8 tracking-tight">Inserisci una Stanza</h2>
