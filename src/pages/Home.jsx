@@ -22,7 +22,6 @@ export default function Home() {
       const savedUser = localStorage.getItem('roomdate_user');
       if (savedUser) {
         const parsedUser = JSON.parse(savedUser);
-        // Verifichiamo che sia un oggetto reale e che abbia un ID
         if (parsedUser && typeof parsedUser === 'object' && parsedUser.id) {
           setUser(parsedUser);
         } else {
@@ -38,7 +37,7 @@ export default function Home() {
         const res = await fetchAPI('/api/get_listings');
         if (res.ok) {
           const lData = await res.json();
-          // 🛡️ TYPE CHECK: Assicuriamoci che il backend restituisca davvero un array
+          // 🛡️ TYPE CHECK
           if (Array.isArray(lData)) setListings(lData);
         }
       } catch (error) {
@@ -113,7 +112,6 @@ export default function Home() {
                 </div>
                 <div className="p-4">
                   <div className="flex justify-between items-start mb-1">
-                    {/* 🛡️ SANITIZZAZIONE E CASTING APPLICATI QUI */}
                     <h3 className="font-bold text-lg text-neutral-900 truncate">{sanitizeHTML(l.title)}</h3>
                     <span className="font-extrabold text-orange-500">&euro;{Number(l.price) || 0}</span>
                   </div>
