@@ -96,11 +96,14 @@ export default function Dashboard() {
     e.preventDefault();
     const formData = new FormData(e.target);
     const tags = user.lifestyle_tags || user.tags || '';
+    
+    const userType = formData.get('userType');
 
     const payload = {
-      userType: formData.get('userType'),
+      userType: userType,
       citta: formData.get('citta'),
-      budgetMax: parseInt(formData.get('budgetMax'), 10) || 0,
+      // 🔴 FIX: Costringiamo a 0 il budget se è un host (Offro una stanza), altrimenti prendiamo il valore
+      budgetMax: userType === 'cerca' ? (parseInt(formData.get('budgetMax'), 10) || 0) : 0,
       occupation: formData.get('occupation'),
       birthdate: formData.get('birthdate'),
       bio: formData.get('bio'),
@@ -116,7 +119,6 @@ export default function Dashboard() {
       if (res.ok) {
         alert("✅ Profilo aggiornato con successo!");
         fetchFreshProfile(); 
-        setActiveView('myListings');
       } else {
         const errorMsg = await res.text();
         alert("❌ Errore dal server: " + errorMsg);
@@ -126,7 +128,6 @@ export default function Dashboard() {
     }
   };
 
-  // 🔴 FIX APPLICATO QUI: Gestione degli errori dal server e reset del form
   const handleSaveListing = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
@@ -146,11 +147,10 @@ export default function Dashboard() {
       });
       if (res.ok) {
         alert("🎉 Annuncio pubblicato!");
-        e.target.reset(); // Svuota i campi del form per il prossimo utilizzo
+        e.target.reset();
         fetchMyListings(); 
         setActiveView('myListings');
       } else {
-        // Se il backend Vercel restituisce un errore, ora lo vediamo a schermo
         const errorMsg = await res.text();
         alert("❌ Errore durante la pubblicazione: " + errorMsg);
       }
@@ -168,8 +168,11 @@ export default function Dashboard() {
     return dateStr.split('T')[0];
   };
 
+  // 🔴 Variabile per capire se dobbiamo mostrare o no il budget dinamicamente
+  const isCerca = (user.user_type || user.userType || 'cerca') === 'cerca';
+
   return (
-    <div className="min-h-screen bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
+    <div className="min-h-[100dvh] bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
       <Helmet>
         <title>Area Privata | RoomDate</title>
         <meta name="robots" content="noindex, nofollow" />
@@ -291,7 +294,8 @@ export default function Dashboard() {
               <h2 className="text-2xl font-extrabold text-neutral-900 mb-8 tracking-tight">Informazioni Personali</h2>
               <form onSubmit={handleSaveProfile} className="flex flex-col gap-6">
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8 border-b border-neutral-100">
+                {/* 🔴 FIX: Se l'utente cerca stanza, mostriamo 2 colonne col budget. Se affitta, 1 colonna sola senza budget */}
+                <div className={`grid grid-cols-1 ${isCerca ? 'md:grid-cols-2' : ''} gap-6 pb-8 border-b border-neutral-100`}>
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-bold text-neutral-900">Il tuo obiettivo</label>
                     <select 
@@ -304,16 +308,19 @@ export default function Dashboard() {
                       <option value="affitta">🏠 Offro una stanza</option>
                     </select>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-bold text-neutral-900">Budget Max / Prezzo (€)</label>
-                    <input 
-                      name="budgetMax" 
-                      type="number" 
-                      value={user.budget_max || user.budgetMax || ''} 
-                      onChange={e => setUser({...user, budget_max: e.target.value, budgetMax: e.target.value})}
-                      className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 
-                    />
-                  </div>
+
+                  {isCerca && (
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-bold text-neutral-900">Budget Max (€/mese)</label>
+                      <input 
+                        name="budgetMax" 
+                        type="number" 
+                        value={user.budget_max || user.budgetMax || ''} 
+                        onChange={e => setUser({...user, budget_max: e.target.value, budgetMax: e.target.value})}
+                        className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

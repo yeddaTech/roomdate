@@ -71,10 +71,8 @@ export default function Register() {
     if (formData.vegano) lifestyleTags.push('Vegano/Vegetariano');
 
     try {
-      // --- 🔐 LOGICA CRITTOGRAFICA INIZIO ---
       const keys = await generateKeyPair();
       const wrappedData = await wrapPrivateKey(keys.privateKey, formData.password);
-      // --- 🔐 LOGICA CRITTOGRAFICA FINE ---
 
       const response = await fetchAPI('/api/register', { 
         method: 'POST',
@@ -86,11 +84,11 @@ export default function Register() {
           citta: formData.citta,
           nascita: formData.nascita,
           userType: userType,
-          budgetMax: parseInt(formData.budgetMax) || 0,
+          // 🔴 FIX: Se l'utente affitta, il budget personale è sempre 0
+          budgetMax: userType === 'cerca' ? (parseInt(formData.budgetMax) || 0) : 0,
           occupation: formData.occupation,
           bio: formData.bio,
           lifestyle_tags: lifestyleTags.join(', '),
-          
           publicKey: keys.publicKey,
           encryptedPrivateKey: wrappedData.encryptedPrivateKey,
           cryptoSalt: wrappedData.salt,
@@ -116,7 +114,7 @@ export default function Register() {
   return (
     <div className="min-h-[100dvh] flex flex-col font-sans bg-[#FAFAFA] selection:bg-orange-200">
       
-      {/* --- TOP NAV MINIMALE (GLASSMORPHISM) --- */}
+      {/* --- TOP NAV --- */}
       <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-sm border-b border-neutral-100 absolute top-0 w-full">
         <div className="flex items-center gap-6">
           <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900 decoration-none">
@@ -136,7 +134,7 @@ export default function Register() {
       {/* --- MAIN LAYOUT SPLIT --- */}
       <div className="flex-1 flex flex-col lg:flex-row w-full pt-16 md:pt-0">
         
-        {/* PARTE SINISTRA (Hero Visivo) */}
+        {/* PARTE SINISTRA */}
         <div className="hidden lg:flex lg:w-4/12 xl:w-5/12 bg-gradient-to-br from-orange-500 to-rose-500 p-12 xl:p-16 flex-col justify-center relative overflow-hidden text-white border-r border-orange-200/20">
           <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, white 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
           <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-white/20 blur-[100px] rounded-full pointer-events-none"></div>
@@ -148,7 +146,7 @@ export default function Register() {
           </div>
         </div>
 
-        {/* PARTE DESTRA (Form) */}
+        {/* PARTE DESTRA */}
         <div className="w-full lg:w-8/12 xl:w-7/12 flex flex-col justify-start items-center p-6 md:p-10 lg:py-24 overflow-y-auto relative">
           
           <div className="absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-orange-400/5 blur-[100px] rounded-full pointer-events-none"></div>
@@ -182,7 +180,7 @@ export default function Register() {
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-8">
               
-              {/* DATI ANAGRAFICI E ACCESSO */}
+              {/* DATI ANAGRAFICI */}
               <div className="p-6 bg-neutral-50 rounded-3xl border border-neutral-100">
                 <h3 className="font-bold text-neutral-900 mb-5 text-lg">I tuoi dati base</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
@@ -214,11 +212,12 @@ export default function Register() {
                 </div>
               </div>
 
-              {/* DATI DEL PROFILO PUBBLICO */}
+              {/* DATI PROFILO */}
               <div className="p-6 bg-orange-50/50 rounded-3xl border border-orange-100">
                 <h3 className="font-extrabold text-orange-600 mb-5 text-lg">Personalizza il tuo Profilo</h3>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-5">
+                {/* 🔴 FIX: Se cerca casa -> 3 colonne (con budget). Se affitta -> 2 colonne (senza budget) */}
+                <div className={`grid grid-cols-1 ${userType === 'cerca' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-5 mb-5`}>
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Città</label>
                     <select name="citta" value={formData.citta} onChange={handleChange} required className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm cursor-pointer">
@@ -230,10 +229,13 @@ export default function Register() {
                     <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Nascita</label>
                     <input type="date" name="nascita" value={formData.nascita} onChange={handleChange} required className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm" />
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">{userType === 'cerca' ? 'Budget Max' : 'Costo Stanza'}</label>
-                    <input type="number" name="budgetMax" placeholder="Es: 500" value={formData.budgetMax} onChange={handleChange} className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm placeholder:text-neutral-300" />
-                  </div>
+                  
+                  {userType === 'cerca' && (
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Budget Max (€)</label>
+                      <input type="number" name="budgetMax" placeholder="Es: 500" value={formData.budgetMax} onChange={handleChange} className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm placeholder:text-neutral-300" />
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-1.5 mb-5">
@@ -269,7 +271,7 @@ export default function Register() {
                 </div>
               </div>
 
-              {/* CHECKBOX TERMINI E PRIVACY */}
+              {/* TERMINI E CONDIZIONI */}
               <div className="flex flex-col gap-3">
                 <label className="flex items-start gap-3 cursor-pointer group">
                   <input 
