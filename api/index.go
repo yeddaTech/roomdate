@@ -38,6 +38,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		backend.DeleteListingHandler(w, r)
 	case "get_listing":
 		backend.GetListingHandler(w, r)
+	case "get_listings": // 🔴 ECCO IL PEZZO MANCANTE
+		backend.GetListingsHandler(w, r)
 	case "send_message":
 		backend.SendMessageHandler(w, r)
 	// Se hai altri endpoint (es. auth_check), aggiungili semplicemente come "case" qui sotto
