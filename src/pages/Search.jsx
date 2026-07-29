@@ -20,15 +20,12 @@ export default function Search() {
     }
   });
 
-  const ruoloUtente = user ? (user.user_type || user.userType || user.type) : null;
-
   const urlIntent = searchParams.get('intent'); 
   const currentCity = searchParams.get('citta') || '';
   const currentBudget = searchParams.get('budget') || '';
 
-  // 🔴 LOGICA SISTEMATA: L'URL comanda. Il ruolo serve solo come default iniziale
-  const defaultIntent = (ruoloUtente === 'affitta') ? 'coinquilino' : 'stanza';
-  const currentIntent = urlIntent || defaultIntent;
+  // 🔴 LOGICA SISTEMATA: L'URL comanda sempre e il default è 'stanza'. Addio conflitti con il ruolo utente.
+  const currentIntent = urlIntent === 'coinquilino' ? 'coinquilino' : 'stanza';
 
   const handleTopSearch = (newIntent, newCity, newBudget) => {
     const params = new URLSearchParams();
@@ -48,6 +45,7 @@ export default function Search() {
         return res.json();
       })
       .then(data => {
+        // Garantiamo che sia sempre un array per evitare crash del map
         setResults(Array.isArray(data) ? data : []);
         setLoading(false);
       })
@@ -90,33 +88,37 @@ export default function Search() {
     }
   };
 
-  // 🔴 LOGICA FILTRI BLINDATA (Gestione stringhe/numeri e variabili alternative DB)
+  // 🔴 LOGICA FILTRI BLINDATA E TOLLERANTE
   const filteredResults = results.filter(item => {
+    // Escludi l'utente stesso dalla visualizzazione dei coinquilini
+    if (user && String(item.id) === String(user.id) && currentIntent === 'coinquilino') {
+      return false;
+    }
+    
     let match = true;
     
+    // Filtro Città tollerante
     if (currentCity) {
-      const itemCity = String(item.citta || item.city || item.citta_interesse || '').toLowerCase();
-      if (itemCity !== currentCity.toLowerCase()) {
+      const itemCity = String(item.citta || item.city || item.citta_interesse || '').toLowerCase().trim();
+      if (itemCity && itemCity !== currentCity.toLowerCase().trim()) {
         match = false;
       }
     }
     
-    if (currentIntent === 'stanza') {
+    // Filtro Budget tollerante per le stanze
+    if (currentIntent === 'stanza' && currentBudget) {
       const itemPrice = Number(item.price || item.prezzo) || 0;
       const targetBudget = Number(currentBudget);
-      if (targetBudget > 0 && itemPrice > targetBudget) {
+      if (targetBudget > 0 && itemPrice > 0 && itemPrice > targetBudget) {
         match = false;
       }
     }
     
-    if (currentIntent === 'coinquilino') {
-      const tipoProfilo = String(item.user_type || item.userType || item.type || '').toLowerCase();
-      if (tipoProfilo === 'affitta') {
-        match = false; // Nasconde gli altri proprietari
-      }
-
+    // Filtro Budget tollerante per i coinquilini
+    if (currentIntent === 'coinquilino' && currentBudget) {
       const budgetCoinquilino = Number(item.budget_max || item.budgetMax || item.budget) || 0;
       const targetBudget = Number(currentBudget);
+      // Se non ha impostato il budget (0), lo mostriamo comunque per non nascondere l'utente
       if (targetBudget > 0 && budgetCoinquilino > 0 && budgetCoinquilino < targetBudget) {
         match = false;
       }
@@ -131,7 +133,7 @@ export default function Search() {
         <title>Ricerca | RoomDate</title>
       </Helmet>
       
-      {/* --- TOP NAV (MODERNA E PULITA) --- */}
+      {/* --- TOP NAV --- */}
       <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-sm border-b border-neutral-100 sticky top-0">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900 decoration-none">
           Room<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">Date</span>
@@ -193,35 +195,26 @@ export default function Search() {
       </div>
       {isMenuOpen && <div className="fixed inset-0 bg-neutral-900/20 backdrop-blur-sm z-[999] md:hidden transition-opacity" onClick={() => setIsMenuOpen(false)}></div>}
 
-      {/* --- HERO / FILTRI (MODERNI) --- */}
+      {/* --- HERO / FILTRI --- */}
       <div className="bg-white border-b border-neutral-100 px-6 py-12 flex justify-center relative overflow-hidden">
-        {/* Effetto Orb */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-orange-400/10 blur-[100px] rounded-full pointer-events-none"></div>
         
         <div className="w-full max-w-3xl relative z-10 text-center">
           
-          {!user || (ruoloUtente !== 'cerca' && ruoloUtente !== 'affitta') ? (
-            <div className="flex gap-2 bg-neutral-100 p-1.5 rounded-2xl mb-8 max-w-md mx-auto shadow-inner">
-              <button 
-                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${currentIntent === 'stanza' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`} 
-                onClick={() => handleTopSearch('stanza', currentCity, currentBudget)}
-              >
-                🔍 Cerca Stanza
-              </button>
-              <button 
-                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${currentIntent === 'coinquilino' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`} 
-                onClick={() => handleTopSearch('coinquilino', currentCity, '')}
-              >
-                👥 Cerca Coinquilini
-              </button>
-            </div>
-          ) : (
-            <div className="mb-8 flex justify-center">
-              <div className="bg-orange-50 border border-orange-100 text-orange-600 px-6 py-2.5 rounded-full text-sm font-bold shadow-sm inline-flex items-center gap-2">
-                {ruoloUtente === 'cerca' ? '🔍 Stai cercando: Stanze in affitto' : '👥 Stai cercando: Coinquilini per la tua stanza'}
-              </div>
-            </div>
-          )}
+          <div className="flex gap-2 bg-neutral-100 p-1.5 rounded-2xl mb-8 max-w-md mx-auto shadow-inner">
+            <button 
+              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${currentIntent === 'stanza' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`} 
+              onClick={() => handleTopSearch('stanza', currentCity, currentBudget)}
+            >
+              🔍 Cerca Stanza
+            </button>
+            <button 
+              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${currentIntent === 'coinquilino' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`} 
+              onClick={() => handleTopSearch('coinquilino', currentCity, '')}
+            >
+              👥 Cerca Coinquilini
+            </button>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <select 
@@ -258,7 +251,6 @@ export default function Search() {
           </p>
 
           {loading ? (
-            /* SKELETON LOADING MODERNO */
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {[1, 2, 3, 4, 5, 6].map((n) => (
                 <div key={n} className="bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col h-full min-h-[380px]">
@@ -272,7 +264,6 @@ export default function Search() {
               ))}
             </div>
           ) : filteredResults.length === 0 ? (
-            /* NESSUN RISULTATO */
             <div className="bg-white rounded-3xl border border-dashed border-neutral-200 p-16 text-center shadow-sm">
               <span className="text-6xl block mb-6 opacity-50">🏜️</span>
               <h3 className="font-serif text-2xl text-neutral-900 mb-3 font-extrabold">Nessun risultato trovato</h3>
@@ -290,7 +281,6 @@ export default function Search() {
               {filteredResults.map(item => {
                 if (currentIntent === 'stanza') {
                   return (
-                    /* CARD STANZA */
                     <div key={item.id} className="w-full bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-orange-100 cursor-pointer overflow-hidden group">
                       <div className="h-52 flex items-center justify-center text-6xl relative transition-transform duration-500 group-hover:scale-105" style={{ background: item.color ? item.color : '#f3f4f6' }}>
                         <span className="drop-shadow-sm">{item.emoji || '🏠'}</span>
@@ -321,7 +311,6 @@ export default function Search() {
                   );
                 } else {
                   return (
-                    /* CARD COINQUILINO */
                     <div key={item.id} className="w-full bg-white rounded-3xl shadow-sm border border-neutral-100 p-6 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-orange-100 group relative overflow-hidden">
                       <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-400/10 rounded-full blur-2xl"></div>
                       
