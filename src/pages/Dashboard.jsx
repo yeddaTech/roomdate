@@ -126,6 +126,7 @@ export default function Dashboard() {
     }
   };
 
+  // 🔴 FIX APPLICATO QUI: Gestione degli errori dal server e reset del form
   const handleSaveListing = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
@@ -145,17 +146,22 @@ export default function Dashboard() {
       });
       if (res.ok) {
         alert("🎉 Annuncio pubblicato!");
+        e.target.reset(); // Svuota i campi del form per il prossimo utilizzo
         fetchMyListings(); 
         setActiveView('myListings');
+      } else {
+        // Se il backend Vercel restituisce un errore, ora lo vediamo a schermo
+        const errorMsg = await res.text();
+        alert("❌ Errore durante la pubblicazione: " + errorMsg);
       }
     } catch (err) {
-      alert("Errore.");
+      console.error(err);
+      alert("Errore di connessione con il server.");
     }
   };
 
   if (!user) return null;
 
-  // Helper per ripulire la data ISO proveniente da Go
   const getBirthdateValue = () => {
     const dateStr = user.nascita || user.birthdate || '';
     if (!dateStr) return '';
