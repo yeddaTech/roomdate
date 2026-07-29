@@ -7,7 +7,6 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// Questa struct è identica a come React si aspetta i dati
 type Listing struct {
 	ID    int      `json:"id"`
 	Title string   `json:"title"`
@@ -26,10 +25,20 @@ func GetListingsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var err error
-
-	// Peschiamo gli ultimi 6 annunci dal database usando la variabile globale DB
-	rows, err := DB.Query("SELECT id, title, city, zone, room_type, price FROM roomdate_app.listings ORDER BY created_at DESC LIMIT 6")
+	// 🔴 FIX: Usiamo COALESCE per evitare crash sui valori NULL e LIMIT 50
+	query := `
+        SELECT 
+            id, 
+            COALESCE(title, ''), 
+            COALESCE(city, ''), 
+            COALESCE(zone, ''), 
+            COALESCE(room_type, ''), 
+            COALESCE(price, 0) 
+        FROM roomdate_app.listings 
+        ORDER BY created_at DESC 
+        LIMIT 50
+    `
+	rows, err := DB.Query(query)
 	if err != nil {
 		http.Error(w, "Errore query", http.StatusInternalServerError)
 		return
@@ -44,11 +53,12 @@ func GetListingsHandler(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var l Listing
 		var roomType string
+
+		// Se c'è un errore, saltiamo solo quella riga, non rompiamo tutto
 		if err := rows.Scan(&l.ID, &l.Title, &l.City, &l.Zone, &roomType, &l.Price); err != nil {
 			continue
 		}
 
-		// Aggiungiamo un po' di design finto per la grafica
 		l.Color = colors[i%len(colors)]
 		l.Emoji = emojis[i%len(emojis)]
 		l.Avail = true
@@ -56,6 +66,11 @@ func GetListingsHandler(w http.ResponseWriter, r *http.Request) {
 
 		listings = append(listings, l)
 		i++
+	}
+
+	// 🔴 FIX: Se l'array è vuoto, restituiamo [] invece di null a React
+	if listings == nil {
+		listings = []Listing{}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
