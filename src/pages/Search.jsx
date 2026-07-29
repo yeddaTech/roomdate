@@ -118,8 +118,10 @@ export default function Search() {
     if (currentIntent === 'coinquilino' && currentBudget) {
       const budgetCoinquilino = Number(item.budget_max || item.budgetMax || item.budget) || 0;
       const targetBudget = Number(currentBudget);
-      // Se non ha impostato il budget (0), lo mostriamo comunque per non nascondere l'utente
-      if (targetBudget > 0 && budgetCoinquilino > 0 && budgetCoinquilino < targetBudget) {
+      
+      // 🔴 FIX: Segno invertito (da < a >)
+      // Se il budget del coinquilino è MAGGIORE del budget cercato, nascondiamo il profilo.
+      if (targetBudget > 0 && budgetCoinquilino > 0 && budgetCoinquilino > targetBudget) {
         match = false;
       }
     }
