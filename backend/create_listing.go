@@ -3,7 +3,6 @@ package backend
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	_ "github.com/lib/pq"
 	"github.com/microcosm-cc/bluemonday"
@@ -15,7 +14,7 @@ type ListingRequest struct {
 	City        string `json:"city"`
 	Zone        string `json:"zone"`
 	RoomType    string `json:"roomType"`
-	Price       string `json:"price"`
+	Price       int    `json:"price"` // 🔴 FIX: Ora si aspetta un intero direttamente da React
 	Description string `json:"description"`
 }
 
@@ -41,7 +40,7 @@ func CreateListingHandler(w http.ResponseWriter, r *http.Request) {
 	var err error // ✅ DICHIARATA CORRETTAMENTE QUI
 
 	var req ListingRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Dati non validi", http.StatusBadRequest)
 		return
 	}
@@ -55,15 +54,15 @@ func CreateListingHandler(w http.ResponseWriter, r *http.Request) {
 	safeZone := p.Sanitize(req.Zone)
 	safeDescription := p.Sanitize(req.Description)
 
-	// Convertiamo il prezzo da testo a numero
-	priceInt, _ := strconv.Atoi(req.Price)
+	// 🔴 RIMOSSO: priceInt, _ := strconv.Atoi(req.Price) non serve più!
 
-	// 4. Salvataggio nel DB utilizzando SOLO i dati sanitizzati e l'ID sicuro (Usando la variabile globale DB maiuscola)
+	// 4. Salvataggio nel DB utilizzando SOLO i dati sanitizzati e l'ID sicuro
 	query := `
         INSERT INTO roomdate_app.listings (user_id, title, city, zone, room_type, price, description) 
         VALUES ($1, $2, $3, $4, $5, $6, $7)
     `
-	_, err = DB.Exec(query, secureUserID, safeTitle, safeCity, safeZone, req.RoomType, priceInt, safeDescription)
+	// 🔴 FIX: Passiamo direttamente req.Price
+	_, err = DB.Exec(query, secureUserID, safeTitle, safeCity, safeZone, req.RoomType, req.Price, safeDescription)
 	if err != nil {
 		http.Error(w, "Errore salvataggio annuncio: "+err.Error(), http.StatusInternalServerError)
 		return
