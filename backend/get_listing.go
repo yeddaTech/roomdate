@@ -33,7 +33,6 @@ func GetListingHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Prende il numero della stanza dall'URL (es: id=2)
 	id := r.URL.Query().Get("id")
 	if id == "" {
 		http.Error(w, "ID mancante", http.StatusBadRequest)
@@ -42,11 +41,19 @@ func GetListingHandler(w http.ResponseWriter, r *http.Request) {
 
 	var l ListingDetail
 	var firstName sql.NullString
-	var err error // ✅ DICHIARATA CORRETTAMENTE QUI
+	var err error
 
-	// Cerca la stanza specifica e il nome del proprietario usando la variabile globale DB
+	// 🔴 FIX: COALESCE applicato anche qui per sicurezza assoluta
 	query := `
-        SELECT l.id, l.title, l.city, l.zone, l.price, l.room_type, l.description, u.first_name
+        SELECT 
+            l.id, 
+            COALESCE(l.title, ''), 
+            COALESCE(l.city, ''), 
+            COALESCE(l.zone, ''), 
+            COALESCE(l.price, 0), 
+            COALESCE(l.room_type, ''), 
+            COALESCE(l.description, ''), 
+            u.first_name
         FROM roomdate_app.listings l
         LEFT JOIN roomdate_app.users u ON l.user_id = u.id
         WHERE l.id = $1
@@ -62,7 +69,7 @@ func GetListingHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Dati finti SOLO per la grafica delle foto e icone (perché non le salviamo ancora nel DB)
+	// Dati finti SOLO per la grafica
 	l.Features = []string{"Wi-Fi", "Lavatrice", "Arredata", "Luminosa"}
 	l.Images = []string{
 		"https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80",
@@ -70,7 +77,6 @@ func GetListingHandler(w http.ResponseWriter, r *http.Request) {
 		"https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80",
 	}
 
-	// Impostiamo il vero nome del proprietario
 	name := "Proprietario"
 	if firstName.Valid && firstName.String != "" {
 		name = firstName.String
