@@ -8,7 +8,7 @@ import (
 	"roomdate-backend/internal/httpx"
 )
 
-var errSessionInvalid = apperr.Unauthorized("session_invalid", "Accesso negato: Sessione non valida")
+var errSessionInvalid = apperr.Unauthorized("session_invalid", "Sessione scaduta: accedi di nuovo")
 
 // Handler espone le API legacy della chat, con percorsi e formati usati dal frontend attuale.
 type Handler struct {

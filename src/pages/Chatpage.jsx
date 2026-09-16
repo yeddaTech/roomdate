@@ -1,10 +1,12 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import Pusher from 'pusher-js'; 
+import Pusher from 'pusher-js';
 import { Helmet } from 'react-helmet-async';
-import { encryptMessage, decryptMessage, unwrapPrivateKey } from '../utils/crypto';
-import { fetchAPI } from '../utils/api';
-import { logoutSession } from '../utils/session';
+import { encryptMessage, decryptMessage } from '../utils/crypto';
+import { useAuth } from '../auth/AuthContext';
+import { getPrivateKey, getPublicKey, hasStoredVault, unlockPrivateKey } from '../auth/keyStorage';
+import { listConversations, notifyTyping, sendMessage } from '../api/chat';
+import { isSessionExpired } from '../api/client';
 
 // Pusher può mancare in sviluppo locale: in quel caso niente tempo reale né "sta scrivendo"
 const PUSHER_KEY = import.meta.env.VITE_PUSHER_KEY;
@@ -36,7 +38,8 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const location = useLocation(); 
   
-  const [user, setUser] = useState(null);
+  // La pagina è protetta: l'utente arriva dalla sessione verificata dal server
+  const { user, logout, endLocalSession } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
@@ -66,33 +69,22 @@ export default function ChatPage() {
   useEffect(() => { activeConvIdRef.current = activeConvId; }, [activeConvId]);
   useEffect(() => { userRef.current = user; }, [user]);
 
-  useEffect(() => {
-    const savedUser = localStorage.getItem('roomdate_user');
-    if (!savedUser) {
-      navigate('/accedi');
-    } else {
-      setUser(JSON.parse(savedUser));
-    }
-  }, [navigate]);
-
   const handleLogout = async () => {
-    await logoutSession();
-    setUser(null);
+    // Prima si lascia la pagina: su quelle protette la sessione chiusa porterebbe all'accesso
     setIsMenuOpen(false);
     navigate('/');
+    await logout();
   };
 
   const fetchChats = useCallback(async () => {
     const currentUser = userRef.current;
     if (!currentUser) return;
-    
+
     try {
-      const res = await fetchAPI(`/api/get_chats`); 
-      if (!res.ok) throw new Error("Errore fetch");
-      const data = await res.json();
-      
+      const data = await listConversations();
+
       if (data) {
-        const myPrivateKey = sessionStorage.getItem('roomdate_private_key'); 
+        const myPrivateKey = getPrivateKey();
 
         if (myPrivateKey) {
           setIsLocked(false);
@@ -116,38 +108,32 @@ export default function ChatPage() {
       }
     } catch (err) {
       console.error("Errore caricamento chat:", err);
+      // Sessione scaduta: si torna all'accesso
+      if (isSessionExpired(err)) endLocalSession();
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [endLocalSession]);
 
   const handleUnlock = async (e) => {
     e.preventDefault();
     setUnlockError('');
     setIsLoading(true);
-    
-    const cryptoDataStr = localStorage.getItem('roomdate_crypto');
-    if (!cryptoDataStr) {
+
+    if (!hasStoredVault()) {
       setUnlockError('Dati di sicurezza mancanti. Fai il logout e riaccedi.');
       setIsLoading(false);
       return;
     }
 
     try {
-      const cryptoData = JSON.parse(cryptoDataStr);
-      const privateKey = await unwrapPrivateKey(
-        cryptoData.encryptedPrivateKey,
-        unlockPassword,
-        cryptoData.cryptoSalt,
-        cryptoData.cryptoIv
-      );
-      
-      sessionStorage.setItem('roomdate_private_key', privateKey);
-      setIsLocked(false);
-      setUnlockPassword('');
-      await fetchChats(); 
-    } catch (err) {
-      setUnlockError('Password errata. Riprova.');
+      if (await unlockPrivateKey(unlockPassword)) {
+        setIsLocked(false);
+        setUnlockPassword('');
+        await fetchChats();
+      } else {
+        setUnlockError('Password errata. Riprova.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -230,12 +216,7 @@ export default function ChatPage() {
     const now = Date.now();
     if (PUSHER_KEY && activeConvId && user && (now - lastTypedRef.current > 1500)) {
       lastTypedRef.current = now;
-        fetchAPI('/api/typing', {
-        method: 'POST',
-        body: JSON.stringify({
-            conversationId: String(activeConvId)
-        })
-      }).catch(err => console.error("Errore typing:", err));
+      notifyTyping(activeConvId).catch(err => console.error("Errore typing:", err));
     }
   };
 
@@ -265,23 +246,24 @@ export default function ChatPage() {
     setTimeout(async () => {
       try {
         const targetPubKey = activeConv?.targetPublicKey;
-        const myPublicKey = localStorage.getItem('roomdate_public_key');
-        
+        const myPublicKey = getPublicKey();
+
         if (!targetPubKey || !myPublicKey) throw new Error("Chiavi crittografiche mancanti.");
 
         const encryptedForTarget = await encryptMessage(textToSend, targetPubKey);
         const encryptedForMe = await encryptMessage(textToSend, myPublicKey);
 
-        await fetchAPI('/api/send_message', {
-          method: 'POST',
-          body: JSON.stringify({
-            conversationId: activeConvId,
-            text: encryptedForTarget,  
-            senderText: encryptedForMe 
-          })
+        await sendMessage({
+          conversationId: activeConvId,
+          text: encryptedForTarget,
+          senderText: encryptedForMe
         });
       } catch (err) {
         console.error(err);
+        if (isSessionExpired(err)) {
+          endLocalSession();
+          return;
+        }
         alert("Errore durante l'invio sicuro. Riprova.");
         setConversations(prev => prev.map(conv => {
             if (String(conv.id) === String(activeConvId)) {
@@ -393,9 +375,9 @@ export default function ChatPage() {
         </div>
 
         <div className="hidden md:flex gap-4 items-center">
-          {user && user.nome ? (
+          {user ? (
             <>
-              <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{sanitizeHTML(user.nome)}</strong>!</span>
+              <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{sanitizeHTML(user.firstName)}</strong>!</span>
               <button onClick={handleLogout} className="border border-neutral-200 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 px-4 py-2 rounded-full text-sm transition-colors cursor-pointer font-medium">Esci</button>
             </>
           ) : (
@@ -418,7 +400,7 @@ export default function ChatPage() {
         <div className="flex flex-col gap-6 text-lg font-medium text-neutral-600">
           {user && (
              <div className="border-b border-neutral-100 pb-4 mb-2">
-               <h3 className="text-xl text-neutral-900 font-bold">👤 Ciao, {sanitizeHTML(user.nome)}!</h3>
+               <h3 className="text-xl text-neutral-900 font-bold">👤 Ciao, {sanitizeHTML(user.firstName)}!</h3>
              </div>
           )}
           

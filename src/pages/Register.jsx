@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { generateKeyPair, wrapPrivateKey } from '../utils/crypto';
-import { fetchAPI } from '../utils/api'; 
+import { register } from '../api/auth';
+import { ApiError } from '../api/client';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -74,38 +75,36 @@ export default function Register() {
       const keys = await generateKeyPair();
       const wrappedData = await wrapPrivateKey(keys.privateKey, formData.password);
 
-      const response = await fetchAPI('/api/register', { 
-        method: 'POST',
-        body: JSON.stringify({
-          nome: formData.nome,
-          cognome: formData.cognome,
-          email: formData.email,
-          password: formData.password,
-          citta: formData.citta,
-          nascita: formData.nascita,
-          userType: userType,
-          // 🔴 FIX: Se l'utente affitta, il budget personale è sempre 0
-          budgetMax: userType === 'cerca' ? (parseInt(formData.budgetMax) || 0) : 0,
-          occupation: formData.occupation,
-          bio: formData.bio,
-          lifestyle_tags: lifestyleTags.join(', '),
+      await register({
+        firstName: formData.nome,
+        lastName: formData.cognome,
+        email: formData.email,
+        password: formData.password,
+        city: formData.citta,
+        birthdate: formData.nascita,
+        userType: userType,
+        // 🔴 FIX: Se l'utente affitta, il budget personale è sempre 0
+        budgetMax: userType === 'cerca' ? (parseInt(formData.budgetMax) || 0) : 0,
+        occupation: formData.occupation,
+        bio: formData.bio,
+        lifestyleTags: lifestyleTags.join(', '),
+        keys: {
           publicKey: keys.publicKey,
           encryptedPrivateKey: wrappedData.encryptedPrivateKey,
           cryptoSalt: wrappedData.salt,
           cryptoIv: wrappedData.iv
-        }),
+        }
       });
 
-      if (response.ok) {
-        alert('🎉 Registrazione completata! Ora puoi accedere e vedere il tuo profilo già impostato.');
-        navigate('/accedi');
-      } else {
-        const errorMsg = await response.text();
-        alert('❌ Errore: ' + errorMsg);
-      }
+      alert('🎉 Registrazione completata! Ora puoi accedere e vedere il tuo profilo già impostato.');
+      navigate('/accedi');
     } catch (error) {
-      console.error("Errore di registrazione o crittografia:", error);
-      alert('⚠️ Errore di connessione col server o errore interno.');
+      if (error instanceof ApiError) {
+        alert('❌ Errore: ' + error.message);
+      } else {
+        console.error("Errore di crittografia durante la registrazione:", error);
+        alert('⚠️ Errore interno durante la creazione delle chiavi di sicurezza.');
+      }
     } finally {
       setIsSubmitting(false);
     }

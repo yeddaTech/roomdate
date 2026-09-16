@@ -3,7 +3,6 @@ package users
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -22,7 +21,7 @@ const (
 const roommatesLimit = 8
 
 var (
-	errSessionInvalid = apperr.Unauthorized("session_invalid", "Accesso negato o sessione non valida")
+	errSessionInvalid = apperr.Unauthorized("session_invalid", "Sessione scaduta: accedi di nuovo")
 	errLocked         = apperr.TooManyRequests("account_locked", "Account temporaneamente bloccato per troppi tentativi. Riprova tra 15 minuti.")
 	errTooManyFailed  = apperr.TooManyRequests("account_locked", "Troppi tentativi falliti. Account bloccato per 15 minuti.")
 	errUserNotFound   = apperr.NotFound("user_not_found", "Utente non trovato")
@@ -37,50 +36,43 @@ func NewService(store *Store) *Service {
 	return &Service{store: store, now: time.Now}
 }
 
-// RegisterInput sono i dati inviati dal modulo di registrazione.
+// RegisterInput sono i dati del modulo di registrazione.
 type RegisterInput struct {
-	Nome          string `json:"nome"`
-	Cognome       string `json:"cognome"`
+	FirstName     string `json:"firstName"`
+	LastName      string `json:"lastName"`
 	Email         string `json:"email"`
 	Password      string `json:"password"`
-	Citta         string `json:"citta"`
+	City          string `json:"city"`
 	UserType      string `json:"userType"`
-	Nascita       string `json:"nascita"`
+	Birthdate     string `json:"birthdate"`
 	BudgetMax     int    `json:"budgetMax"`
 	Occupation    string `json:"occupation"`
 	Bio           string `json:"bio"`
-	LifestyleTags string `json:"lifestyle_tags"`
-
-	PublicKey           string `json:"publicKey"`
-	EncryptedPrivateKey string `json:"encryptedPrivateKey"`
-	CryptoSalt          string `json:"cryptoSalt"`
-	CryptoIv            string `json:"cryptoIv"`
+	LifestyleTags string `json:"lifestyleTags"`
+	Keys          *Vault `json:"keys"`
 }
 
 // Register crea l'account e restituisce l'ID del nuovo utente.
 func (s *Service) Register(ctx context.Context, in RegisterInput) (string, error) {
 	u := NewUser{
-		FirstName:     validate.CleanText(in.Nome),
-		LastName:      validate.CleanText(in.Cognome),
+		FirstName:     validate.CleanText(in.FirstName),
+		LastName:      validate.CleanText(in.LastName),
 		Email:         strings.TrimSpace(in.Email),
-		City:          validate.CleanText(in.Citta),
+		City:          validate.CleanText(in.City),
 		UserType:      in.UserType,
-		Birthdate:     in.Nascita,
+		Birthdate:     in.Birthdate,
 		BudgetMax:     in.BudgetMax,
 		Occupation:    validate.CleanText(in.Occupation),
 		Bio:           validate.CleanText(in.Bio),
 		LifestyleTags: validate.CleanText(in.LifestyleTags),
-		Vault: Vault{
-			PublicKey:           in.PublicKey,
-			EncryptedPrivateKey: in.EncryptedPrivateKey,
-			CryptoSalt:          in.CryptoSalt,
-			CryptoIV:            in.CryptoIv,
-		},
+	}
+	if in.Keys != nil {
+		u.Vault = *in.Keys
 	}
 
 	var v validate.Validator
-	v.Check(validate.NotBlank(u.FirstName) && validate.MaxLen(u.FirstName, 50), "nome", "Il nome è obbligatorio (massimo 50 caratteri)")
-	v.Check(validate.NotBlank(u.LastName) && validate.MaxLen(u.LastName, 50), "cognome", "Il cognome è obbligatorio (massimo 50 caratteri)")
+	v.Check(validate.NotBlank(u.FirstName) && validate.MaxLen(u.FirstName, 50), "firstName", "Il nome è obbligatorio (massimo 50 caratteri)")
+	v.Check(validate.NotBlank(u.LastName) && validate.MaxLen(u.LastName, 50), "lastName", "Il cognome è obbligatorio (massimo 50 caratteri)")
 	v.Check(validate.Email(u.Email), "email", "Inserisci un indirizzo email valido")
 	checkPassword(&v, "password", in.Password)
 	checkPersonalDetails(&v, s.now(), u.UserType, u.City, u.Birthdate, u.BudgetMax, u.Occupation, u.Bio, u.LifestyleTags)
@@ -148,25 +140,25 @@ func (s *Service) verifyPassword(ctx context.Context, account Account, password,
 	return nil
 }
 
-// SessionAccount restituisce l'account della sessione (validate_session).
-func (s *Service) SessionAccount(ctx context.Context, userID string) (Account, error) {
-	account, err := s.store.AccountByID(ctx, userID)
+// SessionAccount restituisce l'account dell'utente in sessione.
+// ok è false se l'utente non esiste più (ad esempio dopo l'eliminazione dell'account).
+func (s *Service) SessionAccount(ctx context.Context, userID string) (account Account, ok bool, err error) {
+	account, err = s.store.AccountByID(ctx, userID)
 	if db.IsNoRows(err) || db.IsInvalidInput(err) {
-		return Account{}, apperr.Unauthorized("user_not_found", "Utente non trovato")
+		return Account{}, false, nil
 	}
 	if err != nil {
-		return Account{}, fmt.Errorf("lettura account: %w", err)
+		return Account{}, false, fmt.Errorf("lettura account: %w", err)
 	}
-	return account, nil
+	return account, true, nil
 }
 
-// ChangePasswordInput sono i dati per il cambio password.
+// ChangePasswordInput sono i dati per il cambio password. Keys è la chiave privata E2EE
+// cifrata di nuovo con la nuova password (senza chiave pubblica).
 type ChangePasswordInput struct {
-	CurrentPassword     string `json:"currentPassword"`
-	NewPassword         string `json:"newPassword"`
-	EncryptedPrivateKey string `json:"encryptedPrivateKey"`
-	CryptoSalt          string `json:"cryptoSalt"`
-	CryptoIv            string `json:"cryptoIv"`
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+	Keys            *Vault `json:"keys"`
 }
 
 // ChangePassword richiede la password attuale e, se l'utente ha chiavi E2EE, la chiave privata
@@ -190,13 +182,16 @@ func (s *Service) ChangePassword(ctx context.Context, userID string, in ChangePa
 		return errLocked
 	}
 
-	newVault := Vault{EncryptedPrivateKey: in.EncryptedPrivateKey, CryptoSalt: in.CryptoSalt, CryptoIV: in.CryptoIv}
+	var newVault Vault
+	if in.Keys != nil {
+		newVault = *in.Keys
+	}
 	if account.Vault.EncryptedPrivateKey != "" {
 		if newVault.EncryptedPrivateKey == "" || newVault.CryptoSalt == "" || newVault.CryptoIV == "" {
 			return apperr.BadRequest("vault_required", "Chiavi di cifratura mancanti: esci, accedi di nuovo e riprova")
 		}
 		v.Check(validate.Base64(newVault.EncryptedPrivateKey, 4096) && validate.Base64(newVault.CryptoSalt, 64) &&
-			validate.Base64(newVault.CryptoIV, 64), "encryptedPrivateKey", "Chiavi di cifratura non valide")
+			validate.Base64(newVault.CryptoIV, 64), "keys", "Chiavi di cifratura non valide")
 		if err := v.Err(); err != nil {
 			return err
 		}
@@ -224,40 +219,51 @@ func (s *Service) DeleteAccount(ctx context.Context, userID string) error {
 	return nil
 }
 
+// MyProfile restituisce il profilo completo dell'utente in sessione.
+func (s *Service) MyProfile(ctx context.Context, userID string) (Profile, error) {
+	profile, err := s.store.Profile(ctx, userID)
+	if db.IsNoRows(err) || db.IsInvalidInput(err) {
+		return Profile{}, errSessionInvalid
+	}
+	if err != nil {
+		return Profile{}, fmt.Errorf("lettura profilo: %w", err)
+	}
+	return profile, nil
+}
+
 // PublicProfile è ciò che gli altri utenti possono vedere: niente email, cognome o data di nascita.
 type PublicProfile struct {
 	ID            string `json:"id"`
-	Nome          string `json:"nome"`
-	UserType      string `json:"user_type"`
-	Citta         string `json:"citta"`
-	BudgetMax     int    `json:"budget_max"`
+	FirstName     string `json:"firstName"`
+	UserType      string `json:"userType"`
+	City          string `json:"city"`
+	BudgetMax     int    `json:"budgetMax"`
 	Occupation    string `json:"occupation"`
 	Bio           string `json:"bio"`
-	LifestyleTags string `json:"lifestyle_tags"`
+	LifestyleTags string `json:"lifestyleTags"`
 }
 
-// Profile restituisce il profilo completo al proprietario e quello pubblico agli altri.
-// Un profilo privato risulta inesistente per chi non ne è il proprietario.
-func (s *Service) Profile(ctx context.Context, viewerID, targetID string) (any, error) {
+// PublicProfile restituisce il profilo pubblico di un utente.
+// Un profilo privato risulta inesistente per tutti tranne che per il proprietario.
+func (s *Service) PublicProfile(ctx context.Context, viewerID, targetID string) (PublicProfile, error) {
+	if !validate.MaxLen(targetID, 64) {
+		return PublicProfile{}, errUserNotFound
+	}
 	profile, err := s.store.Profile(ctx, targetID)
 	if db.IsNoRows(err) || db.IsInvalidInput(err) {
-		return nil, errUserNotFound
+		return PublicProfile{}, errUserNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("lettura profilo: %w", err)
+		return PublicProfile{}, fmt.Errorf("lettura profilo: %w", err)
 	}
-
-	if viewerID != "" && profile.ID == viewerID {
-		return profile, nil
-	}
-	if !profile.IsPublic {
-		return nil, errUserNotFound
+	if !profile.IsPublic && profile.ID != viewerID {
+		return PublicProfile{}, errUserNotFound
 	}
 	return PublicProfile{
 		ID:            profile.ID,
-		Nome:          profile.Nome,
+		FirstName:     profile.FirstName,
 		UserType:      profile.UserType,
-		Citta:         profile.Citta,
+		City:          profile.City,
 		BudgetMax:     profile.BudgetMax,
 		Occupation:    profile.Occupation,
 		Bio:           profile.Bio,
@@ -265,59 +271,41 @@ func (s *Service) Profile(ctx context.Context, viewerID, targetID string) (any, 
 	}, nil
 }
 
-// ProfileInput sono i dati inviati dalla modifica del profilo.
+// ProfileInput sono i campi modificabili del profilo.
 type ProfileInput struct {
-	UserType   string `json:"userType"`
-	Citta      string `json:"citta"`
-	BudgetMax  any    `json:"budgetMax"` // numero o stringa, a seconda del form
-	Occupation string `json:"occupation"`
-	Birthdate  string `json:"birthdate"`
-	Bio        string `json:"bio"`
-	Tags       string `json:"tags"`
-	IsPublic   bool   `json:"isPublic"`
+	UserType      string `json:"userType"`
+	City          string `json:"city"`
+	BudgetMax     int    `json:"budgetMax"`
+	Occupation    string `json:"occupation"`
+	Birthdate     string `json:"birthdate"`
+	Bio           string `json:"bio"`
+	LifestyleTags string `json:"lifestyleTags"`
+	IsPublic      bool   `json:"isPublic"`
 }
 
-func (s *Service) UpdateProfile(ctx context.Context, userID string, in ProfileInput) error {
+// UpdateProfile salva il profilo e lo restituisce aggiornato.
+func (s *Service) UpdateProfile(ctx context.Context, userID string, in ProfileInput) (Profile, error) {
 	u := ProfileUpdate{
 		UserType:      in.UserType,
-		City:          validate.CleanText(in.Citta),
+		City:          validate.CleanText(in.City),
+		BudgetMax:     in.BudgetMax,
 		Occupation:    validate.CleanText(in.Occupation),
 		Birthdate:     in.Birthdate,
 		Bio:           validate.CleanText(in.Bio),
-		LifestyleTags: validate.CleanText(in.Tags),
+		LifestyleTags: validate.CleanText(in.LifestyleTags),
 		IsPublic:      in.IsPublic,
 	}
 
 	var v validate.Validator
-	budget, ok := parseBudget(in.BudgetMax)
-	v.Check(ok, "budgetMax", "Budget non valido")
-	u.BudgetMax = budget
 	checkPersonalDetails(&v, s.now(), u.UserType, u.City, u.Birthdate, u.BudgetMax, u.Occupation, u.Bio, u.LifestyleTags)
 	if err := v.Err(); err != nil {
-		return err
+		return Profile{}, err
 	}
 
 	if err := s.store.UpdateProfile(ctx, userID, u); err != nil {
-		return apperr.Wrap(err, "profile_update_failed", "Impossibile salvare il profilo")
+		return Profile{}, apperr.Wrap(err, "profile_update_failed", "Impossibile salvare il profilo")
 	}
-	return nil
-}
-
-// parseBudget accetta un numero o una stringa numerica; vuoto o assente vale 0.
-func parseBudget(value any) (int, bool) {
-	switch b := value.(type) {
-	case nil:
-		return 0, true
-	case float64:
-		return int(b), b == float64(int(b))
-	case string:
-		if strings.TrimSpace(b) == "" {
-			return 0, true
-		}
-		n, err := strconv.Atoi(strings.TrimSpace(b))
-		return n, err == nil
-	}
-	return 0, false
+	return s.MyProfile(ctx, userID)
 }
 
 // Roommate è un profilo nell'elenco dei coinquilini (formato JSON delle API legacy).
@@ -378,12 +366,12 @@ func checkPassword(v *validate.Validator, field, password string) {
 // Occupazione e città sono ancora testo libero: diventano elenchi chiusi nel modulo M1.5.
 func checkPersonalDetails(v *validate.Validator, now time.Time, userType, city, birthdate string, budget int, occupation, bio, tags string) {
 	v.Check(validate.OneOf(userType, UserTypeSeeker, UserTypeLandlord), "userType", "Tipo di utente non valido")
-	v.Check(validate.MaxLen(city, 80), "citta", "La città può avere al massimo 80 caratteri")
-	v.Check(validate.PastDate(birthdate, now), "nascita", "Data di nascita non valida")
+	v.Check(validate.MaxLen(city, 80), "city", "La città può avere al massimo 80 caratteri")
+	v.Check(validate.PastDate(birthdate, now), "birthdate", "Data di nascita non valida")
 	v.Check(validate.Between(budget, 0, 20000), "budgetMax", "Il budget deve essere compreso tra 0 e 20.000 €")
 	v.Check(validate.MaxLen(occupation, 50), "occupation", "L'occupazione può avere al massimo 50 caratteri")
 	v.Check(validate.MaxLen(bio, 1000), "bio", "La bio può avere al massimo 1000 caratteri")
-	v.Check(validate.MaxLen(tags, 300), "lifestyle_tags", "Troppi tag di stile di vita")
+	v.Check(validate.MaxLen(tags, 300), "lifestyleTags", "Troppi tag di stile di vita")
 }
 
 // checkVault valida la chiave pubblica e la chiave privata cifrata: tutte presenti o tutte assenti.
@@ -403,5 +391,5 @@ func checkVault(v *validate.Validator, vault Vault) {
 		validate.Base64(vault.EncryptedPrivateKey, 4096) &&
 		validate.Base64(vault.CryptoSalt, 64) &&
 		validate.Base64(vault.CryptoIV, 64),
-		"publicKey", "Chiavi di cifratura non valide")
+		"keys", "Chiavi di cifratura non valide")
 }

@@ -1,27 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { fetchAPI } from '../utils/api';
-import { logoutSession } from '../utils/session';
+import { useAuth } from '../auth/AuthContext';
+import { useLatestListings, useRoommates, useStartChat } from '../api/hooks';
 
 export default function Search() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { user, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const [user, setUser] = useState(() => {
-    try {
-      const savedUser = localStorage.getItem('roomdate_user');
-      return savedUser ? JSON.parse(savedUser) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  const urlIntent = searchParams.get('intent'); 
+  const urlIntent = searchParams.get('intent');
   const currentCity = searchParams.get('citta') || '';
   const currentBudget = searchParams.get('budget') || '';
 
@@ -36,32 +25,20 @@ export default function Search() {
     setSearchParams(params);
   };
 
-  useEffect(() => {
-    setLoading(true);
-    const apiEndpoint = currentIntent === 'coinquilino' ? '/api/get_roommates' : '/api/get_listings';
+  // Si carica solo l'elenco della modalità attiva; i dati restano in cache passando da una all'altra
+  const roommatesQuery = useRoommates({ enabled: currentIntent === 'coinquilino' });
+  const listingsQuery = useLatestListings({ enabled: currentIntent === 'stanza' });
+  const activeQuery = currentIntent === 'coinquilino' ? roommatesQuery : listingsQuery;
+  const results = activeQuery.data ?? [];
+  const loading = activeQuery.isPending;
 
-    fetchAPI(apiEndpoint)
-      .then(res => {
-        if (!res.ok) throw new Error('Errore di rete');
-        return res.json();
-      })
-      .then(data => {
-        // Garantiamo che sia sempre un array per evitare crash del map
-        setResults(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Errore fetch:", err);
-        setResults([]);
-        setLoading(false);
-      });
-  }, [currentIntent]); 
+  const startChat = useStartChat();
 
   const handleLogout = async () => {
-    await logoutSession();
-    setUser(null);
+    // Prima si lascia la pagina: su quelle protette la sessione chiusa porterebbe all'accesso
     setIsMenuOpen(false);
     navigate('/');
+    await logout();
   };
 
   const handleDirectContact = async (targetUserId) => {
@@ -71,20 +48,10 @@ export default function Search() {
       return;
     }
     try {
-      const res = await fetchAPI('/api/start_chat', {
-        method: 'POST',
-        body: JSON.stringify({ tenantId: user.id, targetId: targetUserId })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        navigate('/chat', { state: { openChatId: data.conversationId } });
-      } else {
-        alert("Errore nell'avvio della chat.");
-      }
+      const conversationId = await startChat.mutateAsync({ targetId: targetUserId });
+      navigate('/chat', { state: { openChatId: conversationId } });
     } catch (err) {
-      console.error(err);
-      alert("Errore di connessione.");
+      alert("Errore nell'avvio della chat: " + err.message);
     }
   };
 
@@ -99,7 +66,7 @@ export default function Search() {
     
     // Filtro Città tollerante
     if (currentCity) {
-      const itemCity = String(item.citta || item.city || item.citta_interesse || '').toLowerCase().trim();
+      const itemCity = item.city.toLowerCase().trim();
       if (itemCity && itemCity !== currentCity.toLowerCase().trim()) {
         match = false;
       }
@@ -107,7 +74,7 @@ export default function Search() {
     
     // Filtro Budget tollerante per le stanze
     if (currentIntent === 'stanza' && currentBudget) {
-      const itemPrice = Number(item.price || item.prezzo) || 0;
+      const itemPrice = item.price;
       const targetBudget = Number(currentBudget);
       if (targetBudget > 0 && itemPrice > 0 && itemPrice > targetBudget) {
         match = false;
@@ -116,7 +83,7 @@ export default function Search() {
     
     // Filtro Budget tollerante per i coinquilini
     if (currentIntent === 'coinquilino' && currentBudget) {
-      const budgetCoinquilino = Number(item.budget_max || item.budgetMax || item.budget) || 0;
+      const budgetCoinquilino = item.budgetMax;
       const targetBudget = Number(currentBudget);
       
       // 🔴 FIX: Segno invertito (da < a >)
@@ -152,7 +119,7 @@ export default function Search() {
         <div className="hidden md:flex gap-4 items-center">
           {user ? (
             <>
-              <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{user.nome || user.first_name || user.username}</strong>!</span>
+              <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{user.firstName}</strong>!</span>
               <button onClick={handleLogout} className="border border-neutral-200 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer">Esci</button>
             </>
           ) : (
@@ -175,7 +142,7 @@ export default function Search() {
         <div className="flex flex-col gap-6 text-lg font-medium text-neutral-600">
           {user && (
              <div className="border-b border-neutral-100 pb-4 mb-2">
-               <h3 className="text-xl text-neutral-900 font-bold">👤 Ciao, {user.nome || user.first_name || user.username}!</h3>
+               <h3 className="text-xl text-neutral-900 font-bold">👤 Ciao, {user.firstName}!</h3>
              </div>
           )}
           <Link to="/" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">🏠 Home</Link>
@@ -286,21 +253,21 @@ export default function Search() {
                     <div key={item.id} className="w-full bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-orange-100 cursor-pointer overflow-hidden group">
                       <div className="h-52 flex items-center justify-center text-6xl relative transition-transform duration-500 group-hover:scale-105" style={{ background: item.color ? item.color : '#f3f4f6' }}>
                         <span className="drop-shadow-sm">{item.emoji || '🏠'}</span>
-                        <span className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-[11px] font-bold shadow-sm backdrop-blur-md ${item.avail !== false ? 'bg-white/90 text-green-700' : 'bg-neutral-900/80 text-white'}`}>
-                          {item.avail !== false ? '✅ Disponibile' : 'Occupata'}
+                        <span className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-[11px] font-bold shadow-sm backdrop-blur-md ${item.available ? 'bg-white/90 text-green-700' : 'bg-neutral-900/80 text-white'}`}>
+                          {item.available ? '✅ Disponibile' : 'Occupata'}
                         </span>
                         <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-2xl shadow-sm">
-                          <span className="font-extrabold text-lg text-orange-500">€{item.price || item.prezzo}</span><span className="text-[11px] text-neutral-500 font-bold">/mese</span>
+                          <span className="font-extrabold text-lg text-orange-500">€{item.price}</span><span className="text-[11px] text-neutral-500 font-bold">/mese</span>
                         </div>
                       </div>
                       <div className="p-6 flex flex-col grow bg-white relative z-10">
                         <h3 className="font-bold text-lg text-neutral-900 leading-tight mb-2 truncate" title={item.title}>{item.title}</h3>
                         <p className="text-sm text-neutral-500 mb-5 font-medium truncate">
-                          📍 {item.zone || item.zona || item.citta}, {item.city || item.citta}
+                          📍 {item.zone || item.city}, {item.city}
                         </p>
                         <div className="flex flex-wrap gap-2 mb-6">
-                          {(item.tags || []).slice(0, 3).map(t => <span key={t} className="bg-neutral-50 border border-neutral-100 text-neutral-600 px-2.5 py-1 rounded-lg text-[11px] font-bold">{t}</span>)}
-                          {(item.tags || []).length > 3 && <span className="bg-neutral-50 border border-neutral-100 text-neutral-500 px-2 py-1 rounded-lg text-[11px] font-bold">+{item.tags.length - 3}</span>}
+                          {item.tags.slice(0, 3).map(t => <span key={t} className="bg-neutral-50 border border-neutral-100 text-neutral-600 px-2.5 py-1 rounded-lg text-[11px] font-bold">{t}</span>)}
+                          {item.tags.length > 3 && <span className="bg-neutral-50 border border-neutral-100 text-neutral-500 px-2 py-1 rounded-lg text-[11px] font-bold">+{item.tags.length - 3}</span>}
                         </div>
                         <Link 
                             to={`/dettagli/${item.id}`} 
@@ -319,18 +286,18 @@ export default function Search() {
                       <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 shadow-sm relative z-10 transition-transform duration-500 group-hover:scale-110" style={{ background: `linear-gradient(135deg, ${item.color1 || '#fb923c'}, ${item.color2 || '#e11d48'})` }}>
                         <span className="drop-shadow-sm">{item.emoji || '👤'}</span>
                       </div>
-                      <div className="text-center font-bold text-neutral-900 text-lg relative z-10 truncate">{item.name || item.first_name}</div>
-                      <div className="text-center text-xs text-neutral-500 mb-4 font-bold uppercase tracking-wider relative z-10">{item.age ? `${item.age} anni · ` : ''}{item.job || item.occupation || 'Studente'}</div>
+                      <div className="text-center font-bold text-neutral-900 text-lg relative z-10 truncate">{item.name}</div>
+                      <div className="text-center text-xs text-neutral-500 mb-4 font-bold uppercase tracking-wider relative z-10">{item.age ? `${item.age} anni · ` : ''}{item.occupation || 'Studente'}</div>
                       
-                      <div className="bg-neutral-50 p-4 rounded-2xl text-sm text-neutral-600 italic text-center mb-5 leading-relaxed relative z-10 border border-neutral-100 line-clamp-3">"{item.quote || item.bio || 'Cerco una stanza accogliente!'}"</div>
+                      <div className="bg-neutral-50 p-4 rounded-2xl text-sm text-neutral-600 italic text-center mb-5 leading-relaxed relative z-10 border border-neutral-100 line-clamp-3">"{item.bio || 'Cerco una stanza accogliente!'}"</div>
                       
                       <div className="flex flex-wrap justify-center gap-1.5 mb-5 relative z-10">
-                        {(item.tags || (item.lifestyle_tags ? item.lifestyle_tags.split(',') : [])).slice(0, 4).map(t => <span key={t} className="bg-orange-50 text-orange-600 border border-orange-100 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider">{t.trim()}</span>)}
+                        {item.tags.slice(0, 4).map(t => <span key={t} className="bg-orange-50 text-orange-600 border border-orange-100 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider">{t.trim()}</span>)}
                       </div>
 
-                      {item.budget_max > 0 && (
+                      {item.budgetMax > 0 && (
                         <div className="text-center text-sm font-extrabold text-orange-500 mb-5 relative z-10 bg-white border border-neutral-100 py-2 rounded-xl shadow-sm">
-                           Budget max: €{item.budget_max}
+                           Budget max: €{item.budgetMax}
                         </div>
                       )}
                       

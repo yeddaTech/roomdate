@@ -8,7 +8,7 @@ import (
 	"roomdate-backend/internal/httpx"
 )
 
-var errSessionInvalid = apperr.Unauthorized("session_invalid", "Accesso negato: Sessione non valida")
+var errSessionInvalid = apperr.Unauthorized("session_invalid", "Sessione scaduta: accedi di nuovo")
 
 // Handler espone le API legacy degli annunci, con percorsi e formati usati dal frontend attuale.
 type Handler struct {
@@ -32,7 +32,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, err)
 		return
 	}
-	if err := h.svc.Create(r.Context(), session, in); err != nil {
+	if err := h.svc.Create(r.Context(), session.UserID, in); err != nil {
 		httpx.WriteError(w, r, err)
 		return
 	}
@@ -81,7 +81,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, errSessionInvalid)
 		return
 	}
-	if err := h.svc.Delete(r.Context(), session, r.URL.Query().Get("id")); err != nil {
+	if err := h.svc.Delete(r.Context(), session.UserID, r.URL.Query().Get("id")); err != nil {
 		httpx.WriteError(w, r, err)
 		return
 	}

@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
-import { fetchAPI } from '../utils/api';
-import { logoutSession } from '../utils/session';
+import { useLatestListings } from '../api/hooks';
 
 // 🛡️ HELPER SICUREZZA: Previene iniezioni HTML/Script per i dati grezzi
 const sanitizeHTML = (str) => {
@@ -12,71 +10,12 @@ const sanitizeHTML = (str) => {
 };
 
 export default function Home() {
-  const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [listings, setListings] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    // 🛡️ SAFE PARSING: Controllo rigoroso del token utente
-    try {
-      const savedUser = localStorage.getItem('roomdate_user');
-      if (savedUser) {
-        const parsedUser = JSON.parse(savedUser);
-        if (parsedUser && typeof parsedUser === 'object' && parsedUser.id) {
-          setUser(parsedUser);
-        } else {
-          throw new Error("Payload utente non valido");
-        }
-      }
-    } catch (e) {
-      localStorage.removeItem('roomdate_user');
-    }
-
-    // 🚀 Ottimizzazione: AbortController per evitare memory leak
-    const abortController = new AbortController();
-
-    const loadData = async () => {
-      try {
-        const res = await fetchAPI('/api/get_listings', {
-          signal: abortController.signal
-        });
-        if (res.ok) {
-          const lData = await res.json();
-          // 🛡️ TYPE CHECK: Assicuriamoci che il backend restituisca un array
-          if (Array.isArray(lData)) {
-            setListings(lData);
-          }
-        } else {
-          throw new Error("Errore server durante il caricamento");
-        }
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          console.error("Errore fetch stanze", err);
-          setError("Impossibile caricare le stanze al momento.");
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    loadData();
-
-    return () => {
-      abortController.abort();
-    };
-  }, []);
-
-  const handleLogout = async () => {
-    await logoutSession();
-    setUser(null);
-    navigate('/', { replace: true });
-  };
+  const { data: listings = [], isPending: isLoading, isError } = useLatestListings();
+  const error = isError ? "Impossibile caricare le stanze al momento." : null;
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] font-sans selection:bg-orange-200 flex flex-col">
-      <Navbar user={user} handleLogout={handleLogout} />
+      <Navbar />
 
       {/* HERO SECTION */}
       <section className="relative pt-32 md:pt-40 pb-20 px-6 overflow-hidden flex flex-col items-center justify-center min-h-[80vh]">
@@ -143,8 +82,8 @@ export default function Home() {
               >
                 <div className="h-48 flex items-center justify-center text-6xl relative transition-transform duration-500 group-hover:scale-105" style={{ background: sanitizeHTML(l.color) || '#f3f4f6' }}>
                   <span className="drop-shadow-sm">{sanitizeHTML(l.emoji) || '🏠'}</span>
-                  <span className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-[11px] font-bold shadow-sm backdrop-blur-md ${l.avail !== false ? 'bg-white/90 text-green-700' : 'bg-neutral-900/80 text-white'}`}>
-                    {l.avail !== false ? '✅ Disponibile' : 'Occupata'}
+                  <span className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-[11px] font-bold shadow-sm backdrop-blur-md ${l.available ? 'bg-white/90 text-green-700' : 'bg-neutral-900/80 text-white'}`}>
+                    {l.available ? '✅ Disponibile' : 'Occupata'}
                   </span>
                   <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-2xl shadow-sm">
                     <span className="font-extrabold text-lg text-orange-500">€{Number(l.price) || 0}</span><span className="text-[11px] text-neutral-500 font-bold">/mese</span>
