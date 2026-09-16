@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -14,11 +15,31 @@ import (
 )
 
 type MultiRequest struct {
-	Action      string `json:"action"`
-	Email       string `json:"email"`
-	Password    string `json:"password"`
-	UserID      string `json:"userId"`
-	NewPassword string `json:"newPassword"`
+	Action          string `json:"action"`
+	Email           string `json:"email"`
+	Password        string `json:"password"`
+	UserID          string `json:"userId"`
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+
+	// Chiave privata E2EE cifrata di nuovo con la nuova password (solo per update_password)
+	EncryptedPrivateKey string `json:"encryptedPrivateKey"`
+	CryptoSalt          string `json:"cryptoSalt"`
+	CryptoIv            string `json:"cryptoIv"`
+}
+
+// clearSessionCookie chiede al browser di eliminare il cookie di sessione.
+func clearSessionCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "roomdate_session",
+		Value:    "",
+		Path:     "/",
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
 }
 
 type UserData struct {
@@ -105,12 +126,20 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Utente non trovato", http.StatusUnauthorized)
 				return
 			}
-			http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("validate_session: %v", err)
+			http.Error(w, "Errore interno del server", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(user)
+		return
+
+	// --- LOGOUT ---
+	case "logout":
+		clearSessionCookie(w)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Logout effettuato"))
 		return
 
 	// --- UPDATE PASSWORD ---
@@ -121,15 +150,74 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if len(req.NewPassword) < 6 {
+			http.Error(w, "La nuova password deve avere almeno 6 caratteri", http.StatusBadRequest)
+			return
+		}
+
+		var currentHash, storedVault string
+		var failedAttempts int
+		var lockedUntil sql.NullTime
+		err = DB.QueryRow(`SELECT password_hash, COALESCE(encrypted_private_key, ''), COALESCE(failed_login_attempts, 0), locked_until
+                           FROM roomdate_app.users WHERE id = $1`, secureUserID).Scan(&currentHash, &storedVault, &failedAttempts, &lockedUntil)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				http.Error(w, "Accesso negato o sessione non valida", http.StatusUnauthorized)
+				return
+			}
+			log.Printf("update_password: lettura utente: %v", err)
+			http.Error(w, "Errore interno del server", http.StatusInternalServerError)
+			return
+		}
+
+		if lockedUntil.Valid && lockedUntil.Time.After(time.Now()) {
+			http.Error(w, "Account temporaneamente bloccato per troppi tentativi. Riprova tra 15 minuti.", http.StatusTooManyRequests)
+			return
+		}
+
+		// 🔐 Senza la chiave privata cifrata di nuovo, i messaggi E2EE diventerebbero illeggibili
+		hasVault := storedVault != ""
+		if hasVault && (req.EncryptedPrivateKey == "" || req.CryptoSalt == "" || req.CryptoIv == "") {
+			http.Error(w, "Chiavi di cifratura mancanti: esci, accedi di nuovo e riprova", http.StatusBadRequest)
+			return
+		}
+
+		// 🛡️ La password attuale è obbligatoria: una sessione rubata non basta per cambiarla.
+		// Gli errori contano come tentativi di login falliti.
+		if bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(req.CurrentPassword)) != nil {
+			failedAttempts++
+			if failedAttempts >= 5 {
+				DB.Exec(`UPDATE roomdate_app.users SET failed_login_attempts = $1, locked_until = NOW() + INTERVAL '15 minutes' WHERE id = $2`, failedAttempts, secureUserID)
+				http.Error(w, "Troppi tentativi falliti. Account bloccato per 15 minuti.", http.StatusTooManyRequests)
+				return
+			}
+			DB.Exec(`UPDATE roomdate_app.users SET failed_login_attempts = $1 WHERE id = $2`, failedAttempts, secureUserID)
+			http.Error(w, "La password attuale non è corretta", http.StatusUnauthorized)
+			return
+		}
+
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 		if err != nil {
 			http.Error(w, "Errore crittografia", http.StatusInternalServerError)
 			return
 		}
-		query := `UPDATE roomdate_app.users SET password_hash = $1 WHERE id = $2`
-		_, err = DB.Exec(query, hashedPassword, secureUserID)
+
+		// Password e chiave privata cambiano insieme, in un'unica istruzione.
+		// La chiave viene sostituita solo se l'utente ne aveva già una.
+		query := `
+            UPDATE roomdate_app.users
+            SET password_hash = $1,
+                encrypted_private_key = CASE WHEN COALESCE(encrypted_private_key, '') <> '' THEN $2 ELSE encrypted_private_key END,
+                crypto_salt = CASE WHEN COALESCE(encrypted_private_key, '') <> '' THEN $3 ELSE crypto_salt END,
+                crypto_iv = CASE WHEN COALESCE(encrypted_private_key, '') <> '' THEN $4 ELSE crypto_iv END,
+                failed_login_attempts = 0,
+                locked_until = NULL
+            WHERE id = $5
+        `
+		_, err = DB.Exec(query, string(hashedPassword), req.EncryptedPrivateKey, req.CryptoSalt, req.CryptoIv, secureUserID)
 		if err != nil {
-			http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("update_password: aggiornamento: %v", err)
+			http.Error(w, "Errore interno del server", http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -147,9 +235,11 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		query := `DELETE FROM roomdate_app.users WHERE id = $1`
 		_, err = DB.Exec(query, secureUserID)
 		if err != nil {
-			http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("delete_account: %v", err)
+			http.Error(w, "Impossibile eliminare l'account in questo momento", http.StatusInternalServerError)
 			return
 		}
+		clearSessionCookie(w)
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Account eliminato"))
 		return
@@ -177,7 +267,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Email non trovata", http.StatusUnauthorized)
 				return
 			}
-			http.Error(w, "Errore DB: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("login: %v", err)
+			http.Error(w, "Errore interno del server", http.StatusInternalServerError)
 			return
 		}
 

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { fetchAPI } from '../utils/api';
+import { logoutSession } from '../utils/session';
 
 export default function Search() {
   const navigate = useNavigate();
@@ -56,9 +57,8 @@ export default function Search() {
       });
   }, [currentIntent]); 
 
-  const handleLogout = () => {
-    localStorage.removeItem('roomdate_user');
-    sessionStorage.clear();
+  const handleLogout = async () => {
+    await logoutSession();
     setUser(null);
     setIsMenuOpen(false);
     navigate('/');

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom'; 
 import { Helmet } from 'react-helmet-async';
-import { fetchAPI } from '../utils/api'; 
+import { fetchAPI } from '../utils/api';
+import { logoutSession } from '../utils/session';
 
 export default function ListingDetails() {
   const { id } = useParams();
@@ -19,9 +20,8 @@ export default function ListingDetails() {
     if (savedUser) setUser(JSON.parse(savedUser));
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('roomdate_user');
-    sessionStorage.clear();
+  const handleLogout = async () => {
+    await logoutSession();
     setUser(null);
     setIsMenuOpen(false);
     navigate('/');

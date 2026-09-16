@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { fetchAPI } from '../utils/api'; 
+import { fetchAPI } from '../utils/api';
+import { logoutSession } from '../utils/session';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -39,9 +40,8 @@ export default function Dashboard() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('roomdate_user');
-    sessionStorage.clear();
+  const handleLogout = async () => {
+    await logoutSession();
     setIsMenuOpen(false);
     navigate('/');
   };
