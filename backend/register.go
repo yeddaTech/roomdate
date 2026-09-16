@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	_ "github.com/lib/pq"
-	"github.com/microcosm-cc/bluemonday"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -48,13 +47,12 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 🧼 SANITIZZAZIONE XSS DEI CAMPI ANAGRAFICI E DESCRITTIVI
-	p := bluemonday.StrictPolicy()
-	safeNome := p.Sanitize(req.Nome)
-	safeCognome := p.Sanitize(req.Cognome)
-	safeCitta := p.Sanitize(req.Citta)
-	safeOccupation := p.Sanitize(req.Occupation)
-	safeBio := p.Sanitize(req.Bio)
-	safeTags := p.Sanitize(req.LifestyleTags)
+	safeNome := sanitizeText(req.Nome)
+	safeCognome := sanitizeText(req.Cognome)
+	safeCitta := sanitizeText(req.Citta)
+	safeOccupation := sanitizeText(req.Occupation)
+	safeBio := sanitizeText(req.Bio)
+	safeTags := sanitizeText(req.LifestyleTags)
 
 	var err error
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)

@@ -6,6 +6,10 @@ import { encryptMessage, decryptMessage, unwrapPrivateKey } from '../utils/crypt
 import { fetchAPI } from '../utils/api';
 import { logoutSession } from '../utils/session';
 
+// Pusher può mancare in sviluppo locale: in quel caso niente tempo reale né "sta scrivendo"
+const PUSHER_KEY = import.meta.env.VITE_PUSHER_KEY;
+const FALLBACK_REFRESH_MS = 5000;
+
 const QUICK_REPLIES = [
   '📅 Quando sei disponibile?',
   '🏠 Posso visitarla?',
@@ -152,9 +156,15 @@ export default function ChatPage() {
   useEffect(() => {
     if (!user) return;
     
-    fetchChats(); 
+    fetchChats();
 
-    const pusher = new Pusher(import.meta.env.VITE_PUSHER_KEY, {
+    if (!PUSHER_KEY) {
+      // Senza Pusher (sviluppo locale) si aggiornano le chat periodicamente
+      const interval = setInterval(fetchChats, FALLBACK_REFRESH_MS);
+      return () => clearInterval(interval);
+    }
+
+    const pusher = new Pusher(PUSHER_KEY, {
       cluster: import.meta.env.VITE_PUSHER_CLUSTER
     });
 
@@ -218,7 +228,7 @@ export default function ChatPage() {
     ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
 
     const now = Date.now();
-    if (activeConvId && user && (now - lastTypedRef.current > 1500)) {
+    if (PUSHER_KEY && activeConvId && user && (now - lastTypedRef.current > 1500)) {
       lastTypedRef.current = now;
         fetchAPI('/api/typing', {
         method: 'POST',

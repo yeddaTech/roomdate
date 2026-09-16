@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	_ "github.com/lib/pq"
-	"github.com/microcosm-cc/bluemonday"
 )
 
 type ProfileRequest struct {
@@ -131,11 +130,10 @@ func ProfileHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		p := bluemonday.StrictPolicy()
-		safeCitta := p.Sanitize(req.Citta)
-		safeOccupation := p.Sanitize(req.Occupation)
-		safeBio := p.Sanitize(req.Bio)
-		safeTags := p.Sanitize(req.Tags)
+		safeCitta := sanitizeText(req.Citta)
+		safeOccupation := sanitizeText(req.Occupation)
+		safeBio := sanitizeText(req.Bio)
+		safeTags := sanitizeText(req.Tags)
 
 		// Safe parsing del budget a prescindere dal tipo di dato ricevuto (stringa o numero)
 		budget := 0

@@ -28,6 +28,10 @@ type MultiRequest struct {
 	CryptoIv            string `json:"cryptoIv"`
 }
 
+// SecureCookies imposta il flag Secure sul cookie di sessione. Resta true in produzione:
+// solo il server di sviluppo locale (cmd/dev, in HTTP) lo disattiva.
+var SecureCookies = true
+
 // clearSessionCookie chiede al browser di eliminare il cookie di sessione.
 func clearSessionCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
@@ -37,7 +41,7 @@ func clearSessionCookie(w http.ResponseWriter) {
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   SecureCookies,
 		SameSite: http.SameSiteLaxMode,
 	})
 }
@@ -323,7 +327,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			Expires:  time.Now().Add(24 * time.Hour),
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   true,
+			Secure:   SecureCookies,
 			SameSite: http.SameSiteLaxMode, // 👈 Modificato da Strict a Lax per stabilità su Vercel
 		})
 

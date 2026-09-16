@@ -12,6 +12,16 @@ import (
 var DB *sql.DB
 
 func init() {
+	InitDB()
+}
+
+// InitDB apre la connessione usando DATABASE_URL. Non fa nulla se la connessione esiste già
+// o se la variabile non è impostata: il server di sviluppo la richiama dopo aver letto .env.local.
+func InitDB() {
+	if DB != nil {
+		return
+	}
+
 	connStr := os.Getenv("DATABASE_URL")
 	if connStr == "" {
 		return

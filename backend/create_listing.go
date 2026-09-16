@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	_ "github.com/lib/pq"
-	"github.com/microcosm-cc/bluemonday"
 )
 
 type ListingRequest struct {
@@ -47,13 +46,11 @@ func CreateListingHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 🧼 3. SANITIZZAZIONE ANTI-XSS
-	// StrictPolicy rimuove chirurgicamente ogni traccia di tag HTML e script
-	p := bluemonday.StrictPolicy()
-
-	safeTitle := p.Sanitize(req.Title)
-	safeCity := p.Sanitize(req.City)
-	safeZone := p.Sanitize(req.Zone)
-	safeDescription := p.Sanitize(req.Description)
+	// Rimuove ogni tag HTML e script, senza trasformare apostrofi e simboli in entità HTML
+	safeTitle := sanitizeText(req.Title)
+	safeCity := sanitizeText(req.City)
+	safeZone := sanitizeText(req.Zone)
+	safeDescription := sanitizeText(req.Description)
 
 	// 🔴 RIMOSSO: priceInt, _ := strconv.Atoi(req.Price) non serve più!
 
