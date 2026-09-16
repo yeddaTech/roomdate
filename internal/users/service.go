@@ -1,0 +1,407 @@
+package users
+
+import (
+	"context"
+	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
+	"roomdate-backend/internal/apperr"
+	"roomdate-backend/internal/auth"
+	"roomdate-backend/internal/db"
+	"roomdate-backend/internal/validate"
+)
+
+// Tipi di utente ammessi.
+const (
+	UserTypeSeeker   = "cerca"
+	UserTypeLandlord = "affitta"
+)
+
+const roommatesLimit = 8
+
+var (
+	errSessionInvalid = apperr.Unauthorized("session_invalid", "Accesso negato o sessione non valida")
+	errLocked         = apperr.TooManyRequests("account_locked", "Account temporaneamente bloccato per troppi tentativi. Riprova tra 15 minuti.")
+	errTooManyFailed  = apperr.TooManyRequests("account_locked", "Troppi tentativi falliti. Account bloccato per 15 minuti.")
+	errUserNotFound   = apperr.NotFound("user_not_found", "Utente non trovato")
+)
+
+type Service struct {
+	store *Store
+	now   func() time.Time
+}
+
+func NewService(store *Store) *Service {
+	return &Service{store: store, now: time.Now}
+}
+
+// RegisterInput sono i dati inviati dal modulo di registrazione.
+type RegisterInput struct {
+	Nome          string `json:"nome"`
+	Cognome       string `json:"cognome"`
+	Email         string `json:"email"`
+	Password      string `json:"password"`
+	Citta         string `json:"citta"`
+	UserType      string `json:"userType"`
+	Nascita       string `json:"nascita"`
+	BudgetMax     int    `json:"budgetMax"`
+	Occupation    string `json:"occupation"`
+	Bio           string `json:"bio"`
+	LifestyleTags string `json:"lifestyle_tags"`
+
+	PublicKey           string `json:"publicKey"`
+	EncryptedPrivateKey string `json:"encryptedPrivateKey"`
+	CryptoSalt          string `json:"cryptoSalt"`
+	CryptoIv            string `json:"cryptoIv"`
+}
+
+// Register crea l'account e restituisce l'ID del nuovo utente.
+func (s *Service) Register(ctx context.Context, in RegisterInput) (string, error) {
+	u := NewUser{
+		FirstName:     validate.CleanText(in.Nome),
+		LastName:      validate.CleanText(in.Cognome),
+		Email:         strings.TrimSpace(in.Email),
+		City:          validate.CleanText(in.Citta),
+		UserType:      in.UserType,
+		Birthdate:     in.Nascita,
+		BudgetMax:     in.BudgetMax,
+		Occupation:    validate.CleanText(in.Occupation),
+		Bio:           validate.CleanText(in.Bio),
+		LifestyleTags: validate.CleanText(in.LifestyleTags),
+		Vault: Vault{
+			PublicKey:           in.PublicKey,
+			EncryptedPrivateKey: in.EncryptedPrivateKey,
+			CryptoSalt:          in.CryptoSalt,
+			CryptoIV:            in.CryptoIv,
+		},
+	}
+
+	var v validate.Validator
+	v.Check(validate.NotBlank(u.FirstName) && validate.MaxLen(u.FirstName, 50), "nome", "Il nome è obbligatorio (massimo 50 caratteri)")
+	v.Check(validate.NotBlank(u.LastName) && validate.MaxLen(u.LastName, 50), "cognome", "Il cognome è obbligatorio (massimo 50 caratteri)")
+	v.Check(validate.Email(u.Email), "email", "Inserisci un indirizzo email valido")
+	checkPassword(&v, "password", in.Password)
+	checkPersonalDetails(&v, s.now(), u.UserType, u.City, u.Birthdate, u.BudgetMax, u.Occupation, u.Bio, u.LifestyleTags)
+	checkVault(&v, u.Vault)
+	if err := v.Err(); err != nil {
+		return "", err
+	}
+
+	hash, err := auth.HashPassword(in.Password)
+	if err != nil {
+		return "", fmt.Errorf("hash della password: %w", err)
+	}
+	u.PasswordHash = hash
+
+	id, err := s.store.Create(ctx, u)
+	if db.IsUniqueViolation(err) {
+		return "", apperr.Conflict("registration_failed",
+			"Impossibile completare la registrazione. Verifica i dati inseriti o accedi se hai già un account.")
+	}
+	if err != nil {
+		return "", fmt.Errorf("creazione utente: %w", err)
+	}
+	return id, nil
+}
+
+// Login verifica le credenziali, con blocco temporaneo dopo troppi tentativi errati.
+func (s *Service) Login(ctx context.Context, email, password string) (Account, error) {
+	account, err := s.store.AccountByEmail(ctx, email)
+	if db.IsNoRows(err) {
+		return Account{}, apperr.Unauthorized("invalid_credentials", "Email non trovata")
+	}
+	if err != nil {
+		return Account{}, fmt.Errorf("lettura account: %w", err)
+	}
+	if err := s.verifyPassword(ctx, account, password, "Password errata"); err != nil {
+		return Account{}, err
+	}
+	return account, nil
+}
+
+// verifyPassword controlla la password rispettando il blocco dell'account: ogni errore aumenta
+// il contatore e al quinto l'account resta bloccato per 15 minuti. Un successo azzera il contatore.
+func (s *Service) verifyPassword(ctx context.Context, account Account, password, wrongMessage string) error {
+	if account.LockedUntil != nil && account.LockedUntil.After(s.now()) {
+		return errLocked
+	}
+
+	if !auth.CheckPassword(account.PasswordHash, password) {
+		attempts := account.FailedLogins + 1
+		lock := attempts >= auth.MaxFailedLogins
+		if err := s.store.SetFailedLogins(ctx, account.ID, attempts, lock, auth.LockDuration); err != nil {
+			return fmt.Errorf("aggiornamento tentativi: %w", err)
+		}
+		if lock {
+			return errTooManyFailed
+		}
+		return apperr.Unauthorized("invalid_credentials", wrongMessage)
+	}
+
+	if account.FailedLogins > 0 {
+		if err := s.store.ResetFailedLogins(ctx, account.ID); err != nil {
+			return fmt.Errorf("azzeramento tentativi: %w", err)
+		}
+	}
+	return nil
+}
+
+// SessionAccount restituisce l'account della sessione (validate_session).
+func (s *Service) SessionAccount(ctx context.Context, userID string) (Account, error) {
+	account, err := s.store.AccountByID(ctx, userID)
+	if db.IsNoRows(err) || db.IsInvalidInput(err) {
+		return Account{}, apperr.Unauthorized("user_not_found", "Utente non trovato")
+	}
+	if err != nil {
+		return Account{}, fmt.Errorf("lettura account: %w", err)
+	}
+	return account, nil
+}
+
+// ChangePasswordInput sono i dati per il cambio password.
+type ChangePasswordInput struct {
+	CurrentPassword     string `json:"currentPassword"`
+	NewPassword         string `json:"newPassword"`
+	EncryptedPrivateKey string `json:"encryptedPrivateKey"`
+	CryptoSalt          string `json:"cryptoSalt"`
+	CryptoIv            string `json:"cryptoIv"`
+}
+
+// ChangePassword richiede la password attuale e, se l'utente ha chiavi E2EE, la chiave privata
+// cifrata di nuovo con la nuova password: senza, i messaggi diventerebbero illeggibili.
+func (s *Service) ChangePassword(ctx context.Context, userID string, in ChangePasswordInput) error {
+	var v validate.Validator
+	v.Check(len(in.NewPassword) >= auth.MinPasswordLength, "newPassword", "La nuova password deve avere almeno 6 caratteri")
+	v.Check(len(in.NewPassword) <= auth.MaxPasswordBytes, "newPassword", "La nuova password è troppo lunga")
+	if err := v.Err(); err != nil {
+		return err
+	}
+
+	account, err := s.store.AccountByID(ctx, userID)
+	if db.IsNoRows(err) || db.IsInvalidInput(err) {
+		return errSessionInvalid
+	}
+	if err != nil {
+		return fmt.Errorf("lettura account: %w", err)
+	}
+	if account.LockedUntil != nil && account.LockedUntil.After(s.now()) {
+		return errLocked
+	}
+
+	newVault := Vault{EncryptedPrivateKey: in.EncryptedPrivateKey, CryptoSalt: in.CryptoSalt, CryptoIV: in.CryptoIv}
+	if account.Vault.EncryptedPrivateKey != "" {
+		if newVault.EncryptedPrivateKey == "" || newVault.CryptoSalt == "" || newVault.CryptoIV == "" {
+			return apperr.BadRequest("vault_required", "Chiavi di cifratura mancanti: esci, accedi di nuovo e riprova")
+		}
+		v.Check(validate.Base64(newVault.EncryptedPrivateKey, 4096) && validate.Base64(newVault.CryptoSalt, 64) &&
+			validate.Base64(newVault.CryptoIV, 64), "encryptedPrivateKey", "Chiavi di cifratura non valide")
+		if err := v.Err(); err != nil {
+			return err
+		}
+	}
+
+	if err := s.verifyPassword(ctx, account, in.CurrentPassword, "La password attuale non è corretta"); err != nil {
+		return err
+	}
+
+	hash, err := auth.HashPassword(in.NewPassword)
+	if err != nil {
+		return fmt.Errorf("hash della password: %w", err)
+	}
+	if err := s.store.UpdatePassword(ctx, userID, hash, newVault); err != nil {
+		return fmt.Errorf("aggiornamento password: %w", err)
+	}
+	return nil
+}
+
+// DeleteAccount elimina l'utente.
+func (s *Service) DeleteAccount(ctx context.Context, userID string) error {
+	if err := s.store.Delete(ctx, userID); err != nil {
+		return apperr.Wrap(err, "delete_failed", "Impossibile eliminare l'account in questo momento")
+	}
+	return nil
+}
+
+// PublicProfile è ciò che gli altri utenti possono vedere: niente email, cognome o data di nascita.
+type PublicProfile struct {
+	ID            string `json:"id"`
+	Nome          string `json:"nome"`
+	UserType      string `json:"user_type"`
+	Citta         string `json:"citta"`
+	BudgetMax     int    `json:"budget_max"`
+	Occupation    string `json:"occupation"`
+	Bio           string `json:"bio"`
+	LifestyleTags string `json:"lifestyle_tags"`
+}
+
+// Profile restituisce il profilo completo al proprietario e quello pubblico agli altri.
+// Un profilo privato risulta inesistente per chi non ne è il proprietario.
+func (s *Service) Profile(ctx context.Context, viewerID, targetID string) (any, error) {
+	profile, err := s.store.Profile(ctx, targetID)
+	if db.IsNoRows(err) || db.IsInvalidInput(err) {
+		return nil, errUserNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("lettura profilo: %w", err)
+	}
+
+	if viewerID != "" && profile.ID == viewerID {
+		return profile, nil
+	}
+	if !profile.IsPublic {
+		return nil, errUserNotFound
+	}
+	return PublicProfile{
+		ID:            profile.ID,
+		Nome:          profile.Nome,
+		UserType:      profile.UserType,
+		Citta:         profile.Citta,
+		BudgetMax:     profile.BudgetMax,
+		Occupation:    profile.Occupation,
+		Bio:           profile.Bio,
+		LifestyleTags: profile.LifestyleTags,
+	}, nil
+}
+
+// ProfileInput sono i dati inviati dalla modifica del profilo.
+type ProfileInput struct {
+	UserType   string `json:"userType"`
+	Citta      string `json:"citta"`
+	BudgetMax  any    `json:"budgetMax"` // numero o stringa, a seconda del form
+	Occupation string `json:"occupation"`
+	Birthdate  string `json:"birthdate"`
+	Bio        string `json:"bio"`
+	Tags       string `json:"tags"`
+	IsPublic   bool   `json:"isPublic"`
+}
+
+func (s *Service) UpdateProfile(ctx context.Context, userID string, in ProfileInput) error {
+	u := ProfileUpdate{
+		UserType:      in.UserType,
+		City:          validate.CleanText(in.Citta),
+		Occupation:    validate.CleanText(in.Occupation),
+		Birthdate:     in.Birthdate,
+		Bio:           validate.CleanText(in.Bio),
+		LifestyleTags: validate.CleanText(in.Tags),
+		IsPublic:      in.IsPublic,
+	}
+
+	var v validate.Validator
+	budget, ok := parseBudget(in.BudgetMax)
+	v.Check(ok, "budgetMax", "Budget non valido")
+	u.BudgetMax = budget
+	checkPersonalDetails(&v, s.now(), u.UserType, u.City, u.Birthdate, u.BudgetMax, u.Occupation, u.Bio, u.LifestyleTags)
+	if err := v.Err(); err != nil {
+		return err
+	}
+
+	if err := s.store.UpdateProfile(ctx, userID, u); err != nil {
+		return apperr.Wrap(err, "profile_update_failed", "Impossibile salvare il profilo")
+	}
+	return nil
+}
+
+// parseBudget accetta un numero o una stringa numerica; vuoto o assente vale 0.
+func parseBudget(value any) (int, bool) {
+	switch b := value.(type) {
+	case nil:
+		return 0, true
+	case float64:
+		return int(b), b == float64(int(b))
+	case string:
+		if strings.TrimSpace(b) == "" {
+			return 0, true
+		}
+		n, err := strconv.Atoi(strings.TrimSpace(b))
+		return n, err == nil
+	}
+	return 0, false
+}
+
+// Roommate è un profilo nell'elenco dei coinquilini (formato JSON delle API legacy).
+type Roommate struct {
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	Job      string   `json:"job"`
+	Quote    string   `json:"quote"`
+	Age      int      `json:"age"`
+	City     string   `json:"city"`
+	Match    int      `json:"match"`
+	Color1   string   `json:"color1"`
+	Color2   string   `json:"color2"`
+	Emoji    string   `json:"emoji"`
+	Tags     []string `json:"tags"`
+	UserType string   `json:"user_type"`
+	Budget   int      `json:"budget_max"`
+}
+
+// Roommates restituisce i profili pubblici.
+// Età, compatibilità, colori ed emoji sono ancora valori dimostrativi: diventano dati reali nel modulo M1.5.
+func (s *Service) Roommates(ctx context.Context) ([]Roommate, error) {
+	rows, err := s.store.PublicRoommates(ctx, roommatesLimit)
+	if err != nil {
+		return nil, fmt.Errorf("elenco coinquilini: %w", err)
+	}
+
+	colors := [][]string{{"#F5C29A", "#C4603A"}, {"#C4A882", "#7A4B2A"}, {"#D4B896", "#9A4628"}, {"#EAF3DE", "#4CAF50"}}
+	emojis := []string{"👩", "👨", "👩‍🎓", "👨‍🎨"}
+
+	roommates := make([]Roommate, 0, len(rows))
+	for i, row := range rows {
+		roommates = append(roommates, Roommate{
+			ID:       row.ID,
+			Name:     row.Name,
+			Job:      row.Job,
+			Quote:    row.Bio,
+			Age:      22 + (i % 6),
+			City:     row.City,
+			Match:    85 + (i * 2),
+			Color1:   colors[i%len(colors)][0],
+			Color2:   colors[i%len(colors)][1],
+			Emoji:    emojis[i%len(emojis)],
+			Tags:     strings.Split(row.Tags, ", "),
+			UserType: row.UserType,
+			Budget:   row.BudgetMax,
+		})
+	}
+	return roommates, nil
+}
+
+func checkPassword(v *validate.Validator, field, password string) {
+	v.Check(len(password) >= auth.MinPasswordLength, field, "La password deve avere almeno 6 caratteri")
+	v.Check(len(password) <= auth.MaxPasswordBytes, field, "La password è troppo lunga")
+}
+
+// checkPersonalDetails valida i campi comuni a registrazione e modifica del profilo.
+// Occupazione e città sono ancora testo libero: diventano elenchi chiusi nel modulo M1.5.
+func checkPersonalDetails(v *validate.Validator, now time.Time, userType, city, birthdate string, budget int, occupation, bio, tags string) {
+	v.Check(validate.OneOf(userType, UserTypeSeeker, UserTypeLandlord), "userType", "Tipo di utente non valido")
+	v.Check(validate.MaxLen(city, 80), "citta", "La città può avere al massimo 80 caratteri")
+	v.Check(validate.PastDate(birthdate, now), "nascita", "Data di nascita non valida")
+	v.Check(validate.Between(budget, 0, 20000), "budgetMax", "Il budget deve essere compreso tra 0 e 20.000 €")
+	v.Check(validate.MaxLen(occupation, 50), "occupation", "L'occupazione può avere al massimo 50 caratteri")
+	v.Check(validate.MaxLen(bio, 1000), "bio", "La bio può avere al massimo 1000 caratteri")
+	v.Check(validate.MaxLen(tags, 300), "lifestyle_tags", "Troppi tag di stile di vita")
+}
+
+// checkVault valida la chiave pubblica e la chiave privata cifrata: tutte presenti o tutte assenti.
+func checkVault(v *validate.Validator, vault Vault) {
+	fields := []string{vault.PublicKey, vault.EncryptedPrivateKey, vault.CryptoSalt, vault.CryptoIV}
+	present := 0
+	for _, f := range fields {
+		if f != "" {
+			present++
+		}
+	}
+	if present == 0 {
+		return
+	}
+	v.Check(present == len(fields) &&
+		validate.Base64(vault.PublicKey, 1024) &&
+		validate.Base64(vault.EncryptedPrivateKey, 4096) &&
+		validate.Base64(vault.CryptoSalt, 64) &&
+		validate.Base64(vault.CryptoIV, 64),
+		"publicKey", "Chiavi di cifratura non valide")
+}

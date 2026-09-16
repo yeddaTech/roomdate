@@ -9,6 +9,7 @@
     "db:status": "go run ./cmd/migrate status",
     "db:migrate": "go run ./cmd/migrate up",
     "db:seed": "go run ./cmd/seed",
+    "test:api": "go test ./...",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
