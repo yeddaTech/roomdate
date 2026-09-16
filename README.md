@@ -23,6 +23,30 @@ A major technical focal point of this project is its enterprise-grade security m
 *   **Double Encryption Routing:** Messages are encrypted twice on the client—once utilizing the recipient's public key (for secure delivery) and once utilizing the sender's public key (to securely preserve local chat history).
 *   **Local Secure Session:** Private keys are temporarily held in `sessionStorage` during active use. `localStorage` persists the encrypted vault, enabling a local cryptographic lock mechanism upon session expiration without exposing plaintext keys to the disk.
 
+## Local Development
+
+Requirements: Go 1.25+, Node.js 20+ and a **development** PostgreSQL database (a dedicated Neon branch or a local Postgres). Never point local tools at the production database.
+
+1. Copy `.env.example` to `.env.local` and fill in the values.
+2. Install dependencies: `npm ci`
+3. Create the schema: `npm run db:migrate`
+4. Optional sample data: `npm run db:seed` — users such as `giulia@seed.roomdate.test`, password `roomdate-dev`
+5. Start the API (`npm run dev:api`, on `http://127.0.0.1:8080`) and, in a second terminal, the frontend (`npm run dev`), then open `http://127.0.0.1:5173`.
+
+Vite proxies `/api` to the local Go server, so the frontend and the API share the same origin, as they do on Vercel.
+
+### Database migrations
+
+Migrations are SQL files in `internal/db/migrations` (goose format), embedded in the `cmd/migrate` binary.
+
+* `npm run db:status` shows which migrations are applied; `npm run db:migrate` applies the pending ones.
+* To change the schema, add a new file such as `00003_short_description.sql` with `-- +goose Up` and `-- +goose Down` sections. Never edit a migration that has already run in production.
+* `00001_baseline.sql` was reconstructed from the backend queries. Before running migrations on production for the first time, compare it with `pg_dump --schema-only --schema=roomdate_app` and fix any differences. The tool asks for confirmation before changing a non-local database.
+
+### Neon branches and Vercel previews
+
+Create a Neon branch for development and use its connection string locally. In Vercel → Settings → Environment Variables, make sure the **Preview** `DATABASE_URL` points to a non-production branch (the Neon integration for Vercel can create one per preview deployment).
+
 ## Development Workflow
 
 To maintain code quality and stability, direct pushes to the `main` branch are strictly prohibited. All contributions must go through a Pull Request (PR) review process.

@@ -4,10 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
 
 	_ "github.com/lib/pq"
-	"github.com/pusher/pusher-http-go/v5"
 )
 
 type SendMessageReq struct {
@@ -62,16 +60,8 @@ func SendMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pusherClient := pusher.Client{
-		AppID:   os.Getenv("PUSHER_APP_ID"),
-		Key:     os.Getenv("PUSHER_KEY"),
-		Secret:  os.Getenv("PUSHER_SECRET"),
-		Cluster: os.Getenv("PUSHER_CLUSTER"),
-		Secure:  true,
-	}
-
 	data := map[string]interface{}{"conversationId": req.ConversationID}
-	pusherClient.Trigger("roomdate-channel", "nuovo-messaggio", data)
+	triggerRealtime("nuovo-messaggio", data)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
