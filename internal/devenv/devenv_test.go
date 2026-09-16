@@ -1,0 +1,76 @@
+package devenv
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestLoad(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".env.local")
+	content := `# commento
+DEVENV_PLAIN=valore
+export DEVENV_EXPORTED=esportato
+DEVENV_QUOTED="con spazi e = uguale"
+DEVENV_SINGLE='singoli'
+DEVENV_URL=postgresql://u:p@host/db?sslmode=require
+
+DEVENV_EXISTING=dal-file
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEVENV_EXISTING", "dall-ambiente")
+	for _, key := range []string{"DEVENV_PLAIN", "DEVENV_EXPORTED", "DEVENV_QUOTED", "DEVENV_SINGLE", "DEVENV_URL"} {
+		t.Setenv(key, "")
+		os.Unsetenv(key)
+	}
+
+	loaded, err := Load(path)
+	if err != nil || !loaded {
+		t.Fatalf("loaded = %v, err = %v", loaded, err)
+	}
+	for key, want := range map[string]string{
+		"DEVENV_PLAIN":    "valore",
+		"DEVENV_EXPORTED": "esportato",
+		"DEVENV_QUOTED":   "con spazi e = uguale",
+		"DEVENV_SINGLE":   "singoli",
+		"DEVENV_URL":      "postgresql://u:p@host/db?sslmode=require",
+		"DEVENV_EXISTING": "dall-ambiente",
+	} {
+		if got := os.Getenv(key); got != want {
+			t.Errorf("%s = %q, atteso %q", key, got, want)
+		}
+	}
+}
+
+func TestLoadMissingFile(t *testing.T) {
+	loaded, err := Load(filepath.Join(t.TempDir(), "assente"))
+	if loaded || err != nil {
+		t.Fatalf("loaded = %v, err = %v", loaded, err)
+	}
+}
+
+func TestDescribeDSNHidesCredentials(t *testing.T) {
+	cases := []struct{ dsn, host, db string }{
+		{"postgresql://utente:segreto@ep-x.eu-central-1.aws.neon.tech/neondb?sslmode=require", "ep-x.eu-central-1.aws.neon.tech", "neondb"},
+		{"host=/tmp/sock port=5432 user=u password=segreto dbname=roomdate", "/tmp/sock", "roomdate"},
+	}
+	for _, c := range cases {
+		host, db := DescribeDSN(c.dsn)
+		if host != c.host || db != c.db {
+			t.Errorf("DescribeDSN(%q) = %q, %q", c.dsn, host, db)
+		}
+	}
+}
+
+func TestIsLocalHost(t *testing.T) {
+	for host, want := range map[string]bool{
+		"localhost:5432": true, "127.0.0.1": true, "[::1]:5432": true, "/var/run/postgresql": true, "": true,
+		"ep-x.neon.tech": false, "db.example.com:5432": false,
+	} {
+		if got := IsLocalHost(host); got != want {
+			t.Errorf("IsLocalHost(%q) = %v, atteso %v", host, got, want)
+		}
+	}
+}

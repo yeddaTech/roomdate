@@ -1,4 +1,4 @@
-// Server di sviluppo locale: espone le stesse API della funzione Vercel (api/index.go)
+// Server di sviluppo locale: espone la stessa applicazione della funzione Vercel (api/index.go)
 // su http://127.0.0.1:8080. Vite (npm run dev) inoltra qui le richieste /api, così frontend
 // e API condividono l'origine come in produzione.
 //
@@ -8,15 +8,19 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
 
-	handler "roomdate-backend/api"
-	"roomdate-backend/backend"
+	"roomdate-backend/internal/config"
+	"roomdate-backend/internal/db"
 	"roomdate-backend/internal/devenv"
+	"roomdate-backend/internal/realtime"
+	"roomdate-backend/internal/server"
 )
 
 func main() {
@@ -32,55 +36,45 @@ func main() {
 		log.Printf("Variabili caricate da %s", *envFile)
 	}
 
-	for _, key := range []string{"DATABASE_URL", "JWT_SECRET"} {
-		if os.Getenv(key) == "" {
-			log.Fatalf("%s non impostata: copia .env.example in .env.local e compilala", key)
-		}
+	cfg, err := config.FromEnv()
+	if err != nil {
+		log.Fatalf("%v: copia .env.example in .env.local e compilala", err)
 	}
-	if os.Getenv("PUSHER_KEY") == "" {
+	// In locale si usa HTTP: con il flag Secure alcuni browser scarterebbero il cookie di sessione
+	cfg.SecureCookies = false
+
+	if !cfg.Pusher.Enabled() {
 		log.Print("PUSHER_* non impostate: la chat funziona, ma senza tempo reale (il frontend aggiorna ogni 5 secondi)")
 	}
 
-	host, dbname := devenv.DescribeDSN(os.Getenv("DATABASE_URL"))
+	host, dbname := devenv.DescribeDSN(cfg.DatabaseURL)
 	log.Printf("Database: %s / %s", host, dbname)
 
-	// La connessione di init() è saltata se DATABASE_URL arrivava da .env.local
-	backend.InitDB()
-	if err := backend.DB.Ping(); err != nil {
+	ctx := context.Background()
+	pool, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("Stringa di connessione non valida: %v", err)
+	}
+	defer pool.Close()
+	if err := pool.Ping(ctx); err != nil {
 		log.Fatalf("Database non raggiungibile: %v", err)
 	}
 
-	// In locale si usa HTTP: con il flag Secure alcuni browser scarterebbero il cookie di sessione
-	backend.SecureCookies = false
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/api/", handler.Handler)
-
-	server := &http.Server{
-		Addr:              *addr,
-		Handler:           logRequests(mux),
-		ReadHeaderTimeout: 10 * time.Second,
+	handler, err := server.New(server.Deps{
+		Config:    cfg,
+		DB:        pool,
+		Publisher: realtime.New(cfg.Pusher),
+		Logger:    slog.New(slog.NewTextHandler(os.Stderr, nil)),
+	})
+	if err != nil {
+		log.Fatal(err)
 	}
 
+	srv := &http.Server{
+		Addr:              *addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
 	log.Printf("API di sviluppo su http://%s — avvia il frontend con: npm run dev", *addr)
-	log.Fatal(server.ListenAndServe())
-}
-
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
-}
-
-func (r *statusRecorder) WriteHeader(code int) {
-	r.status = code
-	r.ResponseWriter.WriteHeader(code)
-}
-
-func logRequests(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
-		next.ServeHTTP(rec, r)
-		log.Printf("%s %s → %d (%s)", r.Method, r.URL.Path, rec.status, time.Since(start).Round(time.Millisecond))
-	})
+	log.Fatal(srv.ListenAndServe())
 }
