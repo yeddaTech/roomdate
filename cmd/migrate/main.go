@@ -12,15 +12,11 @@ package main
 import (
 	"bufio"
 	"context"
-	"database/sql"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"strings"
-
-	_ "github.com/lib/pq"
-	"github.com/pressly/goose/v3"
 
 	"roomdate-backend/internal/db"
 	"roomdate-backend/internal/devenv"
@@ -63,7 +59,7 @@ func main() {
 		log.Fatal("Operazione annullata")
 	}
 
-	conn, err := sql.Open("postgres", dsn)
+	conn, err := db.OpenSQL(dsn)
 	if err != nil {
 		log.Fatalf("Connessione non valida: %v", err)
 	}
@@ -72,11 +68,7 @@ func main() {
 		log.Fatalf("Database non raggiungibile: %v", err)
 	}
 
-	goose.SetBaseFS(db.Migrations)
-	if err := goose.SetDialect("postgres"); err != nil {
-		log.Fatal(err)
-	}
-	if err := goose.RunContext(context.Background(), command, conn, "migrations"); err != nil {
+	if err := db.Migrate(context.Background(), conn, command); err != nil {
 		log.Fatalf("Migrazione fallita: %v", err)
 	}
 }

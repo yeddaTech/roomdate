@@ -23,7 +23,7 @@ import (
 	"log"
 	"os"
 
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"golang.org/x/crypto/bcrypt"
 
 	"roomdate-backend/internal/devenv"
@@ -128,7 +128,7 @@ func main() {
 	host, dbname := devenv.DescribeDSN(dsn)
 	log.Printf("Database: %s / %s", host, dbname)
 
-	db, err := sql.Open("postgres", dsn)
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		log.Fatalf("Connessione non valida: %v", err)
 	}

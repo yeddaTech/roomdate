@@ -35,6 +35,20 @@ Requirements: Go 1.25+, Node.js 20+ and a **development** PostgreSQL database (a
 
 Vite proxies `/api` to the local Go server, so the frontend and the API share the same origin, as they do on Vercel.
 
+### Backend structure
+
+`api/index.go` is the Vercel function; `cmd/dev` serves the same application locally. Both use `internal/server`, which wires everything together:
+
+* `internal/users`, `internal/listings`, `internal/chat` — one package per area, each with a `handlers.go` (HTTP), `service.go` (rules, validation, authorization) and `store.go` (SQL through pgx).
+* `internal/httpx` — middleware applied to every request: request ID and structured logs, panic recovery, security headers, 64 KB body limit, cross-origin (CSRF) protection and JSON-only request bodies.
+* `internal/auth` (session cookie and passwords), `internal/validate` (input rules and text cleaning), `internal/apperr` (errors shown to users; everything else is logged and answered with a generic message), `internal/config`, `internal/db`, `internal/realtime`.
+
+The legacy endpoints (`/api/login`, `/api/get_chats`, …) keep the paths and plain-text errors the current frontend expects. New endpoints live under `/api/v1/` and answer errors as `{"error": {"code", "message"}}`.
+
+### Tests
+
+`npm run test:api` runs the Go tests. Unit tests need nothing else; the integration tests in `internal/server` (every endpoint through the real router, middleware and database) run when `TEST_DATABASE_URL` is set, and are skipped otherwise. They create a temporary `roomdate_test_…` database, migrate it from scratch and drop it at the end.
+
 ### Database migrations
 
 Migrations are SQL files in `internal/db/migrations` (goose format), embedded in the `cmd/migrate` binary.
