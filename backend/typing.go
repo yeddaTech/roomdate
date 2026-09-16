@@ -4,10 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
-
-	"github.com/pusher/pusher-http-go/v5"
 )
 
 // TypingPayload definisce i dati in arrivo da React.
@@ -54,17 +51,8 @@ func HandleTyping(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 4. Inizializzazione sicura di Pusher con le variabili d'ambiente
-	pusherClient := pusher.Client{
-		AppID:   os.Getenv("PUSHER_APP_ID"),
-		Key:     os.Getenv("PUSHER_KEY"),
-		Secret:  os.Getenv("PUSHER_SECRET"),
-		Cluster: os.Getenv("PUSHER_CLUSTER"),
-		Secure:  true,
-	}
-
-	// 5. Trigger dell'evento sul canale globale "roomdate-channel"
-	err = pusherClient.Trigger("roomdate-channel", "sta-scrivendo", map[string]string{
+	// 4. Trigger dell'evento sul canale globale "roomdate-channel"
+	err = triggerRealtime("sta-scrivendo", map[string]string{
 		"conversationId": strconv.Itoa(conversationID),
 		"senderId":       secureSenderID,
 	})
@@ -75,7 +63,7 @@ func HandleTyping(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 6. Tutto ok, restituiamo 200 senza appesantire la rete
+	// 5. Tutto ok, restituiamo 200 senza appesantire la rete
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ok"}`))
 }
