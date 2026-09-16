@@ -1,12 +1,15 @@
 // Package handler è la funzione serverless di Vercel: vercel.json inoltra qui tutte le richieste /api/*,
-// gestite dall'applicazione in internal/server.
+// gestite dall'applicazione in server/.
+//
+// Vercel compila questo pacchetto come "handler/api", da fuori dal modulo roomdate-backend:
+// qui si possono importare solo pacchetti che non stanno in internal/.
 package handler
 
 import (
 	"net/http"
 	"sync"
 
-	"roomdate-backend/internal/server"
+	"roomdate-backend/server"
 )
 
 var (

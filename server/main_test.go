@@ -34,7 +34,7 @@ import (
 	"roomdate-backend/internal/config"
 	"roomdate-backend/internal/db"
 	"roomdate-backend/internal/devenv"
-	"roomdate-backend/internal/server"
+	"roomdate-backend/server"
 )
 
 var testPool *pgxpool.Pool
