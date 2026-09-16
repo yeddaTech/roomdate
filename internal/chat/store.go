@@ -5,6 +5,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"roomdate-backend/internal/db"
@@ -12,8 +13,10 @@ import (
 
 // Store esegue le query su conversazioni e messaggi.
 //
-// Una conversazione su un annuncio ha listing_id e tenant_id (chi la avvia): l'altro partecipante
-// è il proprietario dell'annuncio. Una chat diretta ha listing_id NULL, tenant_id e user2_id.
+// I partecipanti sono sempre tenant_id (chi avvia la conversazione) e user2_id. Una conversazione
+// su un annuncio ha anche listing_id, e user2_id è il proprietario dell'annuncio: se l'annuncio
+// viene eliminato, listing_id diventa NULL e la conversazione resta ai due partecipanti.
+// Un partecipante che elimina l'account diventa NULL ("Utente eliminato").
 type Store struct {
 	db *pgxpool.Pool
 }
@@ -22,19 +25,20 @@ func NewStore(db *pgxpool.Pool) *Store {
 	return &Store{db: db}
 }
 
-func (s *Store) ListingExists(ctx context.Context, listingID int) (bool, error) {
-	var exists bool
-	err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM roomdate_app.listings WHERE id = $1)`, listingID).Scan(&exists)
-	return exists, err
+// ListingForChat restituisce il proprietario dell'annuncio e se l'annuncio è attivo.
+func (s *Store) ListingForChat(ctx context.Context, listingID int) (ownerID string, active bool, err error) {
+	err = s.db.QueryRow(ctx, `SELECT user_id::text, is_active FROM roomdate_app.listings WHERE id = $1`, listingID).Scan(&ownerID, &active)
+	return ownerID, active, err
 }
 
-func (s *Store) UserExists(ctx context.Context, userID string) (bool, error) {
-	var exists bool
-	err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM roomdate_app.users WHERE id = $1)`, userID).Scan(&exists)
+// UserID restituisce l'ID dell'utente nella forma salvata nel database; pgx.ErrNoRows se non esiste.
+func (s *Store) UserID(ctx context.Context, userID string) (string, error) {
+	var id string
+	err := s.db.QueryRow(ctx, `SELECT id::text FROM roomdate_app.users WHERE id = $1`, userID).Scan(&id)
 	if db.IsInvalidInput(err) {
-		return false, nil
+		return "", pgx.ErrNoRows
 	}
-	return exists, err
+	return id, err
 }
 
 func (s *Store) FindListingConversation(ctx context.Context, listingID int, tenantID string) (int, error) {
@@ -46,11 +50,11 @@ func (s *Store) FindListingConversation(ctx context.Context, listingID int, tena
 	return id, err
 }
 
-func (s *Store) CreateListingConversation(ctx context.Context, listingID int, tenantID string) (int, error) {
+func (s *Store) CreateListingConversation(ctx context.Context, listingID int, tenantID, ownerID string) (int, error) {
 	var id int
 	err := s.db.QueryRow(ctx, `
-        INSERT INTO roomdate_app.conversations (listing_id, tenant_id) VALUES ($1, $2) RETURNING id`,
-		listingID, tenantID).Scan(&id)
+        INSERT INTO roomdate_app.conversations (listing_id, tenant_id, user2_id) VALUES ($1, $2, $3) RETURNING id`,
+		listingID, tenantID, ownerID).Scan(&id)
 	return id, err
 }
 
@@ -72,16 +76,13 @@ func (s *Store) CreateDirectConversation(ctx context.Context, tenantID, targetID
 	return id, err
 }
 
-// IsParticipant indica se l'utente fa parte della conversazione: chi l'ha avviata,
-// il destinatario di una chat diretta o il proprietario dell'annuncio collegato.
+// IsParticipant indica se l'utente fa parte della conversazione.
 func (s *Store) IsParticipant(ctx context.Context, conversationID int, userID string) (bool, error) {
 	var ok bool
 	err := s.db.QueryRow(ctx, `
         SELECT EXISTS (
-            SELECT 1
-            FROM roomdate_app.conversations c
-            LEFT JOIN roomdate_app.listings l ON c.listing_id = l.id
-            WHERE c.id = $1 AND (c.tenant_id = $2 OR c.user2_id = $2 OR l.user_id = $2)
+            SELECT 1 FROM roomdate_app.conversations
+            WHERE id = $1 AND (tenant_id = $2 OR user2_id = $2)
         )`, conversationID, userID).Scan(&ok)
 	return ok, err
 }
@@ -109,24 +110,13 @@ func (s *Store) ConversationsFor(ctx context.Context, userID string) ([]Conversa
         SELECT c.id,
                COALESCE(l.title, 'Chat Diretta'),
                COALESCE(l.price, 0),
-               COALESCE(CASE
-                   WHEN c.listing_id IS NOT NULL THEN
-                       CASE WHEN c.tenant_id = $1 THEN owner.first_name ELSE tenant.first_name END
-                   ELSE
-                       CASE WHEN c.tenant_id = $1 THEN u2.first_name ELSE tenant.first_name END
-               END, ''),
-               COALESCE(CASE
-                   WHEN c.listing_id IS NOT NULL THEN
-                       CASE WHEN c.tenant_id = $1 THEN owner.public_key ELSE tenant.public_key END
-                   ELSE
-                       CASE WHEN c.tenant_id = $1 THEN u2.public_key ELSE tenant.public_key END
-               END, '')
+               COALESCE(CASE WHEN c.tenant_id = $1 THEN u2.first_name ELSE tenant.first_name END, ''),
+               COALESCE(CASE WHEN c.tenant_id = $1 THEN u2.public_key ELSE tenant.public_key END, '')
         FROM roomdate_app.conversations c
         LEFT JOIN roomdate_app.listings l ON c.listing_id = l.id
-        LEFT JOIN roomdate_app.users owner ON l.user_id = owner.id
         LEFT JOIN roomdate_app.users tenant ON c.tenant_id = tenant.id
         LEFT JOIN roomdate_app.users u2 ON c.user2_id = u2.id
-        WHERE c.tenant_id = $1 OR l.user_id = $1 OR c.user2_id = $1
+        WHERE c.tenant_id = $1 OR c.user2_id = $1
         ORDER BY c.id`, userID)
 	if err != nil {
 		return nil, err
@@ -156,7 +146,7 @@ type MessageRow struct {
 // usa la copia cifrata per il mittente, per gli altri quella per il destinatario.
 func (s *Store) MessagesFor(ctx context.Context, conversationID int, readerID string) ([]MessageRow, error) {
 	rows, err := s.db.Query(ctx, `
-        SELECT id, sender_id::text,
+        SELECT id, COALESCE(sender_id::text, ''),
                CASE WHEN sender_id = $2 THEN COALESCE(sender_content, content, '') ELSE COALESCE(content, '') END,
                created_at
         FROM roomdate_app.messages

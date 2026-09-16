@@ -5,20 +5,33 @@ import (
 	"time"
 )
 
-func TestCleanText(t *testing.T) {
+func TestText(t *testing.T) {
 	cases := map[string]string{
-		"Cerco un'amica vicino all'università":         "Cerco un'amica vicino all'università",
-		"Bagno & cucina, \"luminosa\"":                 "Bagno & cucina, \"luminosa\"",
-		"Prezzo < 500 €":                               "Prezzo < 500 €",
-		"<b>grassetto</b> e <i>corsivo</i>":            "grassetto e corsivo",
-		"Titolo<script>alert(1)</script>":              "Titolo",
-		"foto <img src=x onerror=alert(1)> qui":        "foto  qui",
-		"  spazi attorno  ":                            "spazi attorno",
-		"già salvato una volta: un&#39;amica &amp; co": "già salvato una volta: un'amica & co",
+		"Cerco un'amica vicino all'università": "Cerco un'amica vicino all'università",
+		"Bagno & cucina, \"luminosa\"":         "Bagno & cucina, \"luminosa\"",
+		"Prezzo < 500 € e <b>non</b> è HTML":   "Prezzo < 500 € e <b>non</b> è HTML",
+		"un&#39;amica resta com'è":             "un&#39;amica resta com'è",
+		"  spazi attorno  ":                    "spazi attorno",
+		"riga 1\nriga 2\tcon tab":              "riga 1\nriga 2\tcon tab",
+		"nul\x00 e bell\x07 rimossi\u200b":     "nul e bell rimossi\u200b",
+		"utf8 non valido \xff":                 "utf8 non valido",
 	}
 	for input, want := range cases {
-		if got := CleanText(input); got != want {
-			t.Errorf("CleanText(%q) = %q, atteso %q", input, got, want)
+		if got := Text(input); got != want {
+			t.Errorf("Text(%q) = %q, atteso %q", input, got, want)
+		}
+	}
+}
+
+func TestDateBetween(t *testing.T) {
+	min := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	max := time.Date(2028, 9, 16, 0, 0, 0, 0, time.UTC)
+	for s, want := range map[string]bool{
+		"2026-01-01": true, "2027-06-30": true, "2028-09-16": true,
+		"2025-12-31": false, "2028-09-17": false, "": false, "30/06/2027": false, "2027-02-30": false,
+	} {
+		if got := DateBetween(s, min, max); got != want {
+			t.Errorf("DateBetween(%q) = %v, atteso %v", s, got, want)
 		}
 	}
 }

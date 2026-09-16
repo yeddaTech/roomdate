@@ -1,16 +1,14 @@
-// Package validate contiene le regole di validazione dei dati in ingresso e la pulizia del testo.
+// Package validate contiene le regole di validazione dei dati in ingresso e la normalizzazione del testo.
 package validate
 
 import (
 	"encoding/base64"
-	"html"
 	"net/mail"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
-
-	"github.com/microcosm-cc/bluemonday"
 
 	"roomdate-backend/internal/apperr"
 )
@@ -41,14 +39,21 @@ func (v *Validator) Err() error {
 	}
 }
 
-// Le policy di bluemonday sono sicure da usare in parallelo.
-var strictPolicy = bluemonday.StrictPolicy()
-
-// CleanText rimuove ogni tag HTML e gli spazi iniziali e finali, ma conserva il testo
-// così come l'utente l'ha scritto. Da solo, bluemonday restituisce testo già "escapato"
-// ("un'amica" → "un&#39;amica") che React mostrerebbe letteralmente: React fa già l'escape in output.
-func CleanText(s string) string {
-	return strings.TrimSpace(html.UnescapeString(strictPolicy.Sanitize(s)))
+// Text normalizza un testo scritto dall'utente: toglie gli spazi iniziali e finali e i caratteri
+// di controllo invisibili (tranne a capo e tabulazione), ma lo conserva così come è stato scritto,
+// compresi "<", ">" e "&". Non serve rimuovere l'HTML: React fa l'escape quando mostra il testo.
+func Text(s string) string {
+	s = strings.ToValidUTF8(s, "")
+	s = strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\t' {
+			return r
+		}
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, s)
+	return strings.TrimSpace(s)
 }
 
 // NotBlank indica se la stringa contiene almeno un carattere diverso da spazio.
@@ -98,6 +103,12 @@ func Base64(s string, maxLen int) bool {
 func PastDate(s string, now time.Time) bool {
 	t, err := time.Parse(time.DateOnly, s)
 	return err == nil && t.Year() >= 1900 && !t.After(now)
+}
+
+// DateBetween indica se la stringa è una data AAAA-MM-GG compresa tra min e max (inclusi).
+func DateBetween(s string, min, max time.Time) bool {
+	t, err := time.Parse(time.DateOnly, s)
+	return err == nil && !t.Before(min) && !t.After(max)
 }
 
 // PositiveID converte un ID numerico positivo (es. il parametro ?id= di un annuncio).

@@ -1,64 +1,103 @@
-import { request } from './client';
-import type { ListingDetail, ListingInput, ListingSummary, MyListing } from './types';
+import { ApiError, request } from './client';
+import { prepareImage } from './photos';
+import type { ListingDetail, ListingImage, ListingInput, ListingSummary, PendingUpload } from './types';
 
-// --- API legacy (diventano /api/v1 nel modulo M1.4) ---
+/**
+ * Servizi che un annuncio può indicare, nell'ordine in cui vengono mostrati.
+ * Le chiavi devono coincidere con quelle accettate dal server (internal/listings/amenities.go).
+ */
+export const AMENITIES: ReadonlyArray<{ key: string; label: string }> = [
+  { key: 'wifi', label: 'Wi-Fi' },
+  { key: 'arredata', label: 'Arredata' },
+  { key: 'lavatrice', label: 'Lavatrice' },
+  { key: 'lavastoviglie', label: 'Lavastoviglie' },
+  { key: 'aria_condizionata', label: 'Aria condizionata' },
+  { key: 'riscaldamento', label: 'Riscaldamento' },
+  { key: 'balcone', label: 'Balcone o terrazzo' },
+  { key: 'ascensore', label: 'Ascensore' },
+  { key: 'bagno_privato', label: 'Bagno privato' },
+  { key: 'animali_ammessi', label: 'Animali ammessi' },
+];
 
-interface LegacyListing {
-  id: number;
-  title: string;
-  city: string;
-  zone: string;
-  price: number;
-  color: string;
-  emoji: string;
-  tags: string[] | null;
+export const MAX_LISTING_IMAGES = 8;
+
+export function amenityLabel(key: string): string {
+  return AMENITIES.find((a) => a.key === key)?.label ?? key;
 }
 
-export async function listLatestListings(): Promise<ListingSummary[]> {
-  const rows = await request<LegacyListing[] | null>('/api/get_listings');
-  return (rows ?? []).map((l) => ({
-    id: l.id,
-    title: l.title,
-    city: l.city,
-    zone: l.zone,
-    price: l.price,
-    color: l.color,
-    emoji: l.emoji,
-    tags: l.tags ?? [],
-  }));
+/** "Disponibile subito" o "Disponibile dal 1 ottobre 2026"; null se la data non è indicata. */
+export function formatAvailability(availableFrom: string | null, today = new Date()): string | null {
+  if (!availableFrom) return null;
+  const [year, month, day] = availableFrom.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (date <= startOfToday) return 'Disponibile subito';
+  return `Disponibile dal ${date.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}`;
 }
 
-interface LegacyListingDetail extends Omit<ListingDetail, 'roomType' | 'features' | 'images'> {
-  type: string;
-  // Non ancora restituiti dal server (modulo M1.4)
-  features?: string[] | null;
-  images?: string[] | null;
+/** "Spese incluse", "Spese escluse", oppure null se il dato non è indicato. */
+export function formatBills(billsIncluded: boolean | null): string | null {
+  if (billsIncluded === null) return null;
+  return billsIncluded ? 'Spese incluse' : 'Spese escluse';
 }
 
-export async function getListing(id: string): Promise<ListingDetail> {
-  const l = await request<LegacyListingDetail>(`/api/get_listing?id=${encodeURIComponent(id)}`);
-  return {
-    id: l.id,
-    title: l.title,
-    city: l.city,
-    zone: l.zone,
-    price: l.price,
-    roomType: l.type,
-    description: l.description,
-    features: l.features ?? [],
-    images: l.images ?? [],
-    landlord: l.landlord,
-  };
+export function listLatestListings(): Promise<ListingSummary[]> {
+  return request<ListingSummary[]>('/api/v1/listings');
 }
 
-export async function listMyListings(): Promise<MyListing[]> {
-  return (await request<MyListing[] | null>('/api/get_my_listings')) ?? [];
+export function listMyListings(): Promise<ListingSummary[]> {
+  return request<ListingSummary[]>('/api/v1/me/listings');
 }
 
-export async function createListing(input: ListingInput): Promise<void> {
-  await request<unknown>('/api/create_listing', { method: 'POST', body: input });
+export function getListing(id: string | number): Promise<ListingDetail> {
+  return request<ListingDetail>(`/api/v1/listings/${encodeURIComponent(String(id))}`);
 }
 
-export async function deleteListing(id: number): Promise<void> {
-  await request<unknown>(`/api/delete_listing?id=${id}`, { method: 'DELETE' });
+export function createListing(input: ListingInput): Promise<ListingDetail> {
+  return request<ListingDetail>('/api/v1/listings', { method: 'POST', body: input });
+}
+
+export function updateListing(id: number, input: ListingInput): Promise<ListingDetail> {
+  return request<ListingDetail>(`/api/v1/listings/${id}`, { method: 'PUT', body: input });
+}
+
+export function setListingActive(id: number, active: boolean): Promise<void> {
+  return request<void>(`/api/v1/listings/${id}/active`, { method: 'PUT', body: { active } });
+}
+
+export function deleteListing(id: number): Promise<void> {
+  return request<void>(`/api/v1/listings/${id}`, { method: 'DELETE' });
+}
+
+/**
+ * Carica una foto: la ridimensiona nel browser (togliendo anche i metadati, come la posizione GPS),
+ * chiede al server un indirizzo firmato, invia il file direttamente allo storage e chiede al server
+ * di aggiungerlo all'annuncio dopo averlo verificato.
+ */
+export async function uploadListingPhoto(listingId: number, file: File): Promise<ListingImage> {
+  const image = await prepareImage(file);
+  const pending = await request<PendingUpload>(`/api/v1/listings/${listingId}/images/uploads`, {
+    method: 'POST',
+    body: { contentType: image.type },
+  });
+  if (image.size > pending.maxBytes) {
+    throw new ApiError(413, 'image_too_large', 'La foto è troppo grande anche dopo il ridimensionamento.');
+  }
+
+  let response: Response;
+  try {
+    // Nessun cookie verso lo storage: l'autorizzazione è nella firma dell'indirizzo
+    response = await fetch(pending.url, { method: 'PUT', headers: pending.headers, body: image, credentials: 'omit' });
+  } catch {
+    throw new ApiError(0, 'upload_failed', 'Caricamento della foto non riuscito: controlla la connessione.');
+  }
+  if (!response.ok) {
+    throw new ApiError(response.status, 'upload_failed', 'Caricamento della foto non riuscito. Riprova.');
+  }
+
+  return request<ListingImage>(`/api/v1/listings/${listingId}/images`, { method: 'POST', body: { key: pending.key } });
+}
+
+export function deleteListingImage(listingId: number, imageId: number): Promise<void> {
+  return request<void>(`/api/v1/listings/${listingId}/images/${imageId}`, { method: 'DELETE' });
 }

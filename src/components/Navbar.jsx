@@ -2,11 +2,6 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 
-const sanitizeHTML = (str) => {
-  if (typeof str !== 'string') return '';
-  return str.replace(/[<>]/g, '');
-};
-
 const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -98,7 +93,7 @@ const Navbar = () => {
             <div className="hidden md:flex items-center gap-4">
               {user ? (
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium text-neutral-600">Ciao, <strong className="text-neutral-900">{sanitizeHTML(user.firstName)}</strong></span>
+                  <span className="text-sm font-medium text-neutral-600">Ciao, <strong className="text-neutral-900">{user.firstName}</strong></span>
                   <button onClick={handleLogout} className="px-5 py-2.5 rounded-full text-sm font-bold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-all">Esci</button>
                 </div>
               ) : (
@@ -133,7 +128,7 @@ const Navbar = () => {
           {user && (
              <div className="border-b border-neutral-100 pb-6 mb-2">
                <p className="text-xs text-neutral-400 uppercase tracking-wider mb-1">Accesso effettuato</p>
-               <h3 className="text-2xl text-neutral-900 truncate">{sanitizeHTML(user.firstName)}</h3>
+               <h3 className="text-2xl text-neutral-900 truncate">{user.firstName}</h3>
              </div>
           )}
           

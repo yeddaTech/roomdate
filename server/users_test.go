@@ -86,7 +86,7 @@ func TestRegisterValidation(t *testing.T) {
 		message     string
 	}{
 		{"nome vuoto", "firstName", "   ", "Il nome è obbligatorio"},
-		{"nome solo HTML", "firstName", "<b></b>", "Il nome è obbligatorio"},
+		{"nome solo caratteri invisibili", "firstName", "\x00\x07 ", "Il nome è obbligatorio"},
 		{"email non valida", "email", "bruno", "Inserisci un indirizzo email valido"},
 		{"password corta", "password", "12345", "almeno 6 caratteri"},
 		{"password oltre 72 byte", "password", strings.Repeat("x", 73), "troppo lunga"},
@@ -198,15 +198,50 @@ func TestDeleteAccount(t *testing.T) {
 	}
 }
 
-func TestDeleteAccountDatabaseErrorIsGeneric(t *testing.T) {
+// Eliminare un account con annunci, foto e conversazioni funziona (F16): annunci e foto spariscono,
+// le conversazioni restano all'altro partecipante con "Utente eliminato".
+func TestDeleteAccountWithListingsAndChats(t *testing.T) {
 	app := newApp(t)
-	landlord := app.registerUser("Marco", "affitta", false)
-	expect(t, app.do(http.MethodPost, "/api/create_listing", validListing(), withSession(landlord.Cookie)), http.StatusCreated, "")
+	landlord := app.registerUser("Marco", "affitta", true)
+	seeker := app.registerUser("Giulia", "cerca", true)
+	listingID := app.createListing(landlord.Cookie, nil)
+	imageKey := app.uploadImage(landlord.Cookie, listingID, "image/jpeg", jpegBytes(100))
 
-	// Con annunci collegati il vincolo di chiave esterna blocca l'eliminazione
-	rec := app.do(http.MethodDelete, "/api/v1/me", nil, withSession(landlord.Cookie))
-	expect(t, rec, http.StatusInternalServerError, "Impossibile eliminare l'account")
-	expectNoLeak(t, rec)
+	var started struct{ ConversationID int }
+	rec := app.do(http.MethodPost, "/api/start_chat", map[string]int{"listingId": listingID}, withSession(seeker.Cookie))
+	expect(t, rec, http.StatusOK, "")
+	decode(t, rec, &started)
+	expect(t, app.do(http.MethodPost, "/api/send_message", message(started.ConversationID, "domanda"), withSession(seeker.Cookie)), http.StatusOK, "")
+	expect(t, app.do(http.MethodPost, "/api/send_message", message(started.ConversationID, "risposta"), withSession(landlord.Cookie)), http.StatusOK, "")
+
+	expect(t, app.do(http.MethodDelete, "/api/v1/me", nil, withSession(landlord.Cookie)), http.StatusNoContent, "")
+
+	if _, code := app.listing(listingID, ""); code != http.StatusNotFound {
+		t.Errorf("annuncio dell'account eliminato ancora visibile: %d", code)
+	}
+	for _, key := range app.storage.keys() {
+		if key == imageKey {
+			t.Error("foto dell'account eliminato rimasta nello storage")
+		}
+	}
+
+	rec = app.do(http.MethodGet, "/api/get_chats", nil, withSession(seeker.Cookie))
+	var chats []struct {
+		Name     string
+		Messages []struct{ Type, Text string }
+	}
+	decode(t, rec, &chats)
+	if len(chats) != 1 || chats[0].Name != "Utente eliminato" || len(chats[0].Messages) != 2 ||
+		chats[0].Messages[1].Type != "received" || chats[0].Messages[1].Text != b64("risposta-per-destinatario") {
+		t.Fatalf("chat dopo l'eliminazione = %s", rec.Body.String())
+	}
+
+	// La copia dei messaggi cifrata per l'utente eliminato non viene conservata
+	var leftovers int
+	testPool.QueryRow(context.Background(), `SELECT count(*) FROM roomdate_app.messages WHERE sender_id IS NULL AND sender_content IS NOT NULL`).Scan(&leftovers)
+	if leftovers != 0 {
+		t.Errorf("copie per il mittente eliminato rimaste: %d", leftovers)
+	}
 }
 
 func TestProfilePrivacy(t *testing.T) {
@@ -304,7 +339,8 @@ func TestUpdateProfile(t *testing.T) {
 		Email     string
 	}
 	decode(t, rec, &profile)
-	if profile.Bio != `Cerco un'amica & coinquilina "tranquilla"` || profile.BudgetMax != 700 || profile.Email != u.Email {
+	// Il testo si salva così com'è, compresi i caratteri HTML: React fa l'escape quando lo mostra
+	if profile.Bio != bio || profile.BudgetMax != 700 || profile.Email != u.Email {
 		t.Fatalf("profilo restituito = %s", rec.Body.String())
 	}
 
@@ -318,14 +354,14 @@ func TestRoleChangeAppliesWithoutNewLogin(t *testing.T) {
 	app := newApp(t)
 	u := app.registerUser("Sara", "cerca", false)
 
-	expect(t, app.do(http.MethodPost, "/api/create_listing", validListing(), withSession(u.Cookie)), http.StatusForbidden, "Solo i proprietari")
+	expect(t, app.do(http.MethodPost, "/api/v1/listings", validListing(), withSession(u.Cookie)), http.StatusForbidden, "landlord_only")
 
 	expect(t, app.do(http.MethodPut, "/api/v1/me", profileInput(map[string]any{"userType": "affitta", "budgetMax": 0}), withSession(u.Cookie)), http.StatusOK, `"userType":"affitta"`)
 	if s := app.session(u.Cookie); s.User == nil || s.User.UserType != "affitta" {
 		t.Fatalf("sessione = %+v", s.User)
 	}
-	expect(t, app.do(http.MethodPost, "/api/create_listing", validListing(), withSession(u.Cookie)), http.StatusCreated, "")
+	expect(t, app.do(http.MethodPost, "/api/v1/listings", validListing(), withSession(u.Cookie)), http.StatusCreated, "")
 
 	expect(t, app.do(http.MethodPut, "/api/v1/me", profileInput(nil), withSession(u.Cookie)), http.StatusOK, `"userType":"cerca"`)
-	expect(t, app.do(http.MethodDelete, "/api/delete_listing?id=1", nil, withSession(u.Cookie)), http.StatusForbidden, "Solo i proprietari")
+	expect(t, app.do(http.MethodPost, "/api/v1/listings", validListing(), withSession(u.Cookie)), http.StatusForbidden, "landlord_only")
 }

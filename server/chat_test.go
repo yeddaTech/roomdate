@@ -37,8 +37,8 @@ func newChatFixture(t *testing.T) chatFixture {
 	decode(t, rec, &started)
 	f.directChat = started.ConversationID
 
-	expect(t, app.do(http.MethodPost, "/api/create_listing", validListing(), withSession(f.marco.Cookie)), http.StatusCreated, "")
-	rec = app.do(http.MethodPost, "/api/start_chat", map[string]int{"listingId": 1}, withSession(f.anna.Cookie))
+	listingID := app.createListing(f.marco.Cookie, nil)
+	rec = app.do(http.MethodPost, "/api/start_chat", map[string]int{"listingId": listingID}, withSession(f.anna.Cookie))
 	expect(t, rec, http.StatusOK, "")
 	decode(t, rec, &started)
 	f.listingChat = started.ConversationID
@@ -70,6 +70,12 @@ func TestStartChat(t *testing.T) {
 		expect(t, rec, http.StatusOK, `"conversationId":`+itoa(f.directChat))
 		rec = app.do(http.MethodPost, "/api/start_chat", map[string]int{"listingId": 1}, withSession(f.anna.Cookie))
 		expect(t, rec, http.StatusOK, `"conversationId":`+itoa(f.listingChat))
+	})
+
+	t.Run("niente conversazioni con sé stessi", func(t *testing.T) {
+		expect(t, app.do(http.MethodPost, "/api/start_chat", map[string]int{"listingId": 1}, withSession(f.marco.Cookie)), http.StatusBadRequest, "con te stesso")
+		expect(t, app.do(http.MethodPost, "/api/start_chat", map[string]string{"targetId": f.anna.ID}, withSession(f.anna.Cookie)), http.StatusBadRequest, "con te stesso")
+		expect(t, app.do(http.MethodPost, "/api/start_chat", map[string]string{"targetId": "0" + f.anna.ID}, withSession(f.anna.Cookie)), http.StatusBadRequest, "con te stesso")
 	})
 
 	t.Run("richieste non valide", func(t *testing.T) {

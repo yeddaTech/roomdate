@@ -5,6 +5,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -109,9 +110,35 @@ func (s *Store) UpdatePassword(ctx context.Context, id, passwordHash string, vau
 	return err
 }
 
-func (s *Store) Delete(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx, `DELETE FROM roomdate_app.users WHERE id = $1`, id)
-	return err
+// Delete elimina l'utente e restituisce le chiavi delle foto dei suoi annunci, da cancellare dallo storage.
+// Il database elimina a cascata gli annunci; conversazioni e messaggi restano all'altro partecipante.
+// La copia dei messaggi cifrata per l'utente eliminato non serve più a nessuno e viene cancellata.
+func (s *Store) Delete(ctx context.Context, id string) ([]string, error) {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	rows, err := tx.Query(ctx, `
+        SELECT i.storage_key
+        FROM roomdate_app.listing_images i
+        JOIN roomdate_app.listings l ON i.listing_id = l.id
+        WHERE l.user_id = $1`, id)
+	if err != nil {
+		return nil, err
+	}
+	keys, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE roomdate_app.messages SET sender_content = NULL WHERE sender_id = $1`, id); err != nil {
+		return nil, err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM roomdate_app.users WHERE id = $1`, id); err != nil {
+		return nil, err
+	}
+	return keys, tx.Commit(ctx)
 }
 
 // Profile è il profilo completo, visibile solo al proprietario.

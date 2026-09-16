@@ -83,48 +83,58 @@ export interface Roommate {
   budgetMax: number;
 }
 
-/** Annuncio negli elenchi. Colore ed emoji sono decorativi, in attesa delle foto (modulo M1.4). */
+export type RoomType = 'singola' | 'doppia';
+
+/** Annuncio negli elenchi (pubblici e "I miei annunci"). */
 export interface ListingSummary {
   id: number;
   title: string;
   city: string;
   zone: string;
+  roomType: RoomType;
   price: number;
-  color: string;
-  emoji: string;
-  tags: string[];
+  /** null per gli annunci pubblicati prima che il dato esistesse. */
+  billsIncluded: boolean | null;
+  /** Data AAAA-MM-GG da cui la stanza è libera, o null se non indicata. */
+  availableFrom: string | null;
+  isActive: boolean;
+  /** Prima foto dell'annuncio, o null se non ne ha. */
+  coverUrl: string | null;
 }
 
-export interface ListingDetail {
+export interface ListingImage {
   id: number;
-  title: string;
-  city: string;
-  zone: string;
-  price: number;
-  roomType: string;
+  url: string;
+}
+
+export interface ListingDetail extends ListingSummary {
   description: string;
-  /** Vuoti finché servizi e foto non vengono salvati nel database (modulo M1.4). */
-  features: string[];
-  images: string[];
-  landlord: { name: string; role: string; emoji: string };
-}
-
-/** Annuncio nell'elenco "I miei annunci". */
-export interface MyListing {
-  id: number;
-  title: string;
-  city: string;
-  price: number;
-  roomType: string;
+  amenities: string[];
+  images: ListingImage[];
+  owner: { firstName: string };
+  /** true se chi guarda è il proprietario. */
+  isOwner: boolean;
 }
 
 export interface ListingInput {
   title: string;
   city: string;
   zone: string;
-  roomType: string;
+  roomType: RoomType;
   price: number;
   description: string;
+  amenities: string[];
+  billsIncluded: boolean;
+  /** AAAA-MM-GG, oppure stringa vuota se non indicata. */
+  availableFrom: string;
+}
+
+/** Caricamento di una foto autorizzato dal server: il browser invia il file direttamente allo storage. */
+export interface PendingUpload {
+  key: string;
+  url: string;
+  headers: Record<string, string>;
+  maxBytes: number;
 }
 
 export interface ChatMessage {

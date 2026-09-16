@@ -3,12 +3,6 @@ import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 import { useLatestListings } from '../api/hooks';
 
-// 🛡️ HELPER SICUREZZA: Previene iniezioni HTML/Script per i dati grezzi
-const sanitizeHTML = (str) => {
-  if (typeof str !== 'string') return '';
-  return str.replace(/[<>]/g, '');
-};
-
 export default function Home() {
   const { data: listings = [], isPending: isLoading, isError } = useLatestListings();
   const error = isError ? "Impossibile caricare le stanze al momento." : null;
@@ -80,19 +74,22 @@ export default function Home() {
                 key={l.id} 
                 className="w-full bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-orange-100 cursor-pointer overflow-hidden group decoration-none"
               >
-                <div className="h-48 flex items-center justify-center text-6xl relative transition-transform duration-500 group-hover:scale-105" style={{ background: sanitizeHTML(l.color) || '#f3f4f6' }}>
-                  <span className="drop-shadow-sm">{sanitizeHTML(l.emoji) || '🏠'}</span>
+                <div className="h-48 flex items-center justify-center relative overflow-hidden bg-neutral-100">
+                  {l.coverUrl
+                    ? <img src={l.coverUrl} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    : <span className="text-sm font-bold text-neutral-400">📷 Nessuna foto</span>}
                   <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-2xl shadow-sm">
                     <span className="font-extrabold text-lg text-orange-500">€{Number(l.price) || 0}</span><span className="text-[11px] text-neutral-500 font-bold">/mese</span>
                   </div>
                 </div>
                 <div className="p-5 flex flex-col grow bg-white relative z-10">
-                  <h3 className="font-bold text-lg text-neutral-900 leading-tight mb-2 truncate" title={sanitizeHTML(l.title)}>
-                    {sanitizeHTML(l.title)}
+                  <h3 className="font-bold text-lg text-neutral-900 leading-tight mb-2 truncate" title={l.title}>
+                    {l.title}
                   </h3>
                   <p className="text-sm text-neutral-500 font-medium truncate">
-                    📍 {sanitizeHTML(l.zone)}, {sanitizeHTML(l.city)}
+                    📍 {l.zone ? `${l.zone}, ${l.city}` : l.city}
                   </p>
+                  {l.billsIncluded && <p className="text-xs text-green-700 font-bold mt-2">Spese incluse</p>}
                 </div>
               </Link>
             ))
