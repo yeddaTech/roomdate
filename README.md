@@ -1,7 +1,7 @@
 # RoomDate
 
 https://roomdate.vercel.app/
-RoomDate is a robust web platform designed to facilitate roommate and room-rental matching. Built with a primary focus on data privacy, the application features a custom Zero-Knowledge End-to-End Encrypted (E2EE) messaging architecture.
+RoomDate is a web platform for finding rooms to rent and roommates. Users contact each other through a chat whose messages are end-to-end encrypted in the browser.
 
 ## System Architecture & Tech Stack
 
@@ -15,11 +15,11 @@ The platform operates on a decoupled full-stack architecture:
 
 ## Security & Cryptography Infrastructure
 
-A major technical focal point of this project is its enterprise-grade security model, designed to ensure that user communications remain strictly confidential and inaccessible to unauthorized parties.
+Chat messages are encrypted and decrypted in the browser; the server stores and relays only ciphertext.
 
-*   **Zero-Knowledge Architecture:** The server acts strictly as a relay and storage facility for ciphertext. Keys are derived and managed exclusively client-side.
+*   **Not zero-knowledge (yet):** keys are generated and used client-side, but the private key is wrapped with a key derived from the account password, which the server also receives at login. A server operator could therefore derive the wrapping key. Separating the two is planned in module M3.4.
 *   **Asymmetric Encryption (RSA-OAEP):** Each user generates an RSA key pair upon registration. Public keys are exchanged to facilitate secure message transfer.
-*   **Key Wrapping (AES-GCM & PBKDF2):** Private keys are never stored in plaintext. They are wrapped using AES-GCM, with a key derived from the user's master password via PBKDF2, and stored as an encrypted vault in the database.
+*   **Key Wrapping (AES-GCM & PBKDF2):** Private keys are never stored in plaintext on the server. They are wrapped using AES-GCM, with a key derived from the user's master password via PBKDF2, and stored as an encrypted vault in the database.
 *   **Double Encryption Routing:** Messages are encrypted twice on the client—once utilizing the recipient's public key (for secure delivery) and once utilizing the sender's public key (to securely preserve local chat history).
 *   **Local Secure Session:** Private keys are temporarily held in `sessionStorage` during active use. `localStorage` persists the encrypted vault, enabling a local cryptographic lock mechanism upon session expiration without exposing plaintext keys to the disk.
 

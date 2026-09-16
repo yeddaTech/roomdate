@@ -171,7 +171,7 @@ export default function ListingDetails() {
             <h2 className="font-serif text-2xl md:text-3xl font-extrabold text-neutral-900 mb-6 tracking-tight">Descrizione immobile</h2>
             <p className="text-neutral-600 leading-relaxed text-lg whitespace-pre-line font-medium">{listing.description}</p>
             
-            {listing.features && (
+            {listing.features.length > 0 && (
               <div className="border-t border-neutral-100 pt-8 mt-8">
                 <h3 className="font-serif text-2xl font-extrabold text-neutral-900 mb-6 tracking-tight">Cosa offre</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -199,7 +199,7 @@ export default function ListingDetails() {
                 <div className="font-serif text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500 tracking-tight">
                   €{listing.price}
                 </div>
-                <div className="text-sm font-bold text-neutral-500 mt-2 uppercase tracking-wider">al mese (spese incluse)</div>
+                <div className="text-sm font-bold text-neutral-500 mt-2 uppercase tracking-wider">al mese</div>
               </div>
               
               {/* Profilo Host */}
@@ -220,8 +220,8 @@ export default function ListingDetails() {
             {/* Banner Sicurezza */}
             <div className="bg-neutral-50 border border-neutral-100 p-6 rounded-3xl text-center shadow-sm">
               <div className="text-2xl mb-2">🛡️</div>
-              <h4 className="font-bold text-neutral-900 mb-2">Protezione RoomDate</h4>
-              <p className="text-xs text-neutral-500 font-medium leading-relaxed">Le tue chat sono protette da crittografia End-to-End. Non inviare mai denaro fuori dalla piattaforma prima di aver visitato l'immobile.</p>
+              <h4 className="font-bold text-neutral-900 mb-2">Consigli di sicurezza</h4>
+              <p className="text-xs text-neutral-500 font-medium leading-relaxed">Le chat sono cifrate end-to-end. Non inviare denaro prima di aver visitato la stanza e incontrato chi la affitta.</p>
             </div>
 
           </div>

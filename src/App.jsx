@@ -7,7 +7,6 @@ import PageLoader from './components/PageLoader';
 
 // Importa normalmente solo le pagine essenziali (es. la Home)
 import Home from './pages/Home';
-import CookieBanner from './components/CookieBanner';
 
 // Usa lazy e Suspense per caricare le altre pagine solo quando servono
 const Login = lazy(() => import('./pages/Login'));
@@ -49,10 +48,7 @@ function App() {
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
-
-          {/* BANNER COOKIE GLOBAL */}
-          {/* Fuori dal blocco Routes, così sarà presente globalmente in ogni pagina */}
-          <CookieBanner />
+          {/* Nessun banner cookie: l'app usa solo cookie e memoria locale tecnici (sessione e chiavi della chat) */}
         </main>
       </AuthProvider>
     </BrowserRouter>

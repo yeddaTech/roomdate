@@ -258,6 +258,24 @@ func TestProfilePrivacy(t *testing.T) {
 			t.Fatalf("elenco = %s", rec.Body.String())
 		}
 	})
+
+	t.Run("elenco coinquilini senza dati inventati", func(t *testing.T) {
+		// Un profilo senza bio, occupazione né tag resta vuoto: niente testi segnaposto
+		testPool.Exec(context.Background(), `UPDATE roomdate_app.users SET bio = NULL, occupation = NULL, lifestyle_tags = NULL WHERE id = $1`, anna.ID)
+		rec := app.do(http.MethodGet, "/api/get_roommates", nil)
+		var roommates []map[string]any
+		decode(t, rec, &roommates)
+		for _, r := range roommates {
+			for _, fake := range []string{"age", "match"} {
+				if _, found := r[fake]; found {
+					t.Errorf("il profilo contiene %q inventato: %v", fake, r)
+				}
+			}
+			if r["id"] == anna.ID && (r["quote"] != "" || r["job"] != "" || len(r["tags"].([]any)) != 0) {
+				t.Errorf("valori segnaposto al posto dei campi vuoti: %v", r)
+			}
+		}
+	})
 }
 
 func profileInput(fields map[string]any) map[string]any {

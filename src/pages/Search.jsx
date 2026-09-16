@@ -253,9 +253,6 @@ export default function Search() {
                     <div key={item.id} className="w-full bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-orange-100 cursor-pointer overflow-hidden group">
                       <div className="h-52 flex items-center justify-center text-6xl relative transition-transform duration-500 group-hover:scale-105" style={{ background: item.color ? item.color : '#f3f4f6' }}>
                         <span className="drop-shadow-sm">{item.emoji || '🏠'}</span>
-                        <span className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-[11px] font-bold shadow-sm backdrop-blur-md ${item.available ? 'bg-white/90 text-green-700' : 'bg-neutral-900/80 text-white'}`}>
-                          {item.available ? '✅ Disponibile' : 'Occupata'}
-                        </span>
                         <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-2xl shadow-sm">
                           <span className="font-extrabold text-lg text-orange-500">€{item.price}</span><span className="text-[11px] text-neutral-500 font-bold">/mese</span>
                         </div>
@@ -287,9 +284,9 @@ export default function Search() {
                         <span className="drop-shadow-sm">{item.emoji || '👤'}</span>
                       </div>
                       <div className="text-center font-bold text-neutral-900 text-lg relative z-10 truncate">{item.name}</div>
-                      <div className="text-center text-xs text-neutral-500 mb-4 font-bold uppercase tracking-wider relative z-10">{item.age ? `${item.age} anni · ` : ''}{item.occupation || 'Studente'}</div>
+                      <div className="text-center text-xs text-neutral-500 mb-4 font-bold uppercase tracking-wider relative z-10">{item.occupation || 'Occupazione non indicata'}</div>
                       
-                      <div className="bg-neutral-50 p-4 rounded-2xl text-sm text-neutral-600 italic text-center mb-5 leading-relaxed relative z-10 border border-neutral-100 line-clamp-3">"{item.bio || 'Cerco una stanza accogliente!'}"</div>
+                      <div className="bg-neutral-50 p-4 rounded-2xl text-sm text-neutral-600 italic text-center mb-5 leading-relaxed relative z-10 border border-neutral-100 line-clamp-3">{item.bio ? `"${item.bio}"` : 'Nessuna presentazione'}</div>
                       
                       <div className="flex flex-wrap justify-center gap-1.5 mb-5 relative z-10">
                         {item.tags.slice(0, 4).map(t => <span key={t} className="bg-orange-50 text-orange-600 border border-orange-100 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider">{t.trim()}</span>)}
@@ -300,16 +297,6 @@ export default function Search() {
                            Budget max: €{item.budgetMax}
                         </div>
                       )}
-                      
-                      <div className="mt-auto mb-6 relative z-10">
-                        <div className="flex justify-between items-center mb-1.5">
-                          <span className="text-[10px] font-bold text-neutral-400 uppercase">Compatibilità</span>
-                          <span className="text-xs font-bold text-orange-500">{item.match || 85}%</span>
-                        </div>
-                        <div className="w-full bg-neutral-100 rounded-full h-1.5 overflow-hidden">
-                          <div className="bg-gradient-to-r from-orange-400 to-rose-500 h-full rounded-full transition-all duration-1000" style={{ width: `${item.match || 85}%` }}></div>
-                        </div>
-                      </div>
                       
                       <div className="flex flex-col gap-2 relative z-10 mt-auto">
                         <Link 

@@ -68,15 +68,13 @@ export interface PublicProfile {
   lifestyleTags: string;
 }
 
-/** Profilo nell'elenco dei coinquilini. */
+/** Profilo nell'elenco dei coinquilini. Età e compatibilità reali arrivano con il modulo M1.5. */
 export interface Roommate {
   id: string;
   name: string;
   occupation: string;
   bio: string;
-  age: number;
   city: string;
-  match: number;
   color1: string;
   color2: string;
   emoji: string;
@@ -85,7 +83,7 @@ export interface Roommate {
   budgetMax: number;
 }
 
-/** Annuncio negli elenchi. */
+/** Annuncio negli elenchi. Colore ed emoji sono decorativi, in attesa delle foto (modulo M1.4). */
 export interface ListingSummary {
   id: number;
   title: string;
@@ -94,7 +92,6 @@ export interface ListingSummary {
   price: number;
   color: string;
   emoji: string;
-  available: boolean;
   tags: string[];
 }
 
@@ -106,6 +103,7 @@ export interface ListingDetail {
   price: number;
   roomType: string;
   description: string;
+  /** Vuoti finché servizi e foto non vengono salvati nel database (modulo M1.4). */
   features: string[];
   images: string[];
   landlord: { name: string; role: string; emoji: string };
