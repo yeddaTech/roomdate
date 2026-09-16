@@ -5,15 +5,14 @@ import (
 	"fmt"
 
 	"roomdate-backend/internal/apperr"
-	"roomdate-backend/internal/auth"
 	"roomdate-backend/internal/db"
 	"roomdate-backend/internal/validate"
 )
 
 const latestLimit = 50
 
-// Solo chi affitta può pubblicare ed eliminare annunci.
-// Il ruolo viene letto dal cookie di sessione: diventa un dato letto dal database nel modulo M1.2.
+// Solo chi affitta può pubblicare ed eliminare annunci. Il ruolo si legge dal database a ogni
+// richiesta: se l'utente lo cambia nel profilo, vale subito, senza rifare il login.
 const landlordUserType = "affitta"
 
 var (
@@ -21,6 +20,21 @@ var (
 	errNotLandlordDelete = apperr.Forbidden("landlord_only", "Accesso negato: Solo i proprietari possono eliminare annunci")
 	errInvalidID         = apperr.BadRequest("invalid_listing_id", "ID annuncio non valido")
 )
+
+// requireLandlord verifica che l'utente esista e affitti stanze.
+func (s *Service) requireLandlord(ctx context.Context, userID string, notLandlord error) error {
+	userType, err := s.store.UserType(ctx, userID)
+	if db.IsNoRows(err) || db.IsInvalidInput(err) {
+		return errSessionInvalid
+	}
+	if err != nil {
+		return fmt.Errorf("lettura tipo di utente: %w", err)
+	}
+	if userType != landlordUserType {
+		return notLandlord
+	}
+	return nil
+}
 
 type Service struct {
 	store *Store
@@ -40,9 +54,9 @@ type CreateInput struct {
 	Description string `json:"description"`
 }
 
-func (s *Service) Create(ctx context.Context, session auth.Session, in CreateInput) error {
-	if session.UserType != landlordUserType {
-		return errNotLandlordCreate
+func (s *Service) Create(ctx context.Context, userID string, in CreateInput) error {
+	if err := s.requireLandlord(ctx, userID, errNotLandlordCreate); err != nil {
+		return err
 	}
 
 	l := NewListing{
@@ -65,7 +79,7 @@ func (s *Service) Create(ctx context.Context, session auth.Session, in CreateInp
 		return err
 	}
 
-	if err := s.store.Create(ctx, session.UserID, l); err != nil {
+	if err := s.store.Create(ctx, userID, l); err != nil {
 		return apperr.Wrap(err, "listing_create_failed", "Impossibile pubblicare l'annuncio. Controlla i dati e riprova.")
 	}
 	return nil
@@ -194,9 +208,9 @@ func (s *Service) Mine(ctx context.Context, userID string) ([]MyListing, error) 
 	return listings, nil
 }
 
-func (s *Service) Delete(ctx context.Context, session auth.Session, rawID string) error {
-	if session.UserType != landlordUserType {
-		return errNotLandlordDelete
+func (s *Service) Delete(ctx context.Context, userID, rawID string) error {
+	if err := s.requireLandlord(ctx, userID, errNotLandlordDelete); err != nil {
+		return err
 	}
 	if rawID == "" {
 		return apperr.BadRequest("missing_listing_id", "ID annuncio mancante")
@@ -206,7 +220,7 @@ func (s *Service) Delete(ctx context.Context, session auth.Session, rawID string
 		return errInvalidID
 	}
 
-	deleted, err := s.store.DeleteOwned(ctx, id, session.UserID)
+	deleted, err := s.store.DeleteOwned(ctx, id, userID)
 	if err != nil {
 		return apperr.Wrap(err, "listing_delete_failed", "Impossibile eliminare l'annuncio in questo momento")
 	}

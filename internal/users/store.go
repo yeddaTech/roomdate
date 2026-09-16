@@ -28,10 +28,10 @@ type Account struct {
 
 // Vault è la chiave privata E2EE cifrata con la password dell'utente, più la chiave pubblica.
 type Vault struct {
-	PublicKey           string
-	EncryptedPrivateKey string
-	CryptoSalt          string
-	CryptoIV            string
+	PublicKey           string `json:"publicKey"`
+	EncryptedPrivateKey string `json:"encryptedPrivateKey"`
+	CryptoSalt          string `json:"cryptoSalt"`
+	CryptoIV            string `json:"cryptoIv"`
 }
 
 const accountColumns = `id::text, first_name, last_name, email, COALESCE(user_type, ''), password_hash,
@@ -114,20 +114,20 @@ func (s *Store) Delete(ctx context.Context, id string) error {
 	return err
 }
 
-// Profile è il profilo completo, visibile solo al proprietario (formato JSON delle API legacy).
+// Profile è il profilo completo, visibile solo al proprietario.
 type Profile struct {
 	ID            string `json:"id"`
-	Nome          string `json:"nome"`
-	Cognome       string `json:"cognome"`
+	FirstName     string `json:"firstName"`
+	LastName      string `json:"lastName"`
 	Email         string `json:"email"`
-	UserType      string `json:"user_type"`
-	Citta         string `json:"citta"`
-	Nascita       string `json:"nascita"`
-	BudgetMax     int    `json:"budget_max"`
+	UserType      string `json:"userType"`
+	City          string `json:"city"`
+	Birthdate     string `json:"birthdate"`
+	BudgetMax     int    `json:"budgetMax"`
 	Occupation    string `json:"occupation"`
 	Bio           string `json:"bio"`
-	LifestyleTags string `json:"lifestyle_tags"`
-	IsPublic      bool   `json:"is_public"`
+	LifestyleTags string `json:"lifestyleTags"`
+	IsPublic      bool   `json:"isPublic"`
 }
 
 func (s *Store) Profile(ctx context.Context, id string) (Profile, error) {
@@ -138,7 +138,7 @@ func (s *Store) Profile(ctx context.Context, id string) (Profile, error) {
                COALESCE(budget_max, 0), COALESCE(occupation, ''), COALESCE(bio, ''), COALESCE(lifestyle_tags, ''),
                COALESCE(is_public, true)
         FROM roomdate_app.users WHERE id = $1`, id,
-	).Scan(&p.ID, &p.Nome, &p.Cognome, &p.Email, &p.UserType, &p.Citta, &p.Nascita,
+	).Scan(&p.ID, &p.FirstName, &p.LastName, &p.Email, &p.UserType, &p.City, &p.Birthdate,
 		&p.BudgetMax, &p.Occupation, &p.Bio, &p.LifestyleTags, &p.IsPublic)
 	return p, err
 }

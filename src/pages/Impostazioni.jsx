@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { fetchAPI } from '../utils/api';
-import { logoutSession } from '../utils/session';
-import { rewrapPrivateKey } from '../utils/crypto';
+import { useAuth } from '../auth/AuthContext';
+import { changePassword } from '../api/auth';
+import { deleteMyAccount } from '../api/users';
+import { prepareKeysForPasswordChange, saveKeysAfterPasswordChange } from '../auth/keyStorage';
 
 export default function Impostazioni() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  // La pagina è protetta: qui l'utente in sessione c'è sempre
+  const { user, logout, endLocalSession } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Stati per le password e i messaggi a schermo
@@ -21,26 +23,14 @@ export default function Impostazioni() {
   const [emailNotif, setEmailNotif] = useState(true);
   const [pushNotif, setPushNotif] = useState(false);
 
-  useEffect(() => {
-    try {
-      const savedUser = localStorage.getItem('roomdate_user');
-      if (!savedUser) {
-        navigate('/accedi'); // Se non è loggato, via!
-      } else {
-        setUser(JSON.parse(savedUser));
-      }
-    } catch {
-      navigate('/accedi');
-    }
-  }, [navigate]);
-
   const handleLogout = async () => {
-    await logoutSession();
+    // Prima si lascia la pagina: su quelle protette la sessione chiusa porterebbe all'accesso
     setIsMenuOpen(false);
     navigate('/');
+    await logout();
   };
 
-  // --- LA VERA CHIAMATA API PER LA PASSWORD (Usando il trucco del Login Multiplexer) ---
+  // --- CAMBIO PASSWORD ---
   const handleSaveSettings = async (e) => {
     e.preventDefault();
     setStatusMsg({ text: '', type: '' });
@@ -64,53 +54,23 @@ export default function Impostazioni() {
       try {
         // 🔐 La chiave privata della chat è cifrata con la password: va cifrata di nuovo
         // con quella nuova, altrimenti tutti i messaggi diventerebbero illeggibili.
-        const cryptoDataStr = localStorage.getItem('roomdate_crypto');
-        let newVault = null;
-        if (cryptoDataStr) {
-          newVault = await rewrapPrivateKey(
-            JSON.parse(cryptoDataStr),
-            currentPassword,
-            newPassword,
-            localStorage.getItem('roomdate_public_key')
-          );
-          if (!newVault) {
-            setStatusMsg({ text: 'Password attuale errata, oppure le chiavi di cifratura salvate su questo dispositivo non sono aggiornate. Se la password è corretta, esci, accedi di nuovo e riprova.', type: 'error' });
-            return;
-          }
+        const prepared = await prepareKeysForPasswordChange(currentPassword, newPassword);
+        if (!prepared.ok) {
+          setStatusMsg({ text: 'Password attuale errata, oppure le chiavi di cifratura salvate su questo dispositivo non sono aggiornate. Se la password è corretta, esci, accedi di nuovo e riprova.', type: 'error' });
+          return;
         }
 
-        const res = await fetchAPI('/api/login', {
-          method: 'POST',
-          body: JSON.stringify({
-            action: 'update_password',
-            currentPassword: currentPassword,
-            newPassword: newPassword,
-            ...(newVault && {
-              encryptedPrivateKey: newVault.encryptedPrivateKey,
-              cryptoSalt: newVault.salt,
-              cryptoIv: newVault.iv
-            })
-          })
-        });
+        await changePassword({ currentPassword, newPassword, keys: prepared.keys });
 
-        if (res.ok) {
-          if (newVault) {
-            localStorage.setItem('roomdate_crypto', JSON.stringify({
-              encryptedPrivateKey: newVault.encryptedPrivateKey,
-              cryptoSalt: newVault.salt,
-              cryptoIv: newVault.iv
-            }));
-          }
-          setStatusMsg({ text: 'Password aggiornata con successo!', type: 'success' });
-          setCurrentPassword('');
-          setNewPassword('');
-          setConfirmPassword('');
-        } else {
-          const data = await res.text();
-          setStatusMsg({ text: data || 'Errore durante l\'aggiornamento.', type: 'error' });
+        if (prepared.keys) {
+          saveKeysAfterPasswordChange(prepared.keys);
         }
+        setStatusMsg({ text: 'Password aggiornata con successo!', type: 'success' });
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
       } catch (err) {
-        setStatusMsg({ text: 'Errore di connessione al server.', type: 'error' });
+        setStatusMsg({ text: err.message, type: 'error' });
       } finally {
         setIsLoading(false);
       }
@@ -120,30 +80,19 @@ export default function Impostazioni() {
     }
   };
 
-  // --- LA VERA CHIAMATA API PER ELIMINARE L'ACCOUNT ---
+  // --- ELIMINAZIONE ACCOUNT ---
   const handleDeleteAccount = async () => {
     if (window.confirm("Sei assolutamente sicuro? Tutti i tuoi dati verranno cancellati per sempre.")) {
       try {
-        const res = await fetchAPI('/api/login', {
-          method: 'POST',
-          body: JSON.stringify({ 
-            action: 'delete_account', 
-            userId: user.id 
-          })
-        });
-
-        if (res.ok) {
-          handleLogout(); 
-        } else {
-          alert("Impossibile eliminare l'account in questo momento. Riprova più tardi.");
-        }
+        await deleteMyAccount();
+        // Il server ha già chiuso la sessione: resta da pulire il browser
+        navigate('/');
+        endLocalSession();
       } catch (err) {
-        alert("Errore di connessione al server.");
+        alert(err.message);
       }
     }
   };
-
-  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
@@ -167,7 +116,7 @@ export default function Impostazioni() {
         </div>
 
         <div className="hidden md:flex gap-4 items-center">
-          <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{user.nome || user.first_name || 'Utente'}</strong>!</span>
+          <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{user.firstName}</strong>!</span>
           <button onClick={handleLogout} className="border border-neutral-200 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer">Esci</button>
         </div>
 
@@ -184,7 +133,7 @@ export default function Impostazioni() {
         <div className="flex flex-col gap-6 text-lg font-medium text-neutral-600">
           {user && (
              <div className="border-b border-neutral-100 pb-4 mb-2">
-               <h3 className="text-xl text-neutral-900 font-bold">👤 Ciao, {user.nome || user.first_name || 'Utente'}!</h3>
+               <h3 className="text-xl text-neutral-900 font-bold">👤 Ciao, {user.firstName}!</h3>
              </div>
           )}
           <Link to="/" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">🏠 Home</Link>

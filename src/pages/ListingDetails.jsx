@@ -1,47 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom'; 
+import { useState } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { fetchAPI } from '../utils/api';
-import { logoutSession } from '../utils/session';
+import { useAuth } from '../auth/AuthContext';
+import { useListing, useStartChat } from '../api/hooks';
 
 export default function ListingDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  
-  const [listing, setListing] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { user, logout } = useAuth();
+
+  const { data: listing, isPending: loading } = useListing(id);
+  const startChat = useStartChat();
   const [currentIndex, setCurrentIndex] = useState(0);
-  
-  const [user, setUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  useEffect(() => {
-    const savedUser = localStorage.getItem('roomdate_user');
-    if (savedUser) setUser(JSON.parse(savedUser));
-  }, []);
-
   const handleLogout = async () => {
-    await logoutSession();
-    setUser(null);
+    // Prima si lascia la pagina: su quelle protette la sessione chiusa porterebbe all'accesso
     setIsMenuOpen(false);
     navigate('/');
+    await logout();
   };
-
-  useEffect(() => {
-    fetchAPI(`/api/get_listing?id=${id}`)
-      .then(res => {
-        if (!res.ok) throw new Error('Annuncio non trovato');
-        return res.json();
-      })
-      .then(data => {
-        setListing(data);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error("Errore nel caricamento dei dati:", err);
-        setLoading(false);
-      });
-  }, [id]);
 
   const nextImage = () => {
     if (listing?.images) {
@@ -64,21 +42,10 @@ export default function ListingDetails() {
     }
 
     try {
-      const res = await fetchAPI('/api/start_chat', {
-        method: 'POST',
-        body: JSON.stringify({
-          listingId: parseInt(id)
-        })
-      });
-      if (res.ok) {
-        const data = await res.json(); 
-        navigate('/chat', { state: { openChatId: data.conversationId } });
-      } else {
-        alert("Errore nell'avvio della chat.");
-      }
+      const conversationId = await startChat.mutateAsync({ listingId: listing.id });
+      navigate('/chat', { state: { openChatId: conversationId } });
     } catch (err) {
-      console.error(err);
-      alert("Errore di connessione.");
+      alert("Errore nell'avvio della chat: " + err.message);
     }
   };
 
@@ -107,7 +74,7 @@ export default function ListingDetails() {
     <div className="min-h-[100dvh] bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
       <Helmet>
         <title>{listing.title} a {listing.city} | RoomDate</title>
-        <meta name="description" content={`Stanza in affitto (${listing.type}) a ${listing.city}, zona ${listing.zone}.`} />
+        <meta name="description" content={`Stanza in affitto (${listing.roomType}) a ${listing.city}, zona ${listing.zone}.`} />
       </Helmet>
 
       {/* --- TOP NAV (GLASSMORPHISM) --- */}
@@ -124,7 +91,7 @@ export default function ListingDetails() {
         <div className="hidden md:flex gap-4 items-center">
           {user ? (
             <>
-              <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{user.nome}</strong>!</span>
+              <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{user.firstName}</strong>!</span>
               <button onClick={handleLogout} className="border border-neutral-200 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer">Esci</button>
             </>
           ) : (

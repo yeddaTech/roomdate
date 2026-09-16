@@ -225,31 +225,36 @@ type user struct {
 func (a *testApp) registerUser(name, userType string, withVault bool) user {
 	a.t.Helper()
 	u := user{Email: strings.ToLower(name) + "@test.it", Password: "password-" + strings.ToLower(name)}
-	body := map[string]any{
-		"nome": name, "cognome": "Rossi", "email": u.Email, "password": u.Password,
-		"citta": "Milano", "userType": userType, "nascita": "1999-01-01", "budgetMax": 500,
-		"occupation": "Studente", "bio": "ciao", "lifestyle_tags": "Socievole",
-	}
-	if withVault {
-		body["publicKey"] = b64("PUB-" + name)
-		body["encryptedPrivateKey"] = b64("VAULT-" + name)
-		body["cryptoSalt"] = b64("SALT")
-		body["cryptoIv"] = b64("IV")
-	}
-	rec := a.do(http.MethodPost, "/api/register", body)
+	rec := a.do(http.MethodPost, "/api/v1/auth/register", registration(name, u.Email, u.Password, userType, withVault))
 	if rec.Code != http.StatusCreated {
 		a.t.Fatalf("registrazione di %s: %d %s", name, rec.Code, rec.Body.String())
 	}
-	var created struct{ UserID string }
+	var created struct{ ID string }
 	decode(a.t, rec, &created)
-	u.ID = created.UserID
+	u.ID = created.ID
 	u.Cookie = a.login(u.Email, u.Password)
 	return u
 }
 
+// registration restituisce il corpo di una registrazione valida.
+func registration(name, email, password, userType string, withVault bool) map[string]any {
+	body := map[string]any{
+		"firstName": name, "lastName": "Rossi", "email": email, "password": password,
+		"city": "Milano", "userType": userType, "birthdate": "1999-01-01", "budgetMax": 500,
+		"occupation": "Studente", "bio": "ciao", "lifestyleTags": "Socievole",
+	}
+	if withVault {
+		body["keys"] = map[string]string{
+			"publicKey": b64("PUB-" + name), "encryptedPrivateKey": b64("VAULT-" + name),
+			"cryptoSalt": b64("SALT"), "cryptoIv": b64("IV"),
+		}
+	}
+	return body
+}
+
 func (a *testApp) login(email, password string) string {
 	a.t.Helper()
-	rec := a.do(http.MethodPost, "/api/login", map[string]string{"email": email, "password": password})
+	rec := a.do(http.MethodPost, "/api/v1/auth/login", map[string]string{"email": email, "password": password})
 	if rec.Code != http.StatusOK {
 		a.t.Fatalf("login di %s: %d %s", email, rec.Code, rec.Body.String())
 	}

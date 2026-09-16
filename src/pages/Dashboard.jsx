@@ -1,175 +1,113 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { fetchAPI } from '../utils/api';
-import { logoutSession } from '../utils/session';
+import { useAuth } from '../auth/AuthContext';
+import { useCreateListing, useDeleteListing, useMyListings, useMyProfile, useUpdateMyProfile } from '../api/hooks';
+import PageLoader from '../components/PageLoader';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
   const [activeView, setActiveView] = useState('editProfile');
-  const [myListings, setMyListings] = useState([]);
 
+  // Profilo salvato sul server e sua copia modificabile nel form
+  const profileQuery = useMyProfile();
+  const [form, setForm] = useState(null);
   useEffect(() => {
-    try {
-      const savedUser = localStorage.getItem('roomdate_user');
-      if (!savedUser) {
-        navigate('/accedi');
-      } else {
-        const parsedUser = JSON.parse(savedUser);
-        setUser(parsedUser);
-        fetchFreshProfile();
-      }
-    } catch {
-      navigate('/accedi');
-    }
-  }, [navigate]);
+    if (profileQuery.data) setForm(profileQuery.data);
+  }, [profileQuery.data]);
 
-  const fetchFreshProfile = async () => {
-    try {
-      const res = await fetchAPI(`/api/profile`);
-      if (res.ok) {
-        const freshData = await res.json();
-        setUser(prev => ({ ...prev, ...freshData })); 
-        localStorage.setItem('roomdate_user', JSON.stringify(freshData)); 
-      }
-    } catch (err) {
-      console.error("Errore fetch profilo:", err);
-    }
-  };
+  // Solo chi affitta pubblica e gestisce annunci. Conta il ruolo salvato, non quello in modifica.
+  const isLandlord = profileQuery.data?.userType === 'affitta';
+  const view = isLandlord ? activeView : 'editProfile';
+
+  const { data: myListings = [] } = useMyListings({ enabled: isLandlord });
+  const updateProfile = useUpdateMyProfile();
+  const createListing = useCreateListing();
+  const deleteListing = useDeleteListing();
 
   const handleLogout = async () => {
-    await logoutSession();
+    // Prima si lascia la pagina: su quelle protette la sessione chiusa porterebbe all'accesso
     setIsMenuOpen(false);
     navigate('/');
+    await logout();
   };
-
-  const fetchMyListings = async () => {
-    if (!user) return;
-    try {
-      const res = await fetchAPI(`/api/get_my_listings`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data) setMyListings(data);
-      }
-    } catch (err) {
-      console.error("Errore caricamento annunci", err);
-    }
-  };
-
-  useEffect(() => {
-    if (user?.id) fetchMyListings();
-  }, [user?.id]);
 
   const handleDeleteListing = async (id) => {
     if (window.confirm("Sei sicuro di voler eliminare questo annuncio?")) {
       try {
-        const res = await fetchAPI(`/api/delete_listing?id=${id}`, { method: 'DELETE' });
-        if (res.ok) {
-          alert("✅ Annuncio eliminato.");
-          fetchMyListings();
-        }
+        await deleteListing.mutateAsync(id);
+        alert("✅ Annuncio eliminato.");
       } catch (err) {
-        alert("Errore di connessione.");
+        alert("❌ " + err.message);
       }
     }
   };
 
   const handleToggleTag = (tagText) => {
     const rawTag = tagText.split(' ')[1] || tagText;
-    const currentTagsStr = user.lifestyle_tags || user.tags || '';
-    let currentTags = currentTagsStr ? currentTagsStr.split(', ') : [];
+    let currentTags = form.lifestyleTags ? form.lifestyleTags.split(', ') : [];
 
     if (currentTags.includes(rawTag)) {
       currentTags = currentTags.filter(t => t !== rawTag);
     } else {
       currentTags.push(rawTag);
     }
-    
-    const updatedTagsStr = currentTags.join(', ');
-    setUser({ ...user, lifestyle_tags: updatedTagsStr, tags: updatedTagsStr });
+
+    setForm({ ...form, lifestyleTags: currentTags.join(', ') });
   };
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
-    const tags = user.lifestyle_tags || user.tags || '';
-    
-    const userType = formData.get('userType');
-
-    const payload = {
-      userType: userType,
-      citta: formData.get('citta'),
-      // 🔴 FIX: Costringiamo a 0 il budget se è un host (Offro una stanza), altrimenti prendiamo il valore
-      budgetMax: userType === 'cerca' ? (parseInt(formData.get('budgetMax'), 10) || 0) : 0,
-      occupation: formData.get('occupation'),
-      birthdate: formData.get('birthdate'),
-      bio: formData.get('bio'),
-      tags: tags,
-      isPublic: formData.get('isPublic') === 'on' 
-    };
-
     try {
-      const res = await fetchAPI('/api/profile', {
-        method: 'POST',
-        body: JSON.stringify(payload)
+      await updateProfile.mutateAsync({
+        userType: form.userType,
+        city: form.city,
+        // 🔴 FIX: Costringiamo a 0 il budget se è un host (Offro una stanza), altrimenti prendiamo il valore
+        budgetMax: form.userType === 'cerca' ? (parseInt(form.budgetMax, 10) || 0) : 0,
+        occupation: form.occupation,
+        birthdate: form.birthdate,
+        bio: form.bio,
+        lifestyleTags: form.lifestyleTags,
+        isPublic: form.isPublic
       });
-      if (res.ok) {
-        alert("✅ Profilo aggiornato con successo!");
-        fetchFreshProfile(); 
-      } else {
-        const errorMsg = await res.text();
-        alert("❌ Errore dal server: " + errorMsg);
-      }
+      alert("✅ Profilo aggiornato con successo!");
     } catch (err) {
-      alert("Errore di connessione.");
+      alert("❌ Errore dal server: " + err.message);
     }
   };
 
   const handleSaveListing = async (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
-    const data = {
-      title: formData.get('title'),
-      city: formData.get('city'),
-      zone: formData.get('zone'),
-      roomType: formData.get('roomType'),
-      price: parseInt(formData.get('price'), 10) || 0,
-      description: formData.get('description')
-    };
+    const listingForm = e.target;
+    const formData = new FormData(listingForm);
 
     try {
-      const res = await fetchAPI('/api/create_listing', {
-        method: 'POST',
-        body: JSON.stringify(data)
+      await createListing.mutateAsync({
+        title: formData.get('title'),
+        city: formData.get('city'),
+        zone: formData.get('zone'),
+        roomType: formData.get('roomType'),
+        price: parseInt(formData.get('price'), 10) || 0,
+        description: formData.get('description')
       });
-      if (res.ok) {
-        alert("🎉 Annuncio pubblicato!");
-        e.target.reset();
-        fetchMyListings(); 
-        setActiveView('myListings');
-      } else {
-        const errorMsg = await res.text();
-        alert("❌ Errore durante la pubblicazione: " + errorMsg);
-      }
+      alert("🎉 Annuncio pubblicato!");
+      listingForm.reset();
+      setActiveView('myListings');
     } catch (err) {
-      console.error(err);
-      alert("Errore di connessione con il server.");
+      alert("❌ Errore durante la pubblicazione: " + err.message);
     }
   };
 
-  if (!user) return null;
-
-  const getBirthdateValue = () => {
-    const dateStr = user.nascita || user.birthdate || '';
-    if (!dateStr) return '';
-    return dateStr.split('T')[0];
-  };
+  if (!form) {
+    return profileQuery.isError
+      ? <div className="flex min-h-screen items-center justify-center p-6 text-center font-sans text-neutral-600">{profileQuery.error.message}</div>
+      : <PageLoader />;
+  }
 
   // 🔴 Variabile per capire se dobbiamo mostrare o no il budget dinamicamente
-  const isCerca = (user.user_type || user.userType || 'cerca') === 'cerca';
+  const isCerca = form.userType === 'cerca';
 
   return (
     <div className="min-h-[100dvh] bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
@@ -191,7 +129,7 @@ export default function Dashboard() {
           <Link to="/impostazioni" className="hover:text-neutral-900 transition-colors">Impostazioni</Link>
         </div>
         <div className="hidden md:flex gap-4 items-center">
-          <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{user.nome || user.first_name}</strong>!</span>
+          <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{form.firstName}</strong>!</span>
           <button onClick={handleLogout} className="border border-neutral-200 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer">Esci</button>
         </div>
         <button className="md:hidden flex flex-col gap-1.5 z-[1001] cursor-pointer" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Menu">          
@@ -220,13 +158,13 @@ export default function Dashboard() {
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-orange-400/10 blur-[80px] rounded-full pointer-events-none"></div>
           
           <div className="relative z-10 w-28 h-28 rounded-full mx-auto mb-6 flex justify-center items-center text-5xl border-4 border-white shadow-lg bg-gradient-to-br from-orange-400 to-rose-500 text-white font-bold">
-            {(user.nome || user.first_name || 'U').charAt(0).toUpperCase()}
+            {(form.firstName || 'U').charAt(0).toUpperCase()}
           </div>
           <h1 className="font-serif text-3xl font-extrabold mb-2 text-neutral-900 tracking-tight">
-            {user.nome || user.first_name} {user.cognome || user.last_name}
+            {form.firstName} {form.lastName}
           </h1>
           <p className="text-neutral-500 text-lg font-medium">
-            @{(user.nome || user.first_name || 'user').toLowerCase()}{user.id?.toString().substring(0,4)}
+            @{(form.firstName || 'user').toLowerCase()}{form.id.substring(0,4)}
           </p>
         </div>
 
@@ -248,21 +186,25 @@ export default function Dashboard() {
 
         {/* TABS */}
         <div className="flex flex-wrap justify-center gap-3 mb-8">
-          <button className={`px-6 py-3 rounded-full font-bold text-sm transition-all cursor-pointer ${activeView === 'myListings' ? 'bg-neutral-900 text-white shadow-md' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`} onClick={() => setActiveView('myListings')}>
-            📄 I Miei Annunci
-          </button>
-          <button className={`px-6 py-3 rounded-full font-bold text-sm transition-all cursor-pointer ${activeView === 'editProfile' ? 'bg-neutral-900 text-white shadow-md' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`} onClick={() => setActiveView('editProfile')}>
+          {isLandlord && (
+            <button className={`px-6 py-3 rounded-full font-bold text-sm transition-all cursor-pointer ${view === 'myListings' ? 'bg-neutral-900 text-white shadow-md' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`} onClick={() => setActiveView('myListings')}>
+              📄 I Miei Annunci
+            </button>
+          )}
+          <button className={`px-6 py-3 rounded-full font-bold text-sm transition-all cursor-pointer ${view === 'editProfile' ? 'bg-neutral-900 text-white shadow-md' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`} onClick={() => setActiveView('editProfile')}>
             ⚙️ Modifica Profilo
           </button>
-          <button className={`px-6 py-3 rounded-full font-bold text-sm transition-all cursor-pointer ${activeView === 'createListing' ? 'bg-neutral-900 text-white shadow-md' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`} onClick={() => setActiveView('createListing')}>
-            ➕ Pubblica Annuncio
-          </button>
+          {isLandlord && (
+            <button className={`px-6 py-3 rounded-full font-bold text-sm transition-all cursor-pointer ${view === 'createListing' ? 'bg-neutral-900 text-white shadow-md' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`} onClick={() => setActiveView('createListing')}>
+              ➕ Pubblica Annuncio
+            </button>
+          )}
         </div>
 
         <div className="animate-fade-in-up">
-          
+
           {/* TAB 1: I MIEI ANNUNCI */}
-          {activeView === 'myListings' && (
+          {view === 'myListings' && (
             <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100">
               <h2 className="text-2xl font-extrabold text-neutral-900 mb-6 tracking-tight">Annunci Attivi</h2>
               {myListings.length === 0 ? (
@@ -289,7 +231,7 @@ export default function Dashboard() {
           )}
 
           {/* TAB 2: MODIFICA PROFILO */}
-          {activeView === 'editProfile' && (
+          {view === 'editProfile' && (
             <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100">
               <h2 className="text-2xl font-extrabold text-neutral-900 mb-8 tracking-tight">Informazioni Personali</h2>
               <form onSubmit={handleSaveProfile} className="flex flex-col gap-6">
@@ -300,8 +242,8 @@ export default function Dashboard() {
                     <label className="text-sm font-bold text-neutral-900">Il tuo obiettivo</label>
                     <select 
                       name="userType" 
-                      value={user.user_type || user.userType || 'cerca'} 
-                      onChange={e => setUser({...user, user_type: e.target.value, userType: e.target.value})} 
+                      value={form.userType}
+                      onChange={e => setForm({...form, userType: e.target.value})}
                       className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all"
                     >
                       <option value="cerca">🔍 Cerco una stanza</option>
@@ -315,8 +257,8 @@ export default function Dashboard() {
                       <input 
                         name="budgetMax" 
                         type="number" 
-                        value={user.budget_max || user.budgetMax || ''} 
-                        onChange={e => setUser({...user, budget_max: e.target.value, budgetMax: e.target.value})}
+                        value={form.budgetMax || ''}
+                        onChange={e => setForm({...form, budgetMax: e.target.value})}
                         className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 
                       />
                     </div>
@@ -328,8 +270,8 @@ export default function Dashboard() {
                     <label className="text-sm font-bold text-neutral-900">Occupazione</label>
                     <select 
                       name="occupation" 
-                      value={user.occupation || ''} 
-                      onChange={e => setUser({...user, occupation: e.target.value})} 
+                      value={form.occupation}
+                      onChange={e => setForm({...form, occupation: e.target.value})}
                       className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all"
                     >
                       <option value="">Seleziona...</option>
@@ -343,8 +285,8 @@ export default function Dashboard() {
                     <input 
                       name="citta" 
                       type="text" 
-                      value={user.citta || user.city || ''} 
-                      onChange={e => setUser({...user, citta: e.target.value})}
+                      value={form.city}
+                      onChange={e => setForm({...form, city: e.target.value})}
                       className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 
                     />
                   </div>
@@ -353,8 +295,8 @@ export default function Dashboard() {
                     <input 
                       name="birthdate" 
                       type="date" 
-                      value={getBirthdateValue()} 
-                      onChange={e => setUser({...user, nascita: e.target.value, birthdate: e.target.value})}
+                      value={form.birthdate}
+                      onChange={e => setForm({...form, birthdate: e.target.value})}
                       className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 
                     />
                   </div>
@@ -364,8 +306,8 @@ export default function Dashboard() {
                   <label className="text-sm font-bold text-neutral-900">Bio</label>
                   <textarea 
                     name="bio" 
-                    value={user.bio || ''} 
-                    onChange={e => setUser({...user, bio: e.target.value})}
+                    value={form.bio}
+                    onChange={e => setForm({...form, bio: e.target.value})}
                     rows="4" 
                     className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-3xl px-5 py-4 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all resize-none"
                     placeholder="Racconta qualcosa di te..."
@@ -377,7 +319,7 @@ export default function Dashboard() {
                   <div className="flex flex-wrap gap-3">
                     {['🚬 Fumatore', '🚭 Non Fumatore', '🐶 Ho animali', '🧹 Ordinato/a', '🎉 Socievole', '🥦 Vegano/Vegetariano'].map(tag => {
                       const tagValue = tag.split(' ')[1] || tag;
-                      const isChecked = (user.lifestyle_tags || user.tags || '').includes(tagValue);
+                      const isChecked = form.lifestyleTags.includes(tagValue);
                       
                       return (
                         <label key={tag} className="relative cursor-pointer group">
@@ -403,8 +345,8 @@ export default function Dashboard() {
                     <input 
                       type="checkbox" 
                       name="isPublic" 
-                      checked={user.is_public !== false && user.isPublic !== false} 
-                      onChange={e => setUser({...user, is_public: e.target.checked, isPublic: e.target.checked})}
+                      checked={form.isPublic}
+                      onChange={e => setForm({...form, isPublic: e.target.checked})}
                       className="mt-0.5 w-5 h-5 text-orange-500 bg-white border-neutral-300 rounded focus:ring-orange-500 accent-orange-500 cursor-pointer" 
                     />
                     <span className="text-sm text-neutral-600 leading-relaxed font-medium">
@@ -423,7 +365,7 @@ export default function Dashboard() {
           )}
 
           {/* TAB 3: CREA ANNUNCIO */}
-          {activeView === 'createListing' && (
+          {view === 'createListing' && (
             <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100">
               <h2 className="text-2xl font-extrabold text-neutral-900 mb-8 tracking-tight">Inserisci una Stanza</h2>
               <form onSubmit={handleSaveListing} className="flex flex-col gap-6">

@@ -16,6 +16,13 @@ func NewStore(db *pgxpool.Pool) *Store {
 	return &Store{db: db}
 }
 
+// UserType restituisce il tipo di utente ("cerca" o "affitta") letto dal database.
+func (s *Store) UserType(ctx context.Context, userID string) (string, error) {
+	var userType string
+	err := s.db.QueryRow(ctx, `SELECT COALESCE(user_type, '') FROM roomdate_app.users WHERE id = $1`, userID).Scan(&userType)
+	return userType, err
+}
+
 // NewListing contiene i dati di un nuovo annuncio, già validati e ripuliti.
 type NewListing struct {
 	Title, City, Zone, RoomType string

@@ -24,9 +24,10 @@ const (
 )
 
 // Session è l'identità dell'utente ricavata dal cookie.
+// Contiene solo l'ID: ruolo e altri dati si leggono dal database, così una modifica
+// del profilo vale subito, senza dover rifare il login.
 type Session struct {
-	UserID   string
-	UserType string // "cerca" o "affitta", al momento del login
+	UserID string
 }
 
 // Manager emette e verifica i cookie di sessione.
@@ -45,12 +46,11 @@ func NewManager(secret string, secureCookies bool) (*Manager, error) {
 }
 
 // StartSession firma il token di sessione e lo imposta come cookie HttpOnly.
-func (m *Manager) StartSession(w http.ResponseWriter, userID, userType string) error {
+func (m *Manager) StartSession(w http.ResponseWriter, userID string) error {
 	expires := m.now().Add(SessionDuration)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id":   userID,
-		"user_type": userType,
-		"exp":       expires.Unix(),
+		"user_id": userID,
+		"exp":     expires.Unix(),
 	})
 	signed, err := token.SignedString(m.secret)
 	if err != nil {
@@ -119,7 +119,6 @@ func (m *Manager) Parse(tokenString string) (Session, error) {
 	if session.UserID == "" {
 		return Session{}, errors.New("ID utente mancante nel token")
 	}
-	session.UserType, _ = claims["user_type"].(string)
 	return session, nil
 }
 
