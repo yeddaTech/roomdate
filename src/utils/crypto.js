@@ -84,6 +84,29 @@ export async function unwrapPrivateKey(encryptedPrivateKeyBase64, password, salt
   }
 }
 
+// 5. Cifra di nuovo la Chiave Privata con una nuova password (cambio password).
+// Restituisce null se la password attuale non apre la chiave salvata,
+// o se la chiave non corrisponde alla chiave pubblica dell'utente (dati locali di un altro account).
+export async function rewrapPrivateKey(cryptoData, currentPassword, newPassword, publicKeyBase64) {
+  if (!cryptoData || !publicKeyBase64) return null;
+
+  let privateKey;
+  try {
+    privateKey = await unwrapPrivateKey(
+      cryptoData.encryptedPrivateKey,
+      currentPassword,
+      cryptoData.cryptoSalt,
+      cryptoData.cryptoIv
+    );
+    const probe = await encryptMessage('roomdate-key-check', publicKeyBase64);
+    if (await decryptMessage(probe, privateKey) !== 'roomdate-key-check') return null;
+  } catch {
+    return null;
+  }
+
+  return wrapPrivateKey(privateKey, newPassword);
+}
+
 // --- FUNZIONE DI SUPPORTO ---
 // Trasforma una stringa Base64 in un ArrayBuffer (necessario per le API crittografiche)
 function base64ToArrayBuffer(base64) {

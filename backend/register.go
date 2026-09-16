@@ -2,6 +2,7 @@ package backend
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	_ "github.com/lib/pq"
@@ -87,7 +88,8 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	).Scan(&newID)
 
 	if err != nil {
-		http.Error(w, "ERRORE REALE DEL DB: "+err.Error(), http.StatusInternalServerError)
+		log.Printf("register: %v", err)
+		http.Error(w, "Impossibile completare la registrazione. Verifica i dati inseriti o accedi se hai già un account.", http.StatusInternalServerError)
 		return
 	}
 

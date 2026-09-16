@@ -56,6 +56,10 @@ export default function Login() {
                   data.cryptoIv
                 );
                 sessionStorage.setItem('roomdate_private_key', privateKey);
+            } else {
+                // Nessuna chiave per questo account: non lasciare quelle di un accesso precedente
+                localStorage.removeItem('roomdate_crypto');
+                sessionStorage.removeItem('roomdate_private_key');
             }
           // --- 🔐 LOGICA CRITTOGRAFICA FINE ---
 
@@ -64,6 +68,8 @@ export default function Login() {
 
             if (data.publicKey) {
                 localStorage.setItem('roomdate_public_key', data.publicKey);
+            } else {
+                localStorage.removeItem('roomdate_public_key');
             }
 
             setTimeout(() => {

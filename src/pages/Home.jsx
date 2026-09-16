@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 import { fetchAPI } from '../utils/api';
+import { logoutSession } from '../utils/session';
 
 // 🛡️ HELPER SICUREZZA: Previene iniezioni HTML/Script per i dati grezzi
 const sanitizeHTML = (str) => {
@@ -67,11 +68,8 @@ export default function Home() {
     };
   }, []);
 
-  const handleLogout = () => {
-    try {
-      localStorage.removeItem('roomdate_user');
-      sessionStorage.clear();
-    } catch(e) {}
+  const handleLogout = async () => {
+    await logoutSession();
     setUser(null);
     navigate('/', { replace: true });
   };

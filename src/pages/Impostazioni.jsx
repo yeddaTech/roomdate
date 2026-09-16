@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { fetchAPI } from '../utils/api'; 
+import { fetchAPI } from '../utils/api';
+import { logoutSession } from '../utils/session';
+import { rewrapPrivateKey } from '../utils/crypto';
 
 export default function Impostazioni() {
   const navigate = useNavigate();
@@ -9,6 +11,7 @@ export default function Impostazioni() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Stati per le password e i messaggi a schermo
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' }); // type: 'success' o 'error'
@@ -31,9 +34,8 @@ export default function Impostazioni() {
     }
   }, [navigate]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('roomdate_user');
-    sessionStorage.clear();
+  const handleLogout = async () => {
+    await logoutSession();
     setIsMenuOpen(false);
     navigate('/');
   };
@@ -45,6 +47,10 @@ export default function Impostazioni() {
 
     // Se l'utente ha scritto qualcosa nella password, procediamo con l'aggiornamento
     if (newPassword) {
+      if (!currentPassword) {
+        setStatusMsg({ text: 'Inserisci la password attuale per confermare il cambio.', type: 'error' });
+        return;
+      }
       if (newPassword !== confirmPassword) {
         setStatusMsg({ text: 'Le password non coincidono!', type: 'error' });
         return;
@@ -56,17 +62,47 @@ export default function Impostazioni() {
 
       setIsLoading(true);
       try {
+        // 🔐 La chiave privata della chat è cifrata con la password: va cifrata di nuovo
+        // con quella nuova, altrimenti tutti i messaggi diventerebbero illeggibili.
+        const cryptoDataStr = localStorage.getItem('roomdate_crypto');
+        let newVault = null;
+        if (cryptoDataStr) {
+          newVault = await rewrapPrivateKey(
+            JSON.parse(cryptoDataStr),
+            currentPassword,
+            newPassword,
+            localStorage.getItem('roomdate_public_key')
+          );
+          if (!newVault) {
+            setStatusMsg({ text: 'Password attuale errata, oppure le chiavi di cifratura salvate su questo dispositivo non sono aggiornate. Se la password è corretta, esci, accedi di nuovo e riprova.', type: 'error' });
+            return;
+          }
+        }
+
         const res = await fetchAPI('/api/login', {
           method: 'POST',
-          body: JSON.stringify({ 
-            action: 'update_password', 
-            userId: user.id, 
-            newPassword: newPassword 
+          body: JSON.stringify({
+            action: 'update_password',
+            currentPassword: currentPassword,
+            newPassword: newPassword,
+            ...(newVault && {
+              encryptedPrivateKey: newVault.encryptedPrivateKey,
+              cryptoSalt: newVault.salt,
+              cryptoIv: newVault.iv
+            })
           })
         });
 
         if (res.ok) {
+          if (newVault) {
+            localStorage.setItem('roomdate_crypto', JSON.stringify({
+              encryptedPrivateKey: newVault.encryptedPrivateKey,
+              cryptoSalt: newVault.salt,
+              cryptoIv: newVault.iv
+            }));
+          }
           setStatusMsg({ text: 'Password aggiornata con successo!', type: 'success' });
+          setCurrentPassword('');
           setNewPassword('');
           setConfirmPassword('');
         } else {
@@ -200,6 +236,18 @@ export default function Impostazioni() {
                   className="w-full bg-neutral-50 border border-neutral-200 text-neutral-500 rounded-2xl px-5 py-3.5 focus:outline-none cursor-not-allowed opacity-80 font-medium"
                 />
                 <small className="text-xs text-neutral-400 mt-1 ml-2 font-medium">L'indirizzo email non può essere modificato.</small>
+              </div>
+
+              <div className="flex flex-col gap-2 mb-5">
+                <label className="text-sm font-bold text-neutral-900">Password Attuale</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Necessaria per cambiare la password"
+                  autoComplete="current-password"
+                  className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-5 py-3.5 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium placeholder:text-neutral-400"
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
