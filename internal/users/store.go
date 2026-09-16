@@ -172,12 +172,12 @@ type RoommateRow struct {
 func (s *Store) PublicRoommates(ctx context.Context, limit int) ([]RoommateRow, error) {
 	rows, err := s.db.Query(ctx, `
         SELECT id::text,
-               COALESCE(first_name, 'Utente'),
-               COALESCE(occupation, 'Studente/Lavoratore'),
-               COALESCE(bio, 'Ciao! Sto cercando una nuova casa e dei fantastici coinquilini.'),
-               COALESCE(lifestyle_tags, 'Socievole, Ordinato'),
+               first_name,
+               COALESCE(occupation, ''),
+               COALESCE(bio, ''),
+               COALESCE(lifestyle_tags, ''),
                COALESCE(citta, ''),
-               COALESCE(user_type, 'cerca'),
+               COALESCE(user_type, ''),
                COALESCE(budget_max, 0)
         FROM roomdate_app.users
         WHERE COALESCE(is_public, true) = true

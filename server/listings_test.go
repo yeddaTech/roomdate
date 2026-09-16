@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -66,15 +67,23 @@ func TestReadListings(t *testing.T) {
 	}
 	id := int(list[0]["id"].(float64))
 
+	// Nessun dato inventato: niente disponibilità sempre vera né tag "Verificato"
+	if _, found := list[0]["avail"]; found || strings.Contains(rec.Body.String(), "Verificato") {
+		t.Errorf("l'elenco contiene dati inventati: %s", rec.Body.String())
+	}
+
 	rec = app.do(http.MethodGet, "/api/get_listing?id="+itoa(id), nil)
 	expect(t, rec, http.StatusOK, `"type":"singola"`)
-	var detail struct {
-		Landlord struct{ Name string }
-		Images   []string
-	}
+	var detail map[string]any
 	decode(t, rec, &detail)
-	if detail.Landlord.Name != "Marco" {
-		t.Errorf("proprietario = %q", detail.Landlord.Name)
+	if landlord, _ := detail["landlord"].(map[string]any); landlord["name"] != "Marco" {
+		t.Errorf("proprietario = %v", detail["landlord"])
+	}
+	// Servizi e foto non esistono ancora nel database: non vanno inventati
+	for _, fake := range []string{"features", "images"} {
+		if _, found := detail[fake]; found {
+			t.Errorf("il dettaglio contiene %q inventati: %s", fake, rec.Body.String())
+		}
 	}
 
 	expect(t, app.do(http.MethodGet, "/api/get_listing", nil), http.StatusBadRequest, "ID mancante")

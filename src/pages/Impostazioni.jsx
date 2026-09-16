@@ -19,10 +19,6 @@ export default function Impostazioni() {
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' }); // type: 'success' o 'error'
   const [isLoading, setIsLoading] = useState(false);
 
-  // Stati per i toggle delle impostazioni
-  const [emailNotif, setEmailNotif] = useState(true);
-  const [pushNotif, setPushNotif] = useState(false);
-
   const handleLogout = async () => {
     // Prima si lascia la pagina: su quelle protette la sessione chiusa porterebbe all'accesso
     setIsMenuOpen(false);
@@ -75,8 +71,7 @@ export default function Impostazioni() {
         setIsLoading(false);
       }
     } else {
-      // Se non ha toccato la password ma ha premuto salva (es. per le notifiche)
-      setStatusMsg({ text: 'Impostazioni generali aggiornate.', type: 'success' });
+      setStatusMsg({ text: 'Inserisci una nuova password per cambiarla.', type: 'error' });
     }
   };
 
@@ -152,7 +147,7 @@ export default function Impostazioni() {
         
         <div className="mb-10 text-center md:text-left">
           <h1 className="font-serif text-3xl md:text-5xl text-neutral-900 mb-3 font-extrabold tracking-tight">Impostazioni Account</h1>
-          <p className="text-neutral-500 font-medium">Gestisci la tua sicurezza, le notifiche e le preferenze del tuo account.</p>
+          <p className="text-neutral-500 font-medium">Gestisci l'accesso al tuo account.</p>
         </div>
         
         {/* MESSAGGIO DI STATO */}
@@ -223,35 +218,6 @@ export default function Impostazioni() {
               </div>
             </section>
 
-            {/* SEZIONE NOTIFICHE */}
-            <section>
-              <h3 className="text-lg font-extrabold text-neutral-900 border-b border-neutral-100 pb-4 mb-6 flex items-center gap-2">
-                🔔 Notifiche
-              </h3>
-              
-              <div className="flex flex-col gap-4">
-                <label className="flex items-center gap-4 cursor-pointer group bg-neutral-50 p-4 rounded-2xl border border-neutral-100 hover:border-orange-200 transition-colors">
-                  <input 
-                    type="checkbox" 
-                    checked={emailNotif} 
-                    onChange={(e) => setEmailNotif(e.target.checked)} 
-                    className="w-5 h-5 text-orange-500 bg-white border-neutral-300 rounded focus:ring-orange-500 accent-orange-500 cursor-pointer"
-                  />
-                  <span className="text-neutral-700 font-medium group-hover:text-neutral-900 transition-colors">Ricevi aggiornamenti e messaggi via Email</span>
-                </label>
-
-                <label className="flex items-center gap-4 cursor-pointer group bg-neutral-50 p-4 rounded-2xl border border-neutral-100 hover:border-orange-200 transition-colors">
-                  <input 
-                    type="checkbox" 
-                    checked={pushNotif} 
-                    onChange={(e) => setPushNotif(e.target.checked)} 
-                    className="w-5 h-5 text-orange-500 bg-white border-neutral-300 rounded focus:ring-orange-500 accent-orange-500 cursor-pointer"
-                  />
-                  <span className="text-neutral-700 font-medium group-hover:text-neutral-900 transition-colors">Abilita notifiche Push nel browser</span>
-                </label>
-              </div>
-            </section>
-
             {/* PULSANTE SALVATAGGIO */}
             <div className="pt-6 border-t border-neutral-100 flex justify-end">
               <button 
@@ -271,7 +237,7 @@ export default function Impostazioni() {
             ⚠️ Zona Pericolosa
           </h3>
           <p className="text-rose-800/80 text-sm mb-8 leading-relaxed max-w-2xl font-medium">
-            Se elimini il tuo account, perderai tutti i tuoi annunci, le conversazioni crittografate e le stanze salvate. 
+            Se elimini il tuo account, perderai tutti i tuoi annunci e le conversazioni crittografate. 
             Questa operazione è irreversibile e i tuoi dati verranno cancellati in modo permanente dai nostri server.
           </p>
           <button 

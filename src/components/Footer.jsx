@@ -1,11 +1,10 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 
 const Footer = () => {
   const handleScrollTop = () => {
     try {
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (e) {
+    } catch {
       window.scrollTo(0, 0);
     }
   };
@@ -22,22 +21,8 @@ const Footer = () => {
               </span>
             </Link>
             <p className="text-neutral-400 text-sm leading-relaxed max-w-sm mb-8">
-              Il modo più trasparente, veloce e sicuro per trovare stanze e coinquilini in Italia, direttamente dal tuo smartphone.
+              Stanze in affitto e coinquilini, con contatto diretto tra utenti e chat cifrata end-to-end.
             </p>
-            <div className="flex gap-3">
-              {['Facebook', 'Instagram', 'Twitter'].map((social, i) => (
-                <a 
-                  key={i} 
-                  href={`https://${social.toLowerCase()}.com`} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-orange-500 hover:-translate-y-1 flex items-center justify-center transition-all text-white shadow-sm"
-                  aria-label={`Visita la nostra pagina ${social}`}
-                >
-                  <span className="text-xs" aria-hidden="true">{social[0]}</span>
-                </a>
-              ))}
-            </div>
           </div>
 
           <div>
@@ -54,7 +39,6 @@ const Footer = () => {
             <ul className="flex flex-col gap-4">
               <li><Link to="/guida" className="text-neutral-400 hover:text-white transition-colors text-sm">Come funziona</Link></li>
               <li><Link to="/privacy" className="text-neutral-400 hover:text-white transition-colors text-sm">Privacy & Sicurezza</Link></li>
-              <li><a href="mailto:support@roomdate.com" className="text-neutral-400 hover:text-white transition-colors text-sm">Contattaci</a></li>
             </ul>
           </div>
 

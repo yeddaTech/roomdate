@@ -24,9 +24,7 @@ interface LegacyRoommate {
   name: string;
   job: string;
   quote: string;
-  age: number;
   city: string;
-  match: number;
   color1: string;
   color2: string;
   emoji: string;
@@ -42,9 +40,7 @@ export async function listRoommates(): Promise<Roommate[]> {
     name: r.name,
     occupation: r.job,
     bio: r.quote,
-    age: r.age,
     city: r.city,
-    match: r.match,
     color1: r.color1,
     color2: r.color2,
     emoji: r.emoji,

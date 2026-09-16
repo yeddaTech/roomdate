@@ -94,12 +94,11 @@ type Listing struct {
 	Price int      `json:"price"`
 	Color string   `json:"color"`
 	Emoji string   `json:"emoji"`
-	Avail bool     `json:"avail"`
 	Tags  []string `json:"tags"`
 }
 
 // Latest restituisce gli annunci più recenti.
-// Colori, emoji, disponibilità e il tag "Verificato" sono ancora decorativi: spariscono nel modulo M1.4.
+// Colore ed emoji sono solo decorativi (non descrivono l'annuncio): lasciano il posto alle foto nel modulo M1.4.
 func (s *Service) Latest(ctx context.Context) ([]Listing, error) {
 	rows, err := s.store.Latest(ctx, latestLimit)
 	if err != nil {
@@ -119,8 +118,7 @@ func (s *Service) Latest(ctx context.Context) ([]Listing, error) {
 			Price: r.Price,
 			Color: colors[i%len(colors)],
 			Emoji: emojis[i%len(emojis)],
-			Avail: true,
-			Tags:  []string{r.RoomType, "Verificato"},
+			Tags:  []string{r.RoomType},
 		})
 	}
 	return listings, nil
@@ -133,6 +131,7 @@ type Landlord struct {
 }
 
 // Detail è il dettaglio di un annuncio (formato JSON delle API legacy).
+// Servizi e foto non esistono ancora nel database: arrivano con il modulo M1.4.
 type Detail struct {
 	ID          int      `json:"id"`
 	Title       string   `json:"title"`
@@ -141,13 +140,10 @@ type Detail struct {
 	Price       int      `json:"price"`
 	Type        string   `json:"type"`
 	Description string   `json:"description"`
-	Features    []string `json:"features"`
-	Images      []string `json:"images"`
 	Landlord    Landlord `json:"landlord"`
 }
 
 // Get restituisce il dettaglio di un annuncio.
-// Servizi e foto sono ancora dimostrativi: diventano dati reali nel modulo M1.4.
 func (s *Service) Get(ctx context.Context, rawID string) (Detail, error) {
 	if rawID == "" {
 		return Detail{}, apperr.BadRequest("missing_listing_id", "ID mancante")
@@ -177,13 +173,7 @@ func (s *Service) Get(ctx context.Context, rawID string) (Detail, error) {
 		Price:       r.Price,
 		Type:        r.RoomType,
 		Description: r.Description,
-		Features:    []string{"Wi-Fi", "Lavatrice", "Arredata", "Luminosa"},
-		Images: []string{
-			"https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80",
-			"https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80",
-			"https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80",
-		},
-		Landlord: Landlord{Name: name, Role: "Proprietario/a", Emoji: "👋"},
+		Landlord:    Landlord{Name: name, Role: "Proprietario/a", Emoji: "👋"},
 	}, nil
 }
 

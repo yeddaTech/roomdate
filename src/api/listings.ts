@@ -11,7 +11,6 @@ interface LegacyListing {
   price: number;
   color: string;
   emoji: string;
-  avail: boolean;
   tags: string[] | null;
 }
 
@@ -25,15 +24,15 @@ export async function listLatestListings(): Promise<ListingSummary[]> {
     price: l.price,
     color: l.color,
     emoji: l.emoji,
-    available: l.avail,
     tags: l.tags ?? [],
   }));
 }
 
 interface LegacyListingDetail extends Omit<ListingDetail, 'roomType' | 'features' | 'images'> {
   type: string;
-  features: string[] | null;
-  images: string[] | null;
+  // Non ancora restituiti dal server (modulo M1.4)
+  features?: string[] | null;
+  images?: string[] | null;
 }
 
 export async function getListing(id: string): Promise<ListingDetail> {

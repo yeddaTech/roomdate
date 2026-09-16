@@ -8,4 +8,5 @@ export const queryKeys = {
   latestListings: ['listings', 'latest'] as const,
   listing: (id: string) => ['listings', 'detail', id] as const,
   myListings: ['listings', 'mine'] as const,
+  conversations: ['conversations'] as const,
 };

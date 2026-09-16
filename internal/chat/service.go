@@ -139,7 +139,8 @@ func (s *Service) Conversations(ctx context.Context, userID string) ([]Conversat
 			Messages:        []Message{},
 		}
 		if c.Name == "" {
-			c.Name = "Utente Sconosciuto"
+			// L'altro partecipante non esiste più
+			c.Name = "Utente eliminato"
 		}
 		if row.ListingPrice == 0 {
 			c.Listing.Emoji = "💬"
