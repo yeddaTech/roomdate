@@ -20,7 +20,7 @@ import (
 	"roomdate-backend/internal/db"
 	"roomdate-backend/internal/devenv"
 	"roomdate-backend/internal/realtime"
-	"roomdate-backend/internal/server"
+	"roomdate-backend/server"
 )
 
 func main() {

@@ -37,7 +37,7 @@ Vite proxies `/api` to the local Go server, so the frontend and the API share th
 
 ### Backend structure
 
-`api/index.go` is the Vercel function; `cmd/dev` serves the same application locally. Both use `internal/server`, which wires everything together:
+`api/index.go` is the Vercel function; `cmd/dev` serves the same application locally. Both use `server/`, which wires together the packages in `internal/`. (`server/` itself is not under `internal/`: Vercel builds `api/` as a package outside the module, and such a package cannot import `internal/` packages directly.)
 
 * `internal/users`, `internal/listings`, `internal/chat` — one package per area, each with a `handlers.go` (HTTP), `service.go` (rules, validation, authorization) and `store.go` (SQL through pgx).
 * `internal/httpx` — middleware applied to every request: request ID and structured logs, panic recovery, security headers, 64 KB body limit, cross-origin (CSRF) protection and JSON-only request bodies.
@@ -47,7 +47,7 @@ The legacy endpoints (`/api/login`, `/api/get_chats`, …) keep the paths and pl
 
 ### Tests
 
-`npm run test:api` runs the Go tests. Unit tests need nothing else; the integration tests in `internal/server` (every endpoint through the real router, middleware and database) run when `TEST_DATABASE_URL` is set, and are skipped otherwise. They create a temporary `roomdate_test_…` database, migrate it from scratch and drop it at the end.
+`npm run test:api` runs the Go tests. Unit tests need nothing else; the integration tests in `server/` (every endpoint through the real router, middleware and database) run when `TEST_DATABASE_URL` is set, and are skipped otherwise. They create a temporary `roomdate_test_…` database, migrate it from scratch and drop it at the end.
 
 ### Database migrations
 
