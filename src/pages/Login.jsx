@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { unwrapPrivateKey } from '../utils/crypto';
-import { fetchAPI } from '../utils/api';
+import { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
 
   // --- STATI DEL FORM ---
   const [email, setEmail] = useState('');
@@ -32,62 +33,19 @@ export default function Login() {
       setIsSubmitting(true);
       
       try {
-        const response = await fetchAPI('/api/login', {
-          method: 'POST',
-          body: JSON.stringify({ email, password }) 
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          
-          try {
-          // --- 🔐 LOGICA CRITTOGRAFICA INIZIO ---
-            if (data.encryptedPrivateKey && data.cryptoSalt && data.cryptoIv) {
-                localStorage.setItem('roomdate_crypto', JSON.stringify({
-                  encryptedPrivateKey: data.encryptedPrivateKey,
-                  cryptoSalt: data.cryptoSalt,
-                  cryptoIv: data.cryptoIv
-                }));
-
-                const privateKey = await unwrapPrivateKey(
-                  data.encryptedPrivateKey,
-                  password,
-                  data.cryptoSalt,
-                  data.cryptoIv
-                );
-                sessionStorage.setItem('roomdate_private_key', privateKey);
-            } else {
-                // Nessuna chiave per questo account: non lasciare quelle di un accesso precedente
-                localStorage.removeItem('roomdate_crypto');
-                sessionStorage.removeItem('roomdate_private_key');
-            }
-          // --- 🔐 LOGICA CRITTOGRAFICA FINE ---
-
-            setIsSuccess(true);
-            localStorage.setItem('roomdate_user', JSON.stringify(data.user));
-
-            if (data.publicKey) {
-                localStorage.setItem('roomdate_public_key', data.publicKey);
-            } else {
-                localStorage.removeItem('roomdate_public_key');
-            }
-
-            setTimeout(() => {
-              navigate('/'); 
-            }, 1500);
-
-          } catch (cryptoError) {
-             console.error("Impossibile decifrare la chiave:", cryptoError);
-             alert('⚠️ Accesso effettuato, ma la chiave di sicurezza non è valida. Potresti non riuscire a leggere i messaggi.');
-             setIsSubmitting(false);
-          }
-
-        } else {
-          const errorMsg = await response.text();
-          alert('❌ Errore di accesso: ' + errorMsg);
+        // Accesso e preparazione delle chiavi di cifratura della chat (AuthProvider)
+        const { keysUnlocked } = await login(email, password);
+        if (!keysUnlocked) {
+          alert('⚠️ Accesso effettuato, ma la chiave di sicurezza non è valida. Potresti non riuscire a leggere i messaggi.');
         }
+
+        setIsSuccess(true);
+        // Torna alla pagina protetta da cui si era arrivati, se c'è
+        setTimeout(() => {
+          navigate(location.state?.from ?? '/', { replace: true });
+        }, 1500);
       } catch (error) {
-        alert('Errore di connessione al server.');
+        alert('❌ Errore di accesso: ' + error.message);
       } finally {
         setIsSubmitting(false);
       }

@@ -1,47 +1,25 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom'; 
+import { useState } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { fetchAPI } from '../utils/api';
-import { logoutSession } from '../utils/session';
+import { useAuth } from '../auth/AuthContext';
+import { usePublicProfile, useStartChat } from '../api/hooks';
 
 export default function RoommateDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  
-  const [roommate, setRoommate] = useState(null);
-  const [loading, setLoading] = useState(true);
-  
-  const [user, setUser] = useState(null);
+  const { user, logout } = useAuth();
+
+  // Profilo pubblico dell'utente (i profili privati risultano non trovati)
+  const { data: roommate, isPending: loading } = usePublicProfile(id);
+  const startChat = useStartChat();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  useEffect(() => {
-    const savedUser = localStorage.getItem('roomdate_user');
-    if (savedUser) setUser(JSON.parse(savedUser));
-  }, []);
-
   const handleLogout = async () => {
-    await logoutSession();
-    setUser(null);
+    // Prima si lascia la pagina: su quelle protette la sessione chiusa porterebbe all'accesso
     setIsMenuOpen(false);
     navigate('/');
+    await logout();
   };
-
-  useEffect(() => {
-    // Recupera i dettagli del profilo pubblico dell'utente
-    fetchAPI(`/api/profile?userId=${id}`)
-      .then(res => {
-        if (!res.ok) throw new Error('Utente non trovato');
-        return res.json();
-      })
-      .then(data => {
-        setRoommate(data);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error("Errore nel caricamento del profilo:", err);
-        setLoading(false);
-      });
-  }, [id]);
 
   // 🛡️ ZERO-TRUST: Invia solo il targetId
   const handleContact = async () => {
@@ -52,21 +30,10 @@ export default function RoommateDetails() {
     }
 
     try {
-      const res = await fetchAPI('/api/start_chat', {
-        method: 'POST',
-        body: JSON.stringify({
-          targetId: id
-        })
-      });
-      if (res.ok) {
-        const data = await res.json(); 
-        navigate('/chat', { state: { openChatId: data.conversationId } });
-      } else {
-        alert("Errore nell'avvio della chat.");
-      }
+      const conversationId = await startChat.mutateAsync({ targetId: id });
+      navigate('/chat', { state: { openChatId: conversationId } });
     } catch (err) {
-      console.error(err);
-      alert("Errore di connessione.");
+      alert("Errore nell'avvio della chat: " + err.message);
     }
   };
 
@@ -92,7 +59,7 @@ export default function RoommateDetails() {
   return (
     <div className="min-h-[100dvh] bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
       <Helmet>
-        <title>{roommate.first_name || roommate.nome} | RoomDate</title>
+        <title>{roommate.firstName} | RoomDate</title>
       </Helmet>
 
       {/* --- TOP NAV (GLASSMORPHISM) --- */}
@@ -109,7 +76,7 @@ export default function RoommateDetails() {
         <div className="hidden md:flex gap-4 items-center">
           {user ? (
             <>
-              <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{user.nome}</strong>!</span>
+              <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{user.firstName}</strong>!</span>
               <button onClick={handleLogout} className="border border-neutral-200 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer">Esci</button>
             </>
           ) : (
@@ -149,14 +116,14 @@ export default function RoommateDetails() {
 
         <div className="max-w-4xl mx-auto flex flex-col items-center text-center gap-4 relative z-10 animate-fade-in-up">
           <div className="w-32 h-32 rounded-full flex items-center justify-center text-6xl shadow-xl bg-white text-neutral-900 border-4 border-white/20">
-            <span className="drop-shadow-sm">{(roommate.first_name || roommate.nome || 'U').charAt(0).toUpperCase()}</span>
+            <span className="drop-shadow-sm">{(roommate.firstName || 'U').charAt(0).toUpperCase()}</span>
           </div>
           <div>
             <h1 className="font-serif text-4xl md:text-5xl font-extrabold mb-2 tracking-tight">
-              {roommate.first_name || roommate.nome}
+              {roommate.firstName}
             </h1>
             <p className="text-white/90 text-lg font-bold tracking-wide">
-              {roommate.user_type === 'affitta' ? '🏠 Offre una stanza' : '🔍 Cerca una stanza'} a {roommate.citta || 'Milano'}
+              {roommate.userType === 'affitta' ? '🏠 Offre una stanza' : '🔍 Cerca una stanza'} a {roommate.city || 'Milano'}
             </p>
           </div>
         </div>
@@ -177,8 +144,8 @@ export default function RoommateDetails() {
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-neutral-100">
             <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-6 tracking-tight">Stile di vita</h2>
             <div className="flex flex-wrap gap-2.5">
-              {roommate.lifestyle_tags ? (
-                roommate.lifestyle_tags.split(',').map((tag, idx) => (
+              {roommate.lifestyleTags ? (
+                roommate.lifestyleTags.split(',').map((tag, idx) => (
                   <span key={idx} className="bg-orange-50 border border-orange-100 text-orange-600 px-4 py-2 rounded-full font-bold text-sm shadow-sm">
                     {tag.trim()}
                   </span>
@@ -200,7 +167,7 @@ export default function RoommateDetails() {
               <div className="flex flex-col gap-4 mb-8 relative z-10">
                 <div className="flex justify-between items-center border-b border-neutral-100 pb-4">
                   <span className="text-neutral-500 font-bold text-sm uppercase tracking-wider">Budget / Prezzo</span>
-                  <span className="font-extrabold text-neutral-900 text-lg">{roommate.budget_max ? `€${roommate.budget_max}` : 'Da concordare'}</span>
+                  <span className="font-extrabold text-neutral-900 text-lg">{roommate.budgetMax ? `€${roommate.budgetMax}` : 'Da concordare'}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-neutral-100 pb-4">
                   <span className="text-neutral-500 font-bold text-sm uppercase tracking-wider">Occupazione</span>

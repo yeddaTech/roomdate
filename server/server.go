@@ -54,11 +54,20 @@ func New(d Deps) (http.Handler, error) {
 	type methods = map[string]http.HandlerFunc
 	mux := http.NewServeMux()
 
-	// API legacy: stessi percorsi, metodi e formati usati dal frontend attuale.
-	// Verranno sostituite dalle API /api/v1 man mano che il frontend le adotta.
-	mux.Handle("/api/login", httpx.Methods(methods{http.MethodPost: usersHandler.Login}))
-	mux.Handle("/api/register", httpx.Methods(methods{http.MethodPost: usersHandler.Register}))
-	mux.Handle("/api/profile", httpx.Methods(methods{http.MethodGet: usersHandler.GetProfile, http.MethodPost: usersHandler.UpdateProfile}))
+	// API v1: JSON in camelCase, errori {"error": {"code", "message", "fields"}}.
+	mux.Handle("/api/v1/auth/session", httpx.Methods(methods{http.MethodGet: usersHandler.Session}))
+	mux.Handle("/api/v1/auth/login", httpx.Methods(methods{http.MethodPost: usersHandler.Login}))
+	mux.Handle("/api/v1/auth/logout", httpx.Methods(methods{http.MethodPost: usersHandler.Logout}))
+	mux.Handle("/api/v1/auth/register", httpx.Methods(methods{http.MethodPost: usersHandler.Register}))
+	mux.Handle("/api/v1/auth/password", httpx.Methods(methods{http.MethodPost: usersHandler.ChangePassword}))
+	mux.Handle("/api/v1/me", httpx.Methods(methods{
+		http.MethodGet: usersHandler.MyProfile, http.MethodPut: usersHandler.UpdateMyProfile, http.MethodDelete: usersHandler.DeleteMe,
+	}))
+	mux.Handle("/api/v1/users/{id}", httpx.Methods(methods{http.MethodGet: usersHandler.PublicProfile}))
+	mux.Handle("/api/v1/health", httpx.Methods(methods{http.MethodGet: health(d.DB).ServeHTTP}))
+
+	// API legacy, con percorsi e formati originali: passano a /api/v1 nei moduli successivi
+	// (annunci in M1.4, coinquilini in M1.5, chat in M1.7).
 	mux.Handle("/api/get_roommates", httpx.Methods(methods{http.MethodGet: usersHandler.Roommates}))
 	mux.Handle("/api/create_listing", httpx.Methods(methods{http.MethodPost: listingsHandler.Create}))
 	mux.Handle("/api/get_listings", httpx.Methods(methods{http.MethodGet: listingsHandler.Latest}))
@@ -69,9 +78,6 @@ func New(d Deps) (http.Handler, error) {
 	mux.Handle("/api/get_chats", httpx.Methods(methods{http.MethodGet: chatHandler.Conversations}))
 	mux.Handle("/api/send_message", httpx.Methods(methods{http.MethodPost: chatHandler.SendMessage}))
 	mux.Handle("/api/typing", httpx.Methods(methods{http.MethodPost: chatHandler.Typing}))
-
-	// API v1: errori in JSON {"error": {"code", "message"}}.
-	mux.Handle("GET /api/v1/health", health(d.DB))
 
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, apperr.NotFound("endpoint_not_found", "Endpoint non trovato"))

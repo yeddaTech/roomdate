@@ -43,7 +43,13 @@ Vite proxies `/api` to the local Go server, so the frontend and the API share th
 * `internal/httpx` — middleware applied to every request: request ID and structured logs, panic recovery, security headers, 64 KB body limit, cross-origin (CSRF) protection and JSON-only request bodies.
 * `internal/auth` (session cookie and passwords), `internal/validate` (input rules and text cleaning), `internal/apperr` (errors shown to users; everything else is logged and answered with a generic message), `internal/config`, `internal/db`, `internal/realtime`.
 
-The legacy endpoints (`/api/login`, `/api/get_chats`, …) keep the paths and plain-text errors the current frontend expects. New endpoints live under `/api/v1/` and answer errors as `{"error": {"code", "message"}}`.
+Accounts, sessions and profiles use the `/api/v1/` endpoints (`auth/session`, `auth/login`, `auth/logout`, `auth/register`, `auth/password`, `me`, `users/{id}`): camelCase JSON, errors as `{"error": {"code", "message", "fields"}}`. Listings, roommates and chat still use the legacy endpoints (`/api/get_listings`, `/api/get_chats`, …) with plain-text errors, until their own modules move them to `/api/v1/`.
+
+### Frontend data layer
+
+* `src/api/` (TypeScript) — `client.ts` is the only place that calls `fetch`; one file per area converts API responses into the types in `types.ts`; `hooks.ts` exposes TanStack Query hooks, which pages use instead of calling the API directly.
+* `src/auth/` — `AuthProvider` holds the session verified by the server (no user copy in `localStorage`), `ProtectedRoute` guards private pages, `keyStorage.ts` manages the E2EE keys kept in the browser. A request that finds the session expired sends the user back to the login page.
+* `npm run typecheck` checks the TypeScript files; `npm run build` runs it before building.
 
 ### Tests
 

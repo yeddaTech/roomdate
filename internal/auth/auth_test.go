@@ -40,7 +40,7 @@ func TestNewManagerRejectsEmptySecret(t *testing.T) {
 func TestSessionRoundTrip(t *testing.T) {
 	m := newTestManager(t, true)
 	rec := httptest.NewRecorder()
-	if err := m.StartSession(rec, "42", "affitta"); err != nil {
+	if err := m.StartSession(rec, "42"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -52,14 +52,14 @@ func TestSessionRoundTrip(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.AddCookie(cookie)
 	session, ok := m.FromRequest(req)
-	if !ok || session.UserID != "42" || session.UserType != "affitta" {
+	if !ok || session.UserID != "42" {
 		t.Fatalf("sessione = %+v, ok = %v", session, ok)
 	}
 }
 
 func TestInsecureCookiesForLocalDevelopment(t *testing.T) {
 	rec := httptest.NewRecorder()
-	newTestManager(t, false).StartSession(rec, "1", "cerca")
+	newTestManager(t, false).StartSession(rec, "1")
 	if sessionCookie(t, rec).Secure {
 		t.Fatal("in sviluppo il cookie non deve avere Secure")
 	}
