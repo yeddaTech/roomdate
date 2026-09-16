@@ -50,6 +50,9 @@ type seedListing struct {
 	owner, title, city, zone, roomType string
 	price, daysAgo                     int
 	description                        string
+	amenities                          []string
+	billsIncluded                      bool
+	availableInDays                    int // giorni da oggi alla disponibilità; 0 = subito
 }
 
 type seedMessage struct {
@@ -85,13 +88,17 @@ var users = []seedUser{
 
 var listings = []seedListing{
 	{"marco", "Singola luminosa in zona Isola", "Milano", "Isola", "singola", 650, 2,
-		"Stanza singola arredata in un trilocale al terzo piano con ascensore. A 5 minuti dalla M5, spese condominiali incluse. Cerchiamo una persona tranquilla e ordinata."},
+		"Stanza singola arredata in un trilocale al terzo piano con ascensore. A 5 minuti dalla M5, spese condominiali incluse. Cerchiamo una persona tranquilla e ordinata.",
+		[]string{"wifi", "arredata", "lavatrice", "ascensore", "animali_ammessi"}, true, 0},
 	{"marco", "Doppia con balcone vicino all'M5", "Milano", "Isola", "doppia", 480, 6,
-		"Posto letto in doppia con balcone. Cucina abitabile, lavatrice & wi-fi veloce. Ideale per studenti del Politecnico."},
+		"Posto letto in doppia con balcone. Cucina abitabile, lavatrice & wi-fi veloce. Ideale per studenti del Politecnico.",
+		[]string{"wifi", "arredata", "lavatrice", "balcone"}, false, 30},
 	{"luca", "Doppia a Prati, vicino alla metro", "Roma", "Prati", "doppia", 520, 1,
-		"Doppia spaziosa a due passi dalla fermata Lepanto. Casa condivisa con altre due persone, zona piena di servizi."},
+		"Doppia spaziosa a due passi dalla fermata Lepanto. Casa condivisa con altre due persone, zona piena di servizi.",
+		[]string{"wifi", "riscaldamento"}, false, 0},
 	{"luca", "Singola arredata con bagno privato", "Roma", "San Giovanni", "singola", 700, 10,
-		"Singola con bagno privato in un appartamento ristrutturato. Contratto minimo 12 mesi, disponibile da subito."},
+		"Singola con bagno privato in un appartamento ristrutturato. Contratto minimo 12 mesi, disponibile da subito.",
+		[]string{"wifi", "arredata", "lavastoviglie", "aria_condizionata", "bagno_privato"}, true, 0},
 }
 
 var conversations = []seedConversation{
@@ -228,10 +235,14 @@ func insertSeedData(tx *sql.Tx) error {
 	listingIDs := make([]string, len(listings))
 	for i, l := range listings {
 		err := tx.QueryRow(`
-            INSERT INTO roomdate_app.listings (user_id, title, city, zone, room_type, price, description, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW() - make_interval(days => $8))
+            INSERT INTO roomdate_app.listings
+                (user_id, title, city, zone, room_type, price, description, created_at,
+                 amenities, bills_included, available_from)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW() - make_interval(days => $8),
+                    $9, $10, CASE WHEN $11::int > 0 THEN CURRENT_DATE + $11::int END)
             RETURNING id::text`,
 			keys[l.owner].id, l.title, l.city, l.zone, l.roomType, l.price, l.description, l.daysAgo,
+			l.amenities, l.billsIncluded, l.availableInDays,
 		).Scan(&listingIDs[i])
 		if err != nil {
 			return fmt.Errorf("annuncio %q: %w", l.title, err)
@@ -244,6 +255,8 @@ func insertSeedData(tx *sql.Tx) error {
 		if c.listing >= 0 {
 			listingID = listingIDs[c.listing]
 			owner := listings[c.listing].owner
+			// Nelle chat su un annuncio user2_id è il proprietario
+			user2ID = keys[owner].id
 			recipientOf[c.tenant], recipientOf[owner] = owner, c.tenant
 		} else {
 			user2ID = keys[c.user2].id

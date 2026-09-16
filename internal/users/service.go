@@ -29,11 +29,13 @@ var (
 
 type Service struct {
 	store *Store
-	now   func() time.Time
+	// images cancella dallo storage le foto degli annunci di un account eliminato
+	images func(ctx context.Context, keys []string)
+	now    func() time.Time
 }
 
-func NewService(store *Store) *Service {
-	return &Service{store: store, now: time.Now}
+func NewService(store *Store, deleteImages func(ctx context.Context, keys []string)) *Service {
+	return &Service{store: store, images: deleteImages, now: time.Now}
 }
 
 // RegisterInput sono i dati del modulo di registrazione.
@@ -55,16 +57,16 @@ type RegisterInput struct {
 // Register crea l'account e restituisce l'ID del nuovo utente.
 func (s *Service) Register(ctx context.Context, in RegisterInput) (string, error) {
 	u := NewUser{
-		FirstName:     validate.CleanText(in.FirstName),
-		LastName:      validate.CleanText(in.LastName),
+		FirstName:     validate.Text(in.FirstName),
+		LastName:      validate.Text(in.LastName),
 		Email:         strings.TrimSpace(in.Email),
-		City:          validate.CleanText(in.City),
+		City:          validate.Text(in.City),
 		UserType:      in.UserType,
 		Birthdate:     in.Birthdate,
 		BudgetMax:     in.BudgetMax,
-		Occupation:    validate.CleanText(in.Occupation),
-		Bio:           validate.CleanText(in.Bio),
-		LifestyleTags: validate.CleanText(in.LifestyleTags),
+		Occupation:    validate.Text(in.Occupation),
+		Bio:           validate.Text(in.Bio),
+		LifestyleTags: validate.Text(in.LifestyleTags),
 	}
 	if in.Keys != nil {
 		u.Vault = *in.Keys
@@ -211,11 +213,13 @@ func (s *Service) ChangePassword(ctx context.Context, userID string, in ChangePa
 	return nil
 }
 
-// DeleteAccount elimina l'utente.
+// DeleteAccount elimina l'utente, i suoi annunci e le loro foto.
 func (s *Service) DeleteAccount(ctx context.Context, userID string) error {
-	if err := s.store.Delete(ctx, userID); err != nil {
+	keys, err := s.store.Delete(ctx, userID)
+	if err != nil {
 		return apperr.Wrap(err, "delete_failed", "Impossibile eliminare l'account in questo momento")
 	}
+	s.images(ctx, keys)
 	return nil
 }
 
@@ -287,12 +291,12 @@ type ProfileInput struct {
 func (s *Service) UpdateProfile(ctx context.Context, userID string, in ProfileInput) (Profile, error) {
 	u := ProfileUpdate{
 		UserType:      in.UserType,
-		City:          validate.CleanText(in.City),
+		City:          validate.Text(in.City),
 		BudgetMax:     in.BudgetMax,
-		Occupation:    validate.CleanText(in.Occupation),
+		Occupation:    validate.Text(in.Occupation),
 		Birthdate:     in.Birthdate,
-		Bio:           validate.CleanText(in.Bio),
-		LifestyleTags: validate.CleanText(in.LifestyleTags),
+		Bio:           validate.Text(in.Bio),
+		LifestyleTags: validate.Text(in.LifestyleTags),
 		IsPublic:      in.IsPublic,
 	}
 

@@ -29,11 +29,6 @@ const NAV_LINKS = [
   { name: 'Impostazioni', path: '/impostazioni', icon: '⚙️' },
 ];
 
-const sanitizeHTML = (str) => {
-  if (typeof str !== 'string') return '';
-  return str.replace(/[<>]/g, '');
-};
-
 // Iniziale del nome dell'altro partecipante, per l'avatar
 const initial = (name) => (name || '?').charAt(0).toUpperCase();
 
@@ -73,7 +68,6 @@ export default function ChatPage() {
   useEffect(() => { userRef.current = user; }, [user]);
 
   const handleLogout = async () => {
-    // Prima si lascia la pagina: su quelle protette la sessione chiusa porterebbe all'accesso
     setIsMenuOpen(false);
     navigate('/');
     await logout();
@@ -112,7 +106,7 @@ export default function ChatPage() {
     } catch (err) {
       console.error("Errore caricamento chat:", err);
       // Sessione scaduta: si torna all'accesso
-      if (isSessionExpired(err)) endLocalSession();
+      if (isSessionExpired(err)) endLocalSession('expired');
     } finally {
       setIsLoading(false);
     }
@@ -264,7 +258,7 @@ export default function ChatPage() {
       } catch (err) {
         console.error(err);
         if (isSessionExpired(err)) {
-          endLocalSession();
+          endLocalSession('expired');
           return;
         }
         alert("Errore durante l'invio sicuro. Riprova.");
@@ -380,7 +374,7 @@ export default function ChatPage() {
         <div className="hidden md:flex gap-4 items-center">
           {user ? (
             <>
-              <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{sanitizeHTML(user.firstName)}</strong>!</span>
+              <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{user.firstName}</strong>!</span>
               <button onClick={handleLogout} className="border border-neutral-200 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 px-4 py-2 rounded-full text-sm transition-colors cursor-pointer font-medium">Esci</button>
             </>
           ) : (
@@ -403,7 +397,7 @@ export default function ChatPage() {
         <div className="flex flex-col gap-6 text-lg font-medium text-neutral-600">
           {user && (
              <div className="border-b border-neutral-100 pb-4 mb-2">
-               <h3 className="text-xl text-neutral-900 font-bold">👤 Ciao, {sanitizeHTML(user.firstName)}!</h3>
+               <h3 className="text-xl text-neutral-900 font-bold">👤 Ciao, {user.firstName}!</h3>
              </div>
           )}
           

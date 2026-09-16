@@ -3,14 +3,11 @@ package listings
 import (
 	"net/http"
 
-	"roomdate-backend/internal/apperr"
 	"roomdate-backend/internal/auth"
 	"roomdate-backend/internal/httpx"
 )
 
-var errSessionInvalid = apperr.Unauthorized("session_invalid", "Sessione scaduta: accedi di nuovo")
-
-// Handler espone le API legacy degli annunci, con percorsi e formati usati dal frontend attuale.
+// Handler espone le API v1 degli annunci.
 type Handler struct {
 	svc      *Service
 	sessions *auth.Manager
@@ -20,27 +17,16 @@ func NewHandler(svc *Service, sessions *auth.Manager) *Handler {
 	return &Handler{svc: svc, sessions: sessions}
 }
 
-// Create gestisce POST /api/create_listing.
-func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) requireSession(w http.ResponseWriter, r *http.Request) (auth.Session, bool) {
 	session, ok := h.sessions.FromRequest(r)
 	if !ok {
 		httpx.WriteError(w, r, errSessionInvalid)
-		return
 	}
-	var in CreateInput
-	if err := httpx.DecodeJSON(r, &in); err != nil {
-		httpx.WriteError(w, r, err)
-		return
-	}
-	if err := h.svc.Create(r.Context(), session.UserID, in); err != nil {
-		httpx.WriteError(w, r, err)
-		return
-	}
-	httpx.JSON(w, http.StatusCreated, map[string]string{"message": "Annuncio pubblicato in sicurezza!"})
+	return session, ok
 }
 
-// Latest gestisce GET /api/get_listings.
-func (h *Handler) Latest(w http.ResponseWriter, r *http.Request) {
+// List gestisce GET /api/v1/listings.
+func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	listings, err := h.svc.Latest(r.Context())
 	if err != nil {
 		httpx.WriteError(w, r, err)
@@ -49,21 +35,10 @@ func (h *Handler) Latest(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, listings)
 }
 
-// Get gestisce GET /api/get_listing?id=.
-func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	detail, err := h.svc.Get(r.Context(), r.URL.Query().Get("id"))
-	if err != nil {
-		httpx.WriteError(w, r, err)
-		return
-	}
-	httpx.JSON(w, http.StatusOK, detail)
-}
-
-// Mine gestisce GET /api/get_my_listings.
+// Mine gestisce GET /api/v1/me/listings.
 func (h *Handler) Mine(w http.ResponseWriter, r *http.Request) {
-	session, ok := h.sessions.FromRequest(r)
+	session, ok := h.requireSession(w, r)
 	if !ok {
-		httpx.WriteError(w, r, errSessionInvalid)
 		return
 	}
 	listings, err := h.svc.Mine(r.Context(), session.UserID)
@@ -74,16 +49,139 @@ func (h *Handler) Mine(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, listings)
 }
 
-// Delete gestisce DELETE /api/delete_listing?id=.
-func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	session, ok := h.sessions.FromRequest(r)
-	if !ok {
-		httpx.WriteError(w, r, errSessionInvalid)
-		return
-	}
-	if err := h.svc.Delete(r.Context(), session.UserID, r.URL.Query().Get("id")); err != nil {
+// Get gestisce GET /api/v1/listings/{id}.
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
+	session, _ := h.sessions.FromRequest(r)
+	detail, err := h.svc.Get(r.Context(), session.UserID, r.PathValue("id"))
+	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
 	}
-	httpx.Text(w, http.StatusOK, "Annuncio eliminato con successo")
+	httpx.JSON(w, http.StatusOK, detail)
+}
+
+// Create gestisce POST /api/v1/listings.
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.requireSession(w, r)
+	if !ok {
+		return
+	}
+	var in Input
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	detail, err := h.svc.Create(r.Context(), session.UserID, in)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, detail)
+}
+
+// Update gestisce PUT /api/v1/listings/{id}.
+func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.requireSession(w, r)
+	if !ok {
+		return
+	}
+	var in Input
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	detail, err := h.svc.Update(r.Context(), session.UserID, r.PathValue("id"), in)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, detail)
+}
+
+// SetActive gestisce PUT /api/v1/listings/{id}/active con {"active": true|false}.
+func (h *Handler) SetActive(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.requireSession(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Active *bool `json:"active"`
+	}
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	if in.Active == nil {
+		httpx.WriteError(w, r, errMissingActive)
+		return
+	}
+	if err := h.svc.SetActive(r.Context(), session.UserID, r.PathValue("id"), *in.Active); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// Delete gestisce DELETE /api/v1/listings/{id}.
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.requireSession(w, r)
+	if !ok {
+		return
+	}
+	if err := h.svc.Delete(r.Context(), session.UserID, r.PathValue("id")); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// PrepareUpload gestisce POST /api/v1/listings/{id}/images/uploads.
+func (h *Handler) PrepareUpload(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.requireSession(w, r)
+	if !ok {
+		return
+	}
+	var in UploadInput
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	upload, err := h.svc.PrepareUpload(r.Context(), session.UserID, r.PathValue("id"), in)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, upload)
+}
+
+// ConfirmUpload gestisce POST /api/v1/listings/{id}/images.
+func (h *Handler) ConfirmUpload(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.requireSession(w, r)
+	if !ok {
+		return
+	}
+	var in ConfirmInput
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	image, err := h.svc.ConfirmUpload(r.Context(), session.UserID, r.PathValue("id"), in)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, image)
+}
+
+// DeleteImage gestisce DELETE /api/v1/listings/{id}/images/{imageId}.
+func (h *Handler) DeleteImage(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.requireSession(w, r)
+	if !ok {
+		return
+	}
+	if err := h.svc.DeleteImage(r.Context(), session.UserID, r.PathValue("id"), r.PathValue("imageId")); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

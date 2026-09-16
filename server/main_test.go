@@ -22,9 +22,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -34,6 +36,7 @@ import (
 	"roomdate-backend/internal/config"
 	"roomdate-backend/internal/db"
 	"roomdate-backend/internal/devenv"
+	"roomdate-backend/internal/storage"
 	"roomdate-backend/server"
 )
 
@@ -144,20 +147,114 @@ func (p *recordingPublisher) recorded() []event {
 	return append([]event(nil), p.events...)
 }
 
+// fakeStorage è uno storage in memoria. PresignUpload registra il tipo firmato per la chiave:
+// put simula il browser che carica il file sull'URL firmato.
+type fakeStorage struct {
+	mu      sync.Mutex
+	signed  map[string]string // chiave → Content-Type firmato
+	objects map[string]fakeObject
+}
+
+type fakeObject struct {
+	contentType string
+	data        []byte
+}
+
+func newFakeStorage() *fakeStorage {
+	return &fakeStorage{signed: map[string]string{}, objects: map[string]fakeObject{}}
+}
+
+func (f *fakeStorage) PresignUpload(_ context.Context, key, contentType string, _ time.Duration) (storage.Upload, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.signed[key] = contentType
+	return storage.Upload{URL: "https://storage.test/upload/" + key, Headers: map[string]string{"Content-Type": contentType}}, nil
+}
+
+func (f *fakeStorage) put(key string, data []byte) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.objects[key] = fakeObject{contentType: f.signed[key], data: data}
+}
+
+func (f *fakeStorage) Stat(_ context.Context, key string) (storage.ObjectInfo, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	obj, ok := f.objects[key]
+	if !ok {
+		return storage.ObjectInfo{}, storage.ErrNotFound
+	}
+	return storage.ObjectInfo{Size: int64(len(obj.data)), ContentType: obj.contentType}, nil
+}
+
+func (f *fakeStorage) ReadPrefix(_ context.Context, key string, n int) ([]byte, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	obj, ok := f.objects[key]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	return obj.data[:min(n, len(obj.data))], nil
+}
+
+func (f *fakeStorage) Move(_ context.Context, from, to string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	obj, ok := f.objects[from]
+	if !ok {
+		return storage.ErrNotFound
+	}
+	f.objects[to] = obj
+	delete(f.objects, from)
+	return nil
+}
+
+func (f *fakeStorage) Delete(_ context.Context, key string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.objects, key)
+	return nil
+}
+
+func (f *fakeStorage) PublicURL(key string) string {
+	return "https://img.test/" + key
+}
+
+func (f *fakeStorage) keys() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	keys := make([]string, 0, len(f.objects))
+	for k := range f.objects {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 type testApp struct {
 	t         *testing.T
 	handler   http.Handler
 	publisher *recordingPublisher
+	storage   *fakeStorage
 }
 
-// newApp svuota il database e crea un'applicazione nuova.
+// newApp svuota il database e crea un'applicazione nuova, con uno storage delle foto in memoria.
 func newApp(t *testing.T) *testApp {
+	t.Helper()
+	fake := newFakeStorage()
+	app := newAppWithStorage(t, fake)
+	app.storage = fake
+	return app
+}
+
+// newAppWithStorage crea l'applicazione con lo storage indicato (ad esempio storage.Disabled{}).
+func newAppWithStorage(t *testing.T, st storage.Storage) *testApp {
 	t.Helper()
 	if testPool == nil {
 		t.Skip("TEST_DATABASE_URL non impostata")
 	}
 	_, err := testPool.Exec(context.Background(),
-		`TRUNCATE roomdate_app.messages, roomdate_app.conversations, roomdate_app.listings, roomdate_app.users RESTART IDENTITY CASCADE`)
+		`TRUNCATE roomdate_app.messages, roomdate_app.conversations, roomdate_app.listing_images, roomdate_app.listings, roomdate_app.users RESTART IDENTITY CASCADE`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,6 +265,7 @@ func newApp(t *testing.T) *testApp {
 		DB:        testPool,
 		Publisher: publisher,
 		Logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Storage:   st,
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -1,15 +1,33 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../auth/AuthContext';
-import { useConversations, useCreateListing, useDeleteListing, useMyListings, useMyProfile, useUpdateMyProfile } from '../api/hooks';
+import {
+  useConversations,
+  useCreateListing,
+  useDeleteListing,
+  useListing,
+  useMyListings,
+  useMyProfile,
+  useSetListingActive,
+  useUpdateListing,
+  useUpdateMyProfile,
+} from '../api/hooks';
+import { formatAvailability, formatBills } from '../api/listings';
 import PageLoader from '../components/PageLoader';
+import ListingForm from '../components/listings/ListingForm';
+import ListingPhotos from '../components/listings/ListingPhotos';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeView, setActiveView] = useState('editProfile');
+
+  // Da "Modifica annuncio" nella pagina di dettaglio si arriva direttamente alla modifica
+  const [editingId, setEditingId] = useState(location.state?.editListingId ?? null);
+  const [activeView, setActiveView] = useState(editingId ? 'editListing' : 'editProfile');
+  const [notice, setNotice] = useState('');
 
   // Profilo salvato sul server e sua copia modificabile nel form
   const profileQuery = useMyProfile();
@@ -18,31 +36,52 @@ export default function Dashboard() {
     if (profileQuery.data) setForm(profileQuery.data);
   }, [profileQuery.data]);
 
-  // Solo chi affitta pubblica e gestisce annunci. Conta il ruolo salvato, non quello in modifica.
+  // Solo chi affitta pubblica annunci (conta il ruolo salvato, non quello in modifica).
+  // Chi ne ha già pubblicati può sempre gestirli, anche dopo aver cambiato ruolo.
   const isLandlord = profileQuery.data?.userType === 'affitta';
-  const view = isLandlord ? activeView : 'editProfile';
+  const { data: myListings = [] } = useMyListings();
+  const canManageListings = isLandlord || myListings.length > 0;
 
-  const { data: myListings = [] } = useMyListings({ enabled: isLandlord });
+  let view = activeView;
+  if ((view === 'myListings' || view === 'editListing') && !canManageListings) view = 'editProfile';
+  if (view === 'createListing' && !isLandlord) view = 'editProfile';
+
+  const editing = useListing(editingId ?? 0, { enabled: editingId !== null });
   const { data: conversations } = useConversations();
   const updateProfile = useUpdateMyProfile();
   const createListing = useCreateListing();
+  const updateListing = useUpdateListing();
+  const setListingActive = useSetListingActive();
   const deleteListing = useDeleteListing();
 
+  const showView = (nextView, listingId = null) => {
+    setNotice('');
+    setEditingId(listingId);
+    setActiveView(nextView);
+  };
+
   const handleLogout = async () => {
-    // Prima si lascia la pagina: su quelle protette la sessione chiusa porterebbe all'accesso
     setIsMenuOpen(false);
     navigate('/');
     await logout();
   };
 
   const handleDeleteListing = async (id) => {
-    if (window.confirm("Sei sicuro di voler eliminare questo annuncio?")) {
+    if (window.confirm("Eliminare definitivamente questo annuncio e le sue foto? Le conversazioni con chi ti ha scritto resteranno.")) {
       try {
         await deleteListing.mutateAsync(id);
-        alert("✅ Annuncio eliminato.");
+        showView('myListings');
       } catch (err) {
         alert("❌ " + err.message);
       }
+    }
+  };
+
+  const handleToggleActive = async (listing) => {
+    try {
+      await setListingActive.mutateAsync({ id: listing.id, active: !listing.isActive });
+    } catch (err) {
+      alert("❌ " + err.message);
     }
   };
 
@@ -79,26 +118,15 @@ export default function Dashboard() {
     }
   };
 
-  const handleSaveListing = async (e) => {
-    e.preventDefault();
-    const listingForm = e.target;
-    const formData = new FormData(listingForm);
+  const handleCreateListing = async (input) => {
+    const listing = await createListing.mutateAsync(input);
+    showView('editListing', listing.id);
+    setNotice('🎉 Annuncio pubblicato! Ora puoi aggiungere le foto.');
+  };
 
-    try {
-      await createListing.mutateAsync({
-        title: formData.get('title'),
-        city: formData.get('city'),
-        zone: formData.get('zone'),
-        roomType: formData.get('roomType'),
-        price: parseInt(formData.get('price'), 10) || 0,
-        description: formData.get('description')
-      });
-      alert("🎉 Annuncio pubblicato!");
-      listingForm.reset();
-      setActiveView('myListings');
-    } catch (err) {
-      alert("❌ Errore durante la pubblicazione: " + err.message);
-    }
+  const handleUpdateListing = async (input) => {
+    await updateListing.mutateAsync({ id: editingId, input });
+    setNotice('✅ Annuncio aggiornato.');
   };
 
   if (!form) {
@@ -170,8 +198,8 @@ export default function Dashboard() {
         </div>
 
         {/* STATS: solo conteggi reali (i preferiti non esistono ancora) */}
-        <div className={`grid ${isLandlord ? 'grid-cols-2' : 'grid-cols-1'} gap-4 md:gap-6 mb-10`}>
-          {isLandlord && (
+        <div className={`grid ${canManageListings ? 'grid-cols-2' : 'grid-cols-1'} gap-4 md:gap-6 mb-10`}>
+          {canManageListings && (
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100 text-center flex flex-col justify-center transition-transform hover:scale-[1.02]">
               <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">{myListings.length}</div>
               <div className="text-[11px] md:text-xs text-neutral-500 font-bold mt-2 uppercase tracking-wider">Annunci</div>
@@ -185,16 +213,16 @@ export default function Dashboard() {
 
         {/* TABS */}
         <div className="flex flex-wrap justify-center gap-3 mb-8">
-          {isLandlord && (
-            <button className={`px-6 py-3 rounded-full font-bold text-sm transition-all cursor-pointer ${view === 'myListings' ? 'bg-neutral-900 text-white shadow-md' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`} onClick={() => setActiveView('myListings')}>
+          {canManageListings && (
+            <button className={`px-6 py-3 rounded-full font-bold text-sm transition-all cursor-pointer ${view === 'myListings' || view === 'editListing' ? 'bg-neutral-900 text-white shadow-md' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`} onClick={() => showView('myListings')}>
               📄 I Miei Annunci
             </button>
           )}
-          <button className={`px-6 py-3 rounded-full font-bold text-sm transition-all cursor-pointer ${view === 'editProfile' ? 'bg-neutral-900 text-white shadow-md' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`} onClick={() => setActiveView('editProfile')}>
+          <button className={`px-6 py-3 rounded-full font-bold text-sm transition-all cursor-pointer ${view === 'editProfile' ? 'bg-neutral-900 text-white shadow-md' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`} onClick={() => showView('editProfile')}>
             ⚙️ Modifica Profilo
           </button>
           {isLandlord && (
-            <button className={`px-6 py-3 rounded-full font-bold text-sm transition-all cursor-pointer ${view === 'createListing' ? 'bg-neutral-900 text-white shadow-md' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`} onClick={() => setActiveView('createListing')}>
+            <button className={`px-6 py-3 rounded-full font-bold text-sm transition-all cursor-pointer ${view === 'createListing' ? 'bg-neutral-900 text-white shadow-md' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`} onClick={() => showView('createListing')}>
               ➕ Pubblica Annuncio
             </button>
           )}
@@ -205,26 +233,75 @@ export default function Dashboard() {
           {/* TAB 1: I MIEI ANNUNCI */}
           {view === 'myListings' && (
             <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100">
-              <h2 className="text-2xl font-extrabold text-neutral-900 mb-6 tracking-tight">Annunci Attivi</h2>
+              <h2 className="text-2xl font-extrabold text-neutral-900 mb-6 tracking-tight">I miei annunci</h2>
               {myListings.length === 0 ? (
                 <div className="text-center py-16 px-4 bg-neutral-50 rounded-3xl border border-dashed border-neutral-200">
                   <div className="text-5xl mb-4 opacity-50">📭</div>
-                  <p className="text-neutral-500 font-medium mb-6">Non hai ancora nessun annuncio attivo.</p>
-                  <button onClick={() => setActiveView('createListing')} className="bg-white border border-neutral-200 hover:border-orange-300 text-neutral-900 px-6 py-3 rounded-full font-bold shadow-sm transition-all cursor-pointer">Crea il primo</button>
+                  <p className="text-neutral-500 font-medium mb-6">Non hai ancora pubblicato nessun annuncio.</p>
+                  {isLandlord && <button onClick={() => showView('createListing')} className="bg-white border border-neutral-200 hover:border-orange-300 text-neutral-900 px-6 py-3 rounded-full font-bold shadow-sm transition-all cursor-pointer">Crea il primo</button>}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {myListings.map(l => (
-                    <div key={l.id} className="flex flex-col justify-between p-6 bg-white rounded-3xl border border-neutral-100 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="mb-4">
-                        <div className="font-bold text-neutral-900 text-lg mb-1">{l.title}</div>
-                        <div className="text-sm text-neutral-500 font-medium">📍 {l.city} · 🏠 {l.roomType}</div>
-                        <div className="text-lg font-extrabold text-orange-500 mt-2">€{l.price}/mese</div>
+                  {myListings.map(l => {
+                    const details = [formatBills(l.billsIncluded), formatAvailability(l.availableFrom)].filter(Boolean).join(' · ');
+                    return (
+                      <div key={l.id} className="flex flex-col bg-white rounded-3xl border border-neutral-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden" data-testid="my-listing">
+                        <div className="relative h-40 bg-neutral-100 flex items-center justify-center">
+                          {l.coverUrl
+                            ? <img src={l.coverUrl} alt="" className="w-full h-full object-cover" />
+                            : <span className="text-sm font-bold text-neutral-400">📷 Nessuna foto</span>}
+                          <span className={`absolute top-3 left-3 px-3 py-1 rounded-full text-[11px] font-bold shadow-sm ${l.isActive ? 'bg-white/90 text-green-700' : 'bg-neutral-900/80 text-white'}`}>
+                            {l.isActive ? 'Pubblicato' : 'Disattivato'}
+                          </span>
+                        </div>
+                        <div className="p-6 flex flex-col gap-4 grow">
+                          <div>
+                            <Link to={`/dettagli/${l.id}`} className="font-bold text-neutral-900 text-lg mb-1 hover:text-orange-500 transition-colors">{l.title}</Link>
+                            <div className="text-sm text-neutral-500 font-medium">📍 {l.city} · 🏠 {l.roomType}</div>
+                            {details && <div className="text-sm text-neutral-500 font-medium">{details}</div>}
+                            <div className="text-lg font-extrabold text-orange-500 mt-2">€{l.price}/mese</div>
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-auto">
+                            <button onClick={() => showView('editListing', l.id)} className="bg-neutral-900 text-white hover:bg-neutral-800 font-bold px-4 py-2.5 rounded-xl transition-colors text-sm cursor-pointer">Modifica</button>
+                            <button onClick={() => handleToggleActive(l)} disabled={setListingActive.isPending} className="bg-neutral-100 text-neutral-700 hover:bg-neutral-200 font-bold px-4 py-2.5 rounded-xl transition-colors text-sm cursor-pointer disabled:opacity-50">
+                              {l.isActive ? 'Disattiva' : 'Riattiva'}
+                            </button>
+                            <button onClick={() => handleDeleteListing(l.id)} disabled={deleteListing.isPending} className="bg-red-50 text-red-600 hover:bg-red-100 font-bold px-4 py-2.5 rounded-xl transition-colors text-sm cursor-pointer disabled:opacity-50">Elimina</button>
+                          </div>
+                        </div>
                       </div>
-                      <button onClick={() => handleDeleteListing(l.id)} className="bg-red-50 text-red-600 hover:bg-red-100 font-bold px-4 py-2.5 rounded-xl w-max transition-colors text-sm cursor-pointer">Elimina Annuncio</button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* MODIFICA ANNUNCIO: foto e dati */}
+          {view === 'editListing' && (
+            <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100 flex flex-col gap-8">
+              <div className="flex flex-wrap justify-between items-center gap-3">
+                <h2 className="text-2xl font-extrabold text-neutral-900 tracking-tight">Modifica annuncio</h2>
+                <div className="flex gap-3">
+                  <Link to={`/dettagli/${editingId}`} className="text-sm font-bold text-orange-500 hover:text-orange-600 transition-colors">Vedi l&apos;annuncio →</Link>
+                  <button onClick={() => showView('myListings')} className="text-sm font-bold text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer">← I miei annunci</button>
+                </div>
+              </div>
+              {notice && <div className="p-4 rounded-2xl font-bold bg-green-50 text-green-700 border border-green-200">{notice}</div>}
+              {!editing.data ? (
+                editing.isError
+                  ? <p className="text-neutral-600 font-medium">{editing.error.message}</p>
+                  : <p className="text-neutral-500 font-medium">Caricamento annuncio...</p>
+              ) : (
+                <>
+                  {!editing.data.isActive && (
+                    <div className="p-4 rounded-2xl font-medium bg-neutral-50 text-neutral-700 border border-neutral-200 text-sm">Questo annuncio è disattivato: non compare nelle ricerche e non può essere contattato.</div>
+                  )}
+                  <ListingPhotos listing={editing.data} />
+                  <div className="pt-8 border-t border-neutral-100">
+                    <ListingForm key={editing.data.id} listing={editing.data} submitLabel="Salva modifiche" onSubmit={handleUpdateListing} />
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -366,60 +443,9 @@ export default function Dashboard() {
           {/* TAB 3: CREA ANNUNCIO */}
           {view === 'createListing' && (
             <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100">
-              <h2 className="text-2xl font-extrabold text-neutral-900 mb-8 tracking-tight">Inserisci una Stanza</h2>
-              <form onSubmit={handleSaveListing} className="flex flex-col gap-6">
-                <input 
-                  name="title" 
-                  type="text" 
-                  placeholder="Titolo (Es: Camera Singola Navigli)" 
-                  required 
-                  className="w-full bg-neutral-50 border border-neutral-200 px-5 py-4 rounded-2xl text-neutral-900 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 
-                />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <input 
-                    name="city" 
-                    type="text" 
-                    placeholder="Città" 
-                    required 
-                    className="w-full bg-neutral-50 border border-neutral-200 px-5 py-4 rounded-2xl text-neutral-900 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 
-                  />
-                  <input 
-                    name="zone" 
-                    type="text" 
-                    placeholder="Zona" 
-                    required 
-                    className="w-full bg-neutral-50 border border-neutral-200 px-5 py-4 rounded-2xl text-neutral-900 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 
-                  />
-                  <select 
-                    name="roomType" 
-                    required 
-                    className="w-full bg-neutral-50 border border-neutral-200 px-5 py-4 rounded-2xl text-neutral-900 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all"
-                  >
-                    <option value="singola">Singola</option>
-                    <option value="doppia">Doppia</option>
-                  </select>
-                  <input 
-                    name="price" 
-                    type="number" 
-                    placeholder="Prezzo (€)" 
-                    required 
-                    className="w-full bg-neutral-50 border border-neutral-200 px-5 py-4 rounded-2xl text-neutral-900 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 
-                  />
-                </div>
-                <textarea 
-                  name="description" 
-                  placeholder="Descrizione dettagliata..." 
-                  rows="5" 
-                  required 
-                  className="w-full bg-neutral-50 border border-neutral-200 px-5 py-4 rounded-3xl text-neutral-900 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all resize-none"
-                ></textarea>
-                
-                <div className="mt-4 pt-8 border-t border-neutral-100 flex justify-end">
-                  <button type="submit" className="w-full md:w-auto bg-neutral-900 text-white px-10 py-4 rounded-full font-bold hover:bg-neutral-800 transition-all shadow-md cursor-pointer">
-                    Pubblica Annuncio
-                  </button>
-                </div>
-              </form>
+              <h2 className="text-2xl font-extrabold text-neutral-900 mb-2 tracking-tight">Inserisci una Stanza</h2>
+              <p className="text-neutral-500 font-medium mb-8">Dopo la pubblicazione potrai aggiungere le foto.</p>
+              <ListingForm submitLabel="Pubblica Annuncio" onSubmit={handleCreateListing} />
             </div>
           )}
 

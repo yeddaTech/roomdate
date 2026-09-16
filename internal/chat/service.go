@@ -17,6 +17,7 @@ import (
 const maxCiphertextLength = 8192
 
 var (
+	errSelfChat            = apperr.BadRequest("self_chat", "Non puoi avviare una conversazione con te stesso")
 	errInvalidConversation = apperr.BadRequest("invalid_conversation", "Conversazione non valida")
 	errNotParticipant      = apperr.Forbidden("not_participant", "Accesso negato a questa conversazione")
 )
@@ -52,17 +53,20 @@ func (s *Service) startListingChat(ctx context.Context, userID string, listingID
 	if listingID < 0 {
 		return 0, apperr.BadRequest("invalid_listing_id", "ID annuncio non valido")
 	}
-	exists, err := s.store.ListingExists(ctx, listingID)
+	ownerID, active, err := s.store.ListingForChat(ctx, listingID)
+	if db.IsNoRows(err) || (err == nil && !active) {
+		return 0, apperr.NotFound("listing_not_found", "Annuncio non trovato o non più disponibile")
+	}
 	if err != nil {
 		return 0, fmt.Errorf("verifica annuncio: %w", err)
 	}
-	if !exists {
-		return 0, apperr.NotFound("listing_not_found", "Annuncio non trovato")
+	if ownerID == userID {
+		return 0, errSelfChat
 	}
 
 	id, err := s.store.FindListingConversation(ctx, listingID, userID)
 	if db.IsNoRows(err) {
-		id, err = s.store.CreateListingConversation(ctx, listingID, userID)
+		id, err = s.store.CreateListingConversation(ctx, listingID, userID, ownerID)
 	}
 	if err != nil {
 		return 0, apperr.Wrap(err, "chat_start_failed", "Errore interno database")
@@ -74,12 +78,16 @@ func (s *Service) startDirectChat(ctx context.Context, userID, targetID string) 
 	if !validate.MaxLen(targetID, 64) {
 		return 0, apperr.NotFound("user_not_found", "Utente non trovato")
 	}
-	exists, err := s.store.UserExists(ctx, targetID)
+	// ID nella forma salvata nel database (es. "7" anche se il client ha inviato "07")
+	targetID, err := s.store.UserID(ctx, targetID)
+	if db.IsNoRows(err) {
+		return 0, apperr.NotFound("user_not_found", "Utente non trovato")
+	}
 	if err != nil {
 		return 0, fmt.Errorf("verifica utente: %w", err)
 	}
-	if !exists {
-		return 0, apperr.NotFound("user_not_found", "Utente non trovato")
+	if targetID == userID {
+		return 0, errSelfChat
 	}
 
 	id, err := s.store.FindDirectConversation(ctx, userID, targetID)

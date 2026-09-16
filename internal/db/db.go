@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	_ "github.com/jackc/pgx/v5/stdlib" // driver "pgx" per database/sql (goose, seed)
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 )
 
@@ -38,8 +39,19 @@ func Open(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 }
 
 // OpenSQL apre una connessione database/sql con il driver pgx (per goose e il seed).
+// Gli avvisi WARNING del database (ad esempio quelli delle migrazioni) finiscono nel log;
+// i semplici NOTICE (come "does not exist, skipping") no.
 func OpenSQL(databaseURL string) (*sql.DB, error) {
-	return sql.Open("pgx", databaseURL)
+	cfg, err := pgx.ParseConfig(databaseURL)
+	if err != nil {
+		return nil, err
+	}
+	cfg.OnNotice = func(_ *pgconn.PgConn, n *pgconn.Notice) {
+		if n.Severity == "WARNING" {
+			log.Printf("Avviso del database: %s", n.Message)
+		}
+	}
+	return stdlib.OpenDB(*cfg), nil
 }
 
 // Migrate esegue un comando di goose (up, down, status...) con le migrazioni incluse nel binario.

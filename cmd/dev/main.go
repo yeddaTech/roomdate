@@ -46,6 +46,9 @@ func main() {
 	if !cfg.Pusher.Enabled() {
 		log.Print("PUSHER_* non impostate: la chat funziona, ma senza tempo reale (il frontend aggiorna ogni 5 secondi)")
 	}
+	if !cfg.Storage.Enabled() {
+		log.Print("R2_* non impostate: annunci senza caricamento foto")
+	}
 
 	host, dbname := devenv.DescribeDSN(cfg.DatabaseURL)
 	log.Printf("Database: %s / %s", host, dbname)
