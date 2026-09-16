@@ -309,14 +309,13 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, in ProfileIn
 }
 
 // Roommate è un profilo nell'elenco dei coinquilini (formato JSON delle API legacy).
+// Età e compatibilità reali arrivano con il modulo M1.5.
 type Roommate struct {
 	ID       string   `json:"id"`
 	Name     string   `json:"name"`
 	Job      string   `json:"job"`
 	Quote    string   `json:"quote"`
-	Age      int      `json:"age"`
 	City     string   `json:"city"`
-	Match    int      `json:"match"`
 	Color1   string   `json:"color1"`
 	Color2   string   `json:"color2"`
 	Emoji    string   `json:"emoji"`
@@ -325,8 +324,8 @@ type Roommate struct {
 	Budget   int      `json:"budget_max"`
 }
 
-// Roommates restituisce i profili pubblici.
-// Età, compatibilità, colori ed emoji sono ancora valori dimostrativi: diventano dati reali nel modulo M1.5.
+// Roommates restituisce i profili pubblici, con i soli dati inseriti dagli utenti.
+// Colori ed emoji dell'avatar sono decorativi.
 func (s *Service) Roommates(ctx context.Context) ([]Roommate, error) {
 	rows, err := s.store.PublicRoommates(ctx, roommatesLimit)
 	if err != nil {
@@ -338,18 +337,20 @@ func (s *Service) Roommates(ctx context.Context) ([]Roommate, error) {
 
 	roommates := make([]Roommate, 0, len(rows))
 	for i, row := range rows {
+		tags := []string{}
+		if row.Tags != "" {
+			tags = strings.Split(row.Tags, ", ")
+		}
 		roommates = append(roommates, Roommate{
 			ID:       row.ID,
 			Name:     row.Name,
 			Job:      row.Job,
 			Quote:    row.Bio,
-			Age:      22 + (i % 6),
 			City:     row.City,
-			Match:    85 + (i * 2),
 			Color1:   colors[i%len(colors)][0],
 			Color2:   colors[i%len(colors)][1],
 			Emoji:    emojis[i%len(emojis)],
-			Tags:     strings.Split(row.Tags, ", "),
+			Tags:     tags,
 			UserType: row.UserType,
 			Budget:   row.BudgetMax,
 		})

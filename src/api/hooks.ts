@@ -1,6 +1,6 @@
 // Hook per leggere e modificare i dati: le pagine usano questi, non le chiamate API dirette.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { startChat } from './chat';
+import { listConversations, startChat } from './chat';
 import { createListing, deleteListing, getListing, listLatestListings, listMyListings } from './listings';
 import { queryKeys } from './queryKeys';
 import type { SessionUser } from './types';
@@ -63,6 +63,15 @@ export function useDeleteListing() {
   });
 }
 
+/** Conversazioni dell'utente (la pagina Chat le carica per conto suo, con la decifratura). */
+export function useConversations() {
+  return useQuery({ queryKey: queryKeys.conversations, queryFn: listConversations });
+}
+
 export function useStartChat() {
-  return useMutation({ mutationFn: startChat });
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: startChat,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.conversations }),
+  });
 }

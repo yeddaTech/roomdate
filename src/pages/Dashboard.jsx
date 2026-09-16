@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../auth/AuthContext';
-import { useCreateListing, useDeleteListing, useMyListings, useMyProfile, useUpdateMyProfile } from '../api/hooks';
+import { useConversations, useCreateListing, useDeleteListing, useMyListings, useMyProfile, useUpdateMyProfile } from '../api/hooks';
 import PageLoader from '../components/PageLoader';
 
 export default function Dashboard() {
@@ -23,6 +23,7 @@ export default function Dashboard() {
   const view = isLandlord ? activeView : 'editProfile';
 
   const { data: myListings = [] } = useMyListings({ enabled: isLandlord });
+  const { data: conversations } = useConversations();
   const updateProfile = useUpdateMyProfile();
   const createListing = useCreateListing();
   const deleteListing = useDeleteListing();
@@ -164,22 +165,20 @@ export default function Dashboard() {
             {form.firstName} {form.lastName}
           </h1>
           <p className="text-neutral-500 text-lg font-medium">
-            @{(form.firstName || 'user').toLowerCase()}{form.id.substring(0,4)}
+            {isLandlord ? '🏠 Offro una stanza' : '🔍 Cerco una stanza'}{profileQuery.data.city ? ` · ${profileQuery.data.city}` : ''}
           </p>
         </div>
 
-        {/* STATS */}
-        <div className="grid grid-cols-3 gap-4 md:gap-6 mb-10">
+        {/* STATS: solo conteggi reali (i preferiti non esistono ancora) */}
+        <div className={`grid ${isLandlord ? 'grid-cols-2' : 'grid-cols-1'} gap-4 md:gap-6 mb-10`}>
+          {isLandlord && (
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100 text-center flex flex-col justify-center transition-transform hover:scale-[1.02]">
+              <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">{myListings.length}</div>
+              <div className="text-[11px] md:text-xs text-neutral-500 font-bold mt-2 uppercase tracking-wider">Annunci</div>
+            </div>
+          )}
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100 text-center flex flex-col justify-center transition-transform hover:scale-[1.02]">
-            <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">{myListings.length}</div>
-            <div className="text-[11px] md:text-xs text-neutral-500 font-bold mt-2 uppercase tracking-wider">Annunci</div>
-          </div>
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100 text-center flex flex-col justify-center transition-transform hover:scale-[1.02]">
-            <div className="text-4xl font-extrabold text-neutral-300">0</div>
-            <div className="text-[11px] md:text-xs text-neutral-500 font-bold mt-2 uppercase tracking-wider">Salvati</div>
-          </div>
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100 text-center flex flex-col justify-center transition-transform hover:scale-[1.02]">
-            <div className="text-4xl font-extrabold text-neutral-300">0</div>
+            <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">{conversations ? conversations.length : '–'}</div>
             <div className="text-[11px] md:text-xs text-neutral-500 font-bold mt-2 uppercase tracking-wider">Chat</div>
           </div>
         </div>

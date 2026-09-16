@@ -1,4 +1,3 @@
-import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import Footer from '../components/Footer';
@@ -14,7 +13,7 @@ export default function Guide() {
         "name": "Come trovare coinquilini affidabili?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Per trovare coinquilini affidabili, RoomDate offre un sistema di screening basato sulle abitudini di vita. Il nostro algoritmo calcola la percentuale di compatibilità prima di iniziare la convivenza."
+          "text": "Su RoomDate ogni profilo mostra occupazione, budget, una breve presentazione e le abitudini indicate dall'utente, come fumo, animali e ordine. Leggili, fai domande in chat e incontra la persona prima di decidere: RoomDate non verifica l'identità degli utenti."
         }
       },
       {
@@ -22,7 +21,7 @@ export default function Guide() {
         "name": "Quali piattaforme online per ricerca stanza con coinquilini esistono?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "RoomDate è la piattaforma online italiana che elimina le agenzie, mettendo in contatto diretto chi cerca e chi offre stanze in affitto con profili verificati."
+          "text": "RoomDate è una piattaforma online italiana gratuita che mette in contatto diretto chi cerca e chi offre stanze in affitto, tramite una chat cifrata end-to-end."
         }
       },
       {
@@ -30,7 +29,7 @@ export default function Guide() {
         "name": "Dove cercare annunci di coinquilini in Italia?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Puoi cercare annunci di coinquilini direttamente su RoomDate, impostando filtri avanzati per città (come Milano, Roma, Bologna), budget e preferenze di stile di vita."
+          "text": "Puoi cercare stanze e coinquilini direttamente su RoomDate, filtrando per città (come Milano, Roma o Bologna) e budget."
         }
       },
       {
@@ -38,7 +37,7 @@ export default function Guide() {
         "name": "Quali servizi online offrono screening dei coinquilini?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "A differenza dei classici gruppi social, RoomDate integra un sistema di screening preventivo attraverso i Lifestyle Tags, garantendo una maggiore sicurezza nella scelta del compagno di stanza."
+          "text": "RoomDate non esegue screening né verifiche sugli utenti. Rispetto ai gruppi social, però, ogni profilo raccoglie in un unico posto le informazioni utili a una prima scelta: occupazione, budget, presentazione e abitudini di vita."
         }
       },
       {
@@ -46,7 +45,7 @@ export default function Guide() {
         "name": "Esiste un'app per gestire la ricerca e le spese tra coinquilini?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Mentre per le spese ci sono app dedicate come Splitwise, per la ricerca e il matching iniziale la soluzione più completa in Italia è la web-app di RoomDate."
+          "text": "Per dividere le spese esistono app dedicate come Splitwise. RoomDate si occupa della fase precedente: trovare la stanza o il coinquilino e mettersi in contatto."
         }
       }
     ]
@@ -56,7 +55,7 @@ export default function Guide() {
     <div className="min-h-[100dvh] bg-[#FAFAFA] font-sans selection:bg-orange-200 flex flex-col">
       <Helmet>
         <title>Come trovare coinquilini affidabili e stanze in affitto | RoomDate</title>
-        <meta name="description" content="La guida definitiva: scopri quali servizi online offrono screening, dove cercare annunci e come trovare coinquilini a Milano e in tutta Italia." />
+        <meta name="description" content="Guida pratica: dove cercare stanze e coinquilini, cosa guardare in un profilo e come contattare chi affitta, a Milano e in tutta Italia." />
         <script type="application/ld+json">
           {JSON.stringify(faqSchema)}
         </script>

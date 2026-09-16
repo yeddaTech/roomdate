@@ -34,6 +34,9 @@ const sanitizeHTML = (str) => {
   return str.replace(/[<>]/g, '');
 };
 
+// Iniziale del nome dell'altro partecipante, per l'avatar
+const initial = (name) => (name || '?').charAt(0).toUpperCase();
+
 export default function ChatPage() {
   const navigate = useNavigate();
   const location = useLocation(); 
@@ -93,7 +96,7 @@ export default function ChatPage() {
               try {
                 if (msg.isTemp) return msg; 
                 msg.text = await decryptMessage(msg.text, myPrivateKey);
-              } catch (e) {
+              } catch {
                 msg.text = "🔒 [Messaggio non decifrabile]";
               }
               return msg;
@@ -478,14 +481,14 @@ export default function ChatPage() {
                   onClick={() => handleSelectConv(conv)}
                 >
                   {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500 rounded-r-md"></div>}
-                  <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl shrink-0 shadow-sm relative transition-transform duration-300 hover:scale-105" style={{ background: `linear-gradient(135deg, ${conv.color1}, ${conv.color2})` }}>
-                    <span className="drop-shadow-sm">{conv.emoji}</span>
+                  <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white shrink-0 shadow-sm relative transition-transform duration-300 hover:scale-105" style={{ background: `linear-gradient(135deg, ${conv.color1}, ${conv.color2})` }}>
+                    <span className="drop-shadow-sm">{initial(conv.name)}</span>
                   </div>
                   <div className="flex flex-col justify-center overflow-hidden w-full">
                     <div className="font-bold text-neutral-900 text-[15px] truncate">{conv.name}</div>
                     {conv.listing && (
                       <div className="text-[10px] text-orange-600 font-extrabold mb-0.5 truncate uppercase tracking-wider">
-                        🏠 {conv.listing.title}
+                        {conv.listing.emoji} {conv.listing.title}
                       </div>
                     )}
                     <div className={`text-sm truncate mt-0.5 ${isActive ? 'text-orange-600 font-medium' : 'text-neutral-500'}`}>
@@ -521,12 +524,12 @@ export default function ChatPage() {
               {/* Header Chat Attiva */}
               <div className="bg-white/90 backdrop-blur-md px-4 md:px-6 py-4 border-b border-neutral-100 flex items-center gap-4 shrink-0 shadow-sm z-10 w-full">
                 <button className="md:hidden text-2xl text-neutral-500 hover:text-neutral-900 px-2 cursor-pointer transition-colors" onClick={() => setMobileView('list')}>←</button>
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-sm shrink-0" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
-                  <span className="drop-shadow-sm">{activeConv.emoji}</span>
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-sm shrink-0" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
+                  <span className="drop-shadow-sm">{initial(activeConv.name)}</span>
                 </div>
                 <div className="overflow-hidden">
                   <h3 className="font-bold text-neutral-900 leading-tight truncate text-lg">{activeConv.name}</h3>
-                  <p className="text-xs text-neutral-500 font-medium truncate h-4 mt-0.5">Inquilino/Proprietario</p>
+                  <p className="text-xs text-neutral-500 font-medium truncate h-4 mt-0.5">{activeConv.listing.emoji} {activeConv.listing.title}</p>
                 </div>
               </div>
 
@@ -542,8 +545,8 @@ export default function ChatPage() {
                     return (
                       <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end gap-3 w-full ${msg.isTemp ? 'opacity-70 transition-opacity' : ''}`}>
                         {!isMine && (
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 shadow-sm relative bottom-1" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
-                            {activeConv.emoji}
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-sm relative bottom-1" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
+                            {initial(activeConv.name)}
                           </div>
                         )}
                         <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[85%] md:max-w-[70%]`}>
@@ -566,8 +569,8 @@ export default function ChatPage() {
                 {/* Bolla Puntini Scrittura */}
                 {typingUsers[activeConv.id] && (
                   <div className="flex justify-start items-end gap-3 w-full mt-2 animate-fade-in-up">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 shadow-sm opacity-60 relative bottom-1" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
-                      {activeConv.emoji}
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-sm opacity-60 relative bottom-1" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
+                      {initial(activeConv.name)}
                     </div>
                     <div className="bg-white border border-neutral-100 px-5 py-4 rounded-3xl rounded-bl-sm shadow-sm flex gap-1.5 items-center h-[42px]">
                       <span className="typing-dot"></span>

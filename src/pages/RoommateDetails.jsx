@@ -123,7 +123,7 @@ export default function RoommateDetails() {
               {roommate.firstName}
             </h1>
             <p className="text-white/90 text-lg font-bold tracking-wide">
-              {roommate.userType === 'affitta' ? '🏠 Offre una stanza' : '🔍 Cerca una stanza'} a {roommate.city || 'Milano'}
+              {roommate.userType === 'affitta' ? '🏠 Offre una stanza' : '🔍 Cerca una stanza'}{roommate.city ? ` a ${roommate.city}` : ''}
             </p>
           </div>
         </div>
@@ -167,7 +167,7 @@ export default function RoommateDetails() {
               <div className="flex flex-col gap-4 mb-8 relative z-10">
                 <div className="flex justify-between items-center border-b border-neutral-100 pb-4">
                   <span className="text-neutral-500 font-bold text-sm uppercase tracking-wider">Budget / Prezzo</span>
-                  <span className="font-extrabold text-neutral-900 text-lg">{roommate.budgetMax ? `€${roommate.budgetMax}` : 'Da concordare'}</span>
+                  <span className="font-extrabold text-neutral-900 text-lg">{roommate.budgetMax ? `€${roommate.budgetMax}` : 'Non indicato'}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-neutral-100 pb-4">
                   <span className="text-neutral-500 font-bold text-sm uppercase tracking-wider">Occupazione</span>

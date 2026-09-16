@@ -82,9 +82,6 @@ export default function Home() {
               >
                 <div className="h-48 flex items-center justify-center text-6xl relative transition-transform duration-500 group-hover:scale-105" style={{ background: sanitizeHTML(l.color) || '#f3f4f6' }}>
                   <span className="drop-shadow-sm">{sanitizeHTML(l.emoji) || '🏠'}</span>
-                  <span className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-[11px] font-bold shadow-sm backdrop-blur-md ${l.available ? 'bg-white/90 text-green-700' : 'bg-neutral-900/80 text-white'}`}>
-                    {l.available ? '✅ Disponibile' : 'Occupata'}
-                  </span>
                   <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-2xl shadow-sm">
                     <span className="font-extrabold text-lg text-orange-500">€{Number(l.price) || 0}</span><span className="text-[11px] text-neutral-500 font-bold">/mese</span>
                   </div>

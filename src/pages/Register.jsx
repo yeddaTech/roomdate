@@ -141,7 +141,7 @@ export default function Register() {
           <div className="relative z-10 max-w-lg mx-auto">
             <div className="text-white/80 text-xs font-bold uppercase tracking-widest mb-3">Unisciti a RoomDate</div>
             <h2 className="font-serif text-5xl xl:text-6xl font-extrabold leading-tight mb-6 tracking-tight">Trova la tua stanza,<br/><em className="font-light opacity-90">trova casa.</em></h2>
-            <p className="text-white/90 text-lg mb-12 leading-relaxed font-medium">Migliaia di stanze e coinquilini selezionati in tutta Italia. Registrati gratis e inizia subito a cercare la tua prossima sistemazione in totale sicurezza.</p>
+            <p className="text-white/90 text-lg mb-12 leading-relaxed font-medium">Pubblica una stanza o cerca casa e coinquilini. Registrati gratis e parla direttamente con gli altri utenti, con messaggi cifrati end-to-end.</p>
           </div>
         </div>
 

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -28,7 +27,7 @@ export default function Privacy() {
         <h1 className="font-serif text-3xl md:text-4xl font-extrabold text-neutral-900 mb-2 tracking-tight">
           Informativa sulla Privacy e Sicurezza
         </h1>
-        <p className="text-sm text-neutral-400 font-medium mb-8">Ultimo aggiornamento: Luglio 2026</p>
+        <p className="text-sm text-neutral-400 font-medium mb-8">Ultimo aggiornamento: Settembre 2026</p>
 
         <div className="flex flex-col gap-8 leading-relaxed text-neutral-600 font-medium">
           
@@ -43,23 +42,23 @@ export default function Privacy() {
             <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-3">2. Dati Raccolti e Luogo del Trattamento</h2>
             <p className="mb-3">Raccogliamo solo i dati strettamente necessari all'utilizzo della piattaforma:</p>
             <ul className="list-disc pl-5 flex flex-col gap-2 mb-4 text-neutral-600">
-              <li>Dati di registrazione (Nome, email, password cifrata).</li>
-              <li>Dati del profilo pubblico (Età, preferenze di convivenza, foto).</li>
-              <li>Informazioni sugli annunci inseriti (Città, zona, prezzo, immagini della stanza).</li>
-              <li>Log delle chat scambiate all'interno della piattaforma per consentire la messaggistica in tempo reale.</li>
+              <li>Dati di registrazione (nome, cognome, email, data di nascita; la password è conservata solo come hash).</li>
+              <li>Dati del profilo (città, occupazione, budget, presentazione, abitudini di vita). Se il profilo è pubblico sono visibili agli altri utenti insieme al nome; cognome, email e data di nascita restano privati.</li>
+              <li>Informazioni sugli annunci inseriti (titolo, città, zona, tipo di stanza, prezzo, descrizione).</li>
+              <li>I messaggi della chat, conservati sul server in forma cifrata end-to-end, e le chiavi di cifratura dell'utente (la chiave privata è a sua volta cifrata con la password).</li>
             </ul>
             <p>
-              I dati raccolti vengono elaborati tramite infrastruttura cloud (Vercel) e conservati in modo sicuro su database dedicati (infrastruttura Neon), situati fisicamente all'interno dell'Unione Europea, nel pieno rispetto delle normative GDPR.
+              I dati raccolti vengono elaborati tramite l'infrastruttura cloud di Vercel e conservati in un database gestito da Neon.
             </p>
           </section>
 
           <section>
             <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-3">3. Cookie e Strumenti di Tracciamento</h2>
             <p className="mb-3">
-              RoomDate utilizza cookie tecnici e strumenti di memorizzazione locale (come il <code>localStorage</code> del browser) necessari per il corretto funzionamento della piattaforma e per gestire in sicurezza le sessioni utente. 
+              RoomDate utilizza solo strumenti tecnici necessari al funzionamento della piattaforma: un cookie di sessione (<code>roomdate_session</code>, valido 24 ore) per mantenere l'accesso e la memoria locale del browser (<code>localStorage</code> e <code>sessionStorage</code>) per conservare le chiavi di cifratura della chat. Per questi strumenti non è richiesto il consenso.
             </p>
             <p>
-              Inoltre, previo consenso, la piattaforma si riserva il diritto di utilizzare cookie analitici e di profilazione di terze parti. Questi strumenti ci permettono di analizzare il traffico, comprendere l'utilizzo dell'app e fornire annunci pubblicitari o contenuti in linea con le preferenze dell'utente. È possibile gestire o revocare il proprio consenso in qualsiasi momento tramite l'apposito pannello di gestione dei cookie.
+              RoomDate non utilizza cookie analitici, di profilazione o pubblicitari. Il sito carica i caratteri tipografici da Google Fonts e usa Pusher per la chat in tempo reale: questi servizi ricevono i dati tecnici della connessione, come l'indirizzo IP.
             </p>
           </section>
 
