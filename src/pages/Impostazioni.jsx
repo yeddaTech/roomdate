@@ -20,7 +20,6 @@ export default function Impostazioni() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogout = async () => {
-    // Prima si lascia la pagina: su quelle protette la sessione chiusa porterebbe all'accesso
     setIsMenuOpen(false);
     navigate('/');
     await logout();
@@ -80,9 +79,8 @@ export default function Impostazioni() {
     if (window.confirm("Sei assolutamente sicuro? Tutti i tuoi dati verranno cancellati per sempre.")) {
       try {
         await deleteMyAccount();
-        // Il server ha già chiuso la sessione: resta da pulire il browser
-        navigate('/');
-        endLocalSession();
+        // Il server ha già chiuso la sessione: resta da pulire il browser (la pagina protetta rimanda alla home)
+        endLocalSession('signed_out');
       } catch (err) {
         alert(err.message);
       }

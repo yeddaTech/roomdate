@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"roomdate-backend/internal/storage"
 )
 
 // Pusher contiene le credenziali per gli eventi in tempo reale (facoltative in sviluppo).
@@ -21,6 +23,9 @@ type Config struct {
 	DatabaseURL string
 	JWTSecret   string
 	Pusher      Pusher
+
+	// Storage è lo storage delle foto (Cloudflare R2). Facoltativo: senza, il caricamento foto è disattivato.
+	Storage storage.S3Config
 
 	// TrustedOrigins sono origini aggiuntive (es. "https://www.roomdate.it") da cui accettare
 	// richieste che modificano dati, oltre a quella del sito stesso.
@@ -42,6 +47,13 @@ func FromEnv() (Config, error) {
 			Key:     os.Getenv("PUSHER_KEY"),
 			Secret:  os.Getenv("PUSHER_SECRET"),
 			Cluster: os.Getenv("PUSHER_CLUSTER"),
+		},
+		Storage: storage.S3Config{
+			Endpoint:        strings.TrimSpace(os.Getenv("R2_ENDPOINT")),
+			Bucket:          strings.TrimSpace(os.Getenv("R2_BUCKET")),
+			AccessKeyID:     strings.TrimSpace(os.Getenv("R2_ACCESS_KEY_ID")),
+			SecretAccessKey: strings.TrimSpace(os.Getenv("R2_SECRET_ACCESS_KEY")),
+			PublicURL:       strings.TrimSpace(os.Getenv("R2_PUBLIC_URL")),
 		},
 		SecureCookies: true,
 	}

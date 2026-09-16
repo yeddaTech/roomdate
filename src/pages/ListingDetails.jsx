@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../auth/AuthContext';
 import { useListing, useStartChat } from '../api/hooks';
+import { amenityLabel, formatAvailability, formatBills } from '../api/listings';
 
 export default function ListingDetails() {
   const { id } = useParams();
@@ -10,27 +11,23 @@ export default function ListingDetails() {
   const { user, logout } = useAuth();
 
   const { data: listing, isPending: loading } = useListing(id);
+  const imageCount = listing?.images.length ?? 0;
   const startChat = useStartChat();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleLogout = async () => {
-    // Prima si lascia la pagina: su quelle protette la sessione chiusa porterebbe all'accesso
     setIsMenuOpen(false);
     navigate('/');
     await logout();
   };
 
   const nextImage = () => {
-    if (listing?.images) {
-      setCurrentIndex((prev) => (prev === listing.images.length - 1 ? 0 : prev + 1));
-    }
+    setCurrentIndex((prev) => (prev >= imageCount - 1 ? 0 : prev + 1));
   };
 
   const prevImage = () => {
-    if (listing?.images) {
-      setCurrentIndex((prev) => (prev === 0 ? listing.images.length - 1 : prev - 1));
-    }
+    setCurrentIndex((prev) => (prev === 0 ? imageCount - 1 : prev - 1));
   };
 
   // 🛡️ ZERO-TRUST: Invia solo l'ID dell'annuncio
@@ -68,13 +65,20 @@ export default function ListingDetails() {
     );
   }
 
-  const hasImages = listing.images && listing.images.length > 0;
+  const hasImages = imageCount > 0;
+  // Dopo l'eliminazione di una foto l'indice potrebbe superare il numero di foto
+  const shownIndex = Math.min(currentIndex, Math.max(imageCount - 1, 0));
+  const facts = [
+    listing.roomType === 'doppia' ? 'Stanza doppia' : 'Stanza singola',
+    formatBills(listing.billsIncluded),
+    formatAvailability(listing.availableFrom),
+  ].filter(Boolean);
 
   return (
     <div className="min-h-[100dvh] bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
       <Helmet>
         <title>{listing.title} a {listing.city} | RoomDate</title>
-        <meta name="description" content={`Stanza in affitto (${listing.roomType}) a ${listing.city}, zona ${listing.zone}.`} />
+        <meta name="description" content={`Stanza ${listing.roomType} in affitto a ${listing.city}${listing.zone ? `, zona ${listing.zone}` : ''}.`} />
       </Helmet>
 
       {/* --- TOP NAV (GLASSMORPHISM) --- */}
@@ -135,7 +139,12 @@ export default function ListingDetails() {
           </button>
           <div>
             <h1 className="font-serif text-4xl md:text-5xl font-extrabold mb-3 tracking-tight">{listing.title}</h1>
-            <p className="text-white/90 text-lg md:text-xl font-medium flex items-center gap-2">📍 {listing.zone}, {listing.city}</p>
+            <p className="text-white/90 text-lg md:text-xl font-medium flex items-center gap-2">📍 {listing.zone ? `${listing.zone}, ${listing.city}` : listing.city}</p>
+            <div className="flex flex-wrap gap-2 mt-4">
+              {facts.map((fact) => (
+                <span key={fact} className="bg-white/20 backdrop-blur-md border border-white/30 px-4 py-1.5 rounded-full text-sm font-bold">{fact}</span>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -156,14 +165,17 @@ export default function ListingDetails() {
                   
                   {/* Contatore immagini */}
                   <div className="absolute bottom-4 right-4 bg-neutral-900/70 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 rounded-full z-10">
-                    {currentIndex + 1} / {listing.images.length}
+                    {shownIndex + 1} / {imageCount}
                   </div>
                 </>
               )}
-              <img src={listing.images[currentIndex]} alt="Stanza" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
+              <img src={listing.images[shownIndex].url} alt={`Foto ${shownIndex + 1} di ${imageCount}: ${listing.title}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
             </div>
           ) : (
-            <div className="w-full h-[300px] md:h-[400px] rounded-3xl bg-neutral-100 flex items-center justify-center text-6xl shadow-sm border border-neutral-200">📸</div>
+            <div className="w-full h-[240px] md:h-[300px] rounded-3xl bg-neutral-100 flex flex-col items-center justify-center gap-2 shadow-sm border border-neutral-200 text-neutral-400">
+              <span className="text-5xl">📷</span>
+              <span className="font-bold text-sm">Nessuna foto caricata per questo annuncio</span>
+            </div>
           )}
 
           {/* Dettagli Immobile */}
@@ -171,13 +183,13 @@ export default function ListingDetails() {
             <h2 className="font-serif text-2xl md:text-3xl font-extrabold text-neutral-900 mb-6 tracking-tight">Descrizione immobile</h2>
             <p className="text-neutral-600 leading-relaxed text-lg whitespace-pre-line font-medium">{listing.description}</p>
             
-            {listing.features.length > 0 && (
+            {listing.amenities.length > 0 && (
               <div className="border-t border-neutral-100 pt-8 mt-8">
                 <h3 className="font-serif text-2xl font-extrabold text-neutral-900 mb-6 tracking-tight">Cosa offre</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {listing.features.map(f => (
-                    <div key={f} className="flex items-center gap-3 text-neutral-700 font-bold bg-neutral-50 border border-neutral-100 px-5 py-3.5 rounded-2xl">
-                      <span className="text-orange-500 text-lg">✦</span> {f}
+                  {listing.amenities.map(a => (
+                    <div key={a} className="flex items-center gap-3 text-neutral-700 font-bold bg-neutral-50 border border-neutral-100 px-5 py-3.5 rounded-2xl">
+                      <span className="text-orange-500 text-lg">✦</span> {amenityLabel(a)}
                     </div>
                   ))}
                 </div>
@@ -199,21 +211,32 @@ export default function ListingDetails() {
                 <div className="font-serif text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500 tracking-tight">
                   €{listing.price}
                 </div>
-                <div className="text-sm font-bold text-neutral-500 mt-2 uppercase tracking-wider">al mese</div>
+                <div className="text-sm font-bold text-neutral-500 mt-2 uppercase tracking-wider">al mese{listing.billsIncluded !== null && (listing.billsIncluded ? ', spese incluse' : ', spese escluse')}</div>
               </div>
               
               {/* Profilo Host */}
               <div className="relative z-10">
                 <div className="w-24 h-24 mx-auto rounded-full flex items-center justify-center text-5xl mb-5 shadow-md bg-gradient-to-br from-orange-300 to-rose-400 transform transition-transform hover:scale-105 cursor-default">
-                  <span className="drop-shadow-sm">{listing.landlord?.emoji || '👤'}</span>
+                  <span className="drop-shadow-sm text-white font-bold">{(listing.owner.firstName || '?').charAt(0).toUpperCase()}</span>
                 </div>
-                <h3 className="font-serif text-2xl font-extrabold text-neutral-900 mb-1">{listing.landlord?.name || 'Utente'}</h3>
+                <h3 className="font-serif text-2xl font-extrabold text-neutral-900 mb-1">{listing.owner.firstName}</h3>
                 <p className="text-sm font-bold text-neutral-400 mb-8 uppercase tracking-wider">Host su RoomDate</p>
                 
-                {/* Bottone Contatto */}
-                <button onClick={handleContact} className="w-full bg-gradient-to-r from-orange-500 to-rose-500 text-white py-4.5 rounded-2xl font-bold shadow-lg hover:shadow-orange-500/25 hover:scale-[1.02] transition-all duration-300 text-lg flex items-center justify-center gap-2 cursor-pointer">
-                  <span className="text-xl">💬</span> Contatta in Chat
-                </button>
+                {listing.isOwner ? (
+                  <>
+                    {!listing.isActive && (
+                      <p className="mb-4 text-sm font-medium text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-2xl p-3">Questo annuncio è disattivato: lo vedi solo tu.</p>
+                    )}
+                    <button onClick={() => navigate('/dashboard', { state: { editListingId: listing.id } })} className="w-full bg-neutral-900 text-white py-4.5 rounded-2xl font-bold shadow-lg hover:bg-neutral-800 transition-all duration-300 text-lg flex items-center justify-center gap-2 cursor-pointer">
+                      ✏️ Modifica annuncio
+                    </button>
+                  </>
+                ) : (
+                  /* Bottone Contatto */
+                  <button onClick={handleContact} className="w-full bg-gradient-to-r from-orange-500 to-rose-500 text-white py-4.5 rounded-2xl font-bold shadow-lg hover:shadow-orange-500/25 hover:scale-[1.02] transition-all duration-300 text-lg flex items-center justify-center gap-2 cursor-pointer">
+                    <span className="text-xl">💬</span> Contatta in Chat
+                  </button>
+                )}
               </div>
             </div>
 

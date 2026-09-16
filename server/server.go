@@ -23,6 +23,7 @@ import (
 	"roomdate-backend/internal/httpx"
 	"roomdate-backend/internal/listings"
 	"roomdate-backend/internal/realtime"
+	"roomdate-backend/internal/storage"
 	"roomdate-backend/internal/users"
 )
 
@@ -34,6 +35,8 @@ type Deps struct {
 	DB        *pgxpool.Pool
 	Publisher realtime.Publisher
 	Logger    *slog.Logger
+	// Storage delle foto; se nil viene creato da Config.Storage (disattivato se incompleto).
+	Storage storage.Storage
 }
 
 // New costruisce l'handler HTTP con tutte le rotte /api e i middleware comuni.
@@ -47,8 +50,14 @@ func New(d Deps) (http.Handler, error) {
 		return nil, err
 	}
 
-	usersHandler := users.NewHandler(users.NewService(users.NewStore(d.DB)), sessions)
-	listingsHandler := listings.NewHandler(listings.NewService(listings.NewStore(d.DB)), sessions)
+	photos := d.Storage
+	if photos == nil {
+		photos = storage.New(d.Config.Storage)
+	}
+	deleteImages := func(ctx context.Context, keys []string) { listings.DeleteObjects(ctx, photos, keys) }
+
+	usersHandler := users.NewHandler(users.NewService(users.NewStore(d.DB), deleteImages), sessions)
+	listingsHandler := listings.NewHandler(listings.NewService(listings.NewStore(d.DB), photos), sessions)
 	chatHandler := chat.NewHandler(chat.NewService(chat.NewStore(d.DB), d.Publisher), sessions)
 
 	type methods = map[string]http.HandlerFunc
@@ -66,14 +75,19 @@ func New(d Deps) (http.Handler, error) {
 	mux.Handle("/api/v1/users/{id}", httpx.Methods(methods{http.MethodGet: usersHandler.PublicProfile}))
 	mux.Handle("/api/v1/health", httpx.Methods(methods{http.MethodGet: health(d.DB).ServeHTTP}))
 
+	mux.Handle("/api/v1/listings", httpx.Methods(methods{http.MethodGet: listingsHandler.List, http.MethodPost: listingsHandler.Create}))
+	mux.Handle("/api/v1/listings/{id}", httpx.Methods(methods{
+		http.MethodGet: listingsHandler.Get, http.MethodPut: listingsHandler.Update, http.MethodDelete: listingsHandler.Delete,
+	}))
+	mux.Handle("/api/v1/listings/{id}/active", httpx.Methods(methods{http.MethodPut: listingsHandler.SetActive}))
+	mux.Handle("/api/v1/listings/{id}/images/uploads", httpx.Methods(methods{http.MethodPost: listingsHandler.PrepareUpload}))
+	mux.Handle("/api/v1/listings/{id}/images", httpx.Methods(methods{http.MethodPost: listingsHandler.ConfirmUpload}))
+	mux.Handle("/api/v1/listings/{id}/images/{imageId}", httpx.Methods(methods{http.MethodDelete: listingsHandler.DeleteImage}))
+	mux.Handle("/api/v1/me/listings", httpx.Methods(methods{http.MethodGet: listingsHandler.Mine}))
+
 	// API legacy, con percorsi e formati originali: passano a /api/v1 nei moduli successivi
-	// (annunci in M1.4, coinquilini in M1.5, chat in M1.7).
+	// (coinquilini in M1.5, chat in M1.7).
 	mux.Handle("/api/get_roommates", httpx.Methods(methods{http.MethodGet: usersHandler.Roommates}))
-	mux.Handle("/api/create_listing", httpx.Methods(methods{http.MethodPost: listingsHandler.Create}))
-	mux.Handle("/api/get_listings", httpx.Methods(methods{http.MethodGet: listingsHandler.Latest}))
-	mux.Handle("/api/get_listing", httpx.Methods(methods{http.MethodGet: listingsHandler.Get}))
-	mux.Handle("/api/get_my_listings", httpx.Methods(methods{http.MethodGet: listingsHandler.Mine}))
-	mux.Handle("/api/delete_listing", httpx.Methods(methods{http.MethodDelete: listingsHandler.Delete}))
 	mux.Handle("/api/start_chat", httpx.Methods(methods{http.MethodPost: chatHandler.StartChat}))
 	mux.Handle("/api/get_chats", httpx.Methods(methods{http.MethodGet: chatHandler.Conversations}))
 	mux.Handle("/api/send_message", httpx.Methods(methods{http.MethodPost: chatHandler.SendMessage}))

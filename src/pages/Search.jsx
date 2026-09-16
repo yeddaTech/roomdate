@@ -3,6 +3,7 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../auth/AuthContext';
 import { useLatestListings, useRoommates, useStartChat } from '../api/hooks';
+import { formatAvailability, formatBills } from '../api/listings';
 
 export default function Search() {
   const navigate = useNavigate();
@@ -35,7 +36,6 @@ export default function Search() {
   const startChat = useStartChat();
 
   const handleLogout = async () => {
-    // Prima si lascia la pagina: su quelle protette la sessione chiusa porterebbe all'accesso
     setIsMenuOpen(false);
     navigate('/');
     await logout();
@@ -251,8 +251,10 @@ export default function Search() {
                 if (currentIntent === 'stanza') {
                   return (
                     <div key={item.id} className="w-full bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-orange-100 cursor-pointer overflow-hidden group">
-                      <div className="h-52 flex items-center justify-center text-6xl relative transition-transform duration-500 group-hover:scale-105" style={{ background: item.color ? item.color : '#f3f4f6' }}>
-                        <span className="drop-shadow-sm">{item.emoji || '🏠'}</span>
+                      <div className="h-52 flex items-center justify-center relative overflow-hidden bg-neutral-100">
+                        {item.coverUrl
+                          ? <img src={item.coverUrl} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                          : <span className="text-sm font-bold text-neutral-400">📷 Nessuna foto</span>}
                         <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-2xl shadow-sm">
                           <span className="font-extrabold text-lg text-orange-500">€{item.price}</span><span className="text-[11px] text-neutral-500 font-bold">/mese</span>
                         </div>
@@ -260,11 +262,10 @@ export default function Search() {
                       <div className="p-6 flex flex-col grow bg-white relative z-10">
                         <h3 className="font-bold text-lg text-neutral-900 leading-tight mb-2 truncate" title={item.title}>{item.title}</h3>
                         <p className="text-sm text-neutral-500 mb-5 font-medium truncate">
-                          📍 {item.zone || item.city}, {item.city}
+                          📍 {item.zone ? `${item.zone}, ${item.city}` : item.city}
                         </p>
                         <div className="flex flex-wrap gap-2 mb-6">
-                          {item.tags.slice(0, 3).map(t => <span key={t} className="bg-neutral-50 border border-neutral-100 text-neutral-600 px-2.5 py-1 rounded-lg text-[11px] font-bold">{t}</span>)}
-                          {item.tags.length > 3 && <span className="bg-neutral-50 border border-neutral-100 text-neutral-500 px-2 py-1 rounded-lg text-[11px] font-bold">+{item.tags.length - 3}</span>}
+                          {[item.roomType, formatBills(item.billsIncluded), formatAvailability(item.availableFrom)].filter(Boolean).map(t => <span key={t} className="bg-neutral-50 border border-neutral-100 text-neutral-600 px-2.5 py-1 rounded-lg text-[11px] font-bold">{t}</span>)}
                         </div>
                         <Link 
                             to={`/dettagli/${item.id}`} 

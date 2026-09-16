@@ -3,9 +3,12 @@ import { Navigate, useLocation } from 'react-router-dom';
 import PageLoader from '../components/PageLoader';
 import { useAuth } from './AuthContext';
 
-/** Mostra la pagina solo a chi ha una sessione valida; gli altri vanno all'accesso e poi tornano qui. */
+/**
+ * Mostra la pagina solo a chi ha una sessione valida. Chi non ce l'ha va all'accesso e poi torna qui;
+ * chi è appena uscito volontariamente da questa pagina va alla home.
+ */
 export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { status, retry } = useAuth();
+  const { status, signedOutFrom, retry } = useAuth();
   const location = useLocation();
 
   if (status === 'loading') return <PageLoader />;
@@ -25,6 +28,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   }
 
   if (status === 'anonymous') {
+    if (signedOutFrom === location.pathname) return <Navigate to="/" replace />;
     return <Navigate to="/accedi" replace state={{ from: location.pathname + location.search }} />;
   }
 
