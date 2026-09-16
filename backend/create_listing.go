@@ -2,6 +2,7 @@ package backend
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	_ "github.com/lib/pq"
@@ -64,7 +65,8 @@ func CreateListingHandler(w http.ResponseWriter, r *http.Request) {
 	// 🔴 FIX: Passiamo direttamente req.Price
 	_, err = DB.Exec(query, secureUserID, safeTitle, safeCity, safeZone, req.RoomType, req.Price, safeDescription)
 	if err != nil {
-		http.Error(w, "Errore salvataggio annuncio: "+err.Error(), http.StatusInternalServerError)
+		log.Printf("create_listing: %v", err)
+		http.Error(w, "Impossibile pubblicare l'annuncio. Controlla i dati e riprova.", http.StatusInternalServerError)
 		return
 	}
 

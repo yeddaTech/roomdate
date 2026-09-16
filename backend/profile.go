@@ -2,6 +2,7 @@ package backend
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -35,6 +36,18 @@ type UserProfile struct {
 	IsPublic      bool   `json:"is_public"`
 }
 
+// PublicProfile è ciò che gli altri utenti possono vedere: niente email, cognome o data di nascita.
+type PublicProfile struct {
+	ID            string `json:"id"`
+	Nome          string `json:"nome"`
+	UserType      string `json:"user_type"`
+	Citta         string `json:"citta"`
+	BudgetMax     int    `json:"budget_max"`
+	Occupation    string `json:"occupation"`
+	Bio           string `json:"bio"`
+	LifestyleTags string `json:"lifestyle_tags"`
+}
+
 func ProfileHandler(w http.ResponseWriter, r *http.Request) {
 	// --- GESTIONE CORS PREFLIGHT ---
 	if r.Method == http.MethodOptions {
@@ -45,11 +58,12 @@ func ProfileHandler(w http.ResponseWriter, r *http.Request) {
 	// --- 1. GESTIONE GET (Visualizzazione Profili) ---
 	if r.Method == http.MethodGet {
 		userId := r.URL.Query().Get("userId")
+		secureUserID := getSecureUserID(r)
 
 		// 👈 FALLBACK MUTUO: Se la richiesta frontend non passa un'id esplicito (es: caricamento dashboard propria),
 		// leggiamo l'identità dell'utente dal cookie di sessione.
 		if userId == "" {
-			userId = getSecureUserID(r)
+			userId = secureUserID
 		}
 
 		if userId == "" {
@@ -77,7 +91,29 @@ func ProfileHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(p)
+
+		// 🛡️ Il profilo completo è visibile solo al proprietario
+		if secureUserID != "" && p.ID == secureUserID {
+			json.NewEncoder(w).Encode(p)
+			return
+		}
+
+		// Un profilo privato risulta inesistente per gli altri
+		if !p.IsPublic {
+			http.Error(w, "Utente non trovato", http.StatusNotFound)
+			return
+		}
+
+		json.NewEncoder(w).Encode(PublicProfile{
+			ID:            p.ID,
+			Nome:          p.Nome,
+			UserType:      p.UserType,
+			Citta:         p.Citta,
+			BudgetMax:     p.BudgetMax,
+			Occupation:    p.Occupation,
+			Bio:           p.Bio,
+			LifestyleTags: p.LifestyleTags,
+		})
 		return
 	}
 
@@ -124,7 +160,8 @@ func ProfileHandler(w http.ResponseWriter, r *http.Request) {
 		_, err = DB.Exec(query, req.UserType, safeCitta, budget, safeOccupation, req.Birthdate, safeBio, safeTags, req.IsPublic, secureUserID)
 
 		if err != nil {
-			http.Error(w, "Errore salvataggio: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("profile: salvataggio: %v", err)
+			http.Error(w, "Impossibile salvare il profilo", http.StatusInternalServerError)
 			return
 		}
 

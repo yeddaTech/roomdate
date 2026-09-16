@@ -3,7 +3,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import Pusher from 'pusher-js'; 
 import { Helmet } from 'react-helmet-async';
 import { encryptMessage, decryptMessage, unwrapPrivateKey } from '../utils/crypto';
-import { fetchAPI } from '../utils/api'; 
+import { fetchAPI } from '../utils/api';
+import { logoutSession } from '../utils/session';
 
 const QUICK_REPLIES = [
   '📅 Quando sei disponibile?',
@@ -70,11 +71,8 @@ export default function ChatPage() {
     }
   }, [navigate]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('roomdate_user');
-    sessionStorage.clear();
-    localStorage.removeItem('roomdate_crypto');
-    localStorage.removeItem('roomdate_public_key');
+  const handleLogout = async () => {
+    await logoutSession();
     setUser(null);
     setIsMenuOpen(false);
     navigate('/');
@@ -224,9 +222,8 @@ export default function ChatPage() {
       lastTypedRef.current = now;
         fetchAPI('/api/typing', {
         method: 'POST',
-        body: JSON.stringify({ 
-            conversationId: String(activeConvId), 
-            senderId: String(user.id) 
+        body: JSON.stringify({
+            conversationId: String(activeConvId)
         })
       }).catch(err => console.error("Errore typing:", err));
     }

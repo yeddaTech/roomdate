@@ -2,6 +2,7 @@ package backend
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
@@ -37,7 +38,8 @@ func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
             COALESCE(citta, ''),
             COALESCE(user_type, 'cerca'),
             COALESCE(budget_max, 0)
-        FROM roomdate_app.users 
+        FROM roomdate_app.users
+        WHERE COALESCE(is_public, true) = true
         LIMIT 8
     `
 	rows, err := DB.Query(query)
@@ -58,7 +60,8 @@ func GetRoommatesHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Aggiunto &rm.Budget allo Scan
 		if err := rows.Scan(&rm.ID, &rm.Name, &rm.Job, &rm.Quote, &tagsStr, &rm.City, &rm.UserType, &rm.Budget); err != nil {
-			http.Error(w, "Errore Scan: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("get_roommates: scan: %v", err)
+			http.Error(w, "Errore interno del server", http.StatusInternalServerError)
 			return
 		}
 

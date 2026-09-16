@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"log"
 	"net/http"
 
 	_ "github.com/lib/pq"
@@ -35,7 +36,8 @@ func DeleteListingHandler(w http.ResponseWriter, r *http.Request) {
 	query := "DELETE FROM roomdate_app.listings WHERE id = $1 AND user_id = $2"
 	res, err := DB.Exec(query, id, secureUserID)
 	if err != nil {
-		http.Error(w, "Errore cancellazione: "+err.Error(), http.StatusInternalServerError)
+		log.Printf("delete_listing: %v", err)
+		http.Error(w, "Impossibile eliminare l'annuncio in questo momento", http.StatusInternalServerError)
 		return
 	}
 
