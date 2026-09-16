@@ -1,5 +1,8 @@
 // Package server compone l'applicazione: configurazione, database, servizi e rotte HTTP.
 // Lo usano sia la funzione Vercel (api/index.go) sia il server di sviluppo (cmd/dev).
+//
+// Non sta in internal/ perché Vercel compila api/ come un pacchetto esterno al modulo, che non può
+// importare pacchetti internal. Da qui in poi, invece, gli import verso internal/ sono consentiti.
 package server
 
 import (
