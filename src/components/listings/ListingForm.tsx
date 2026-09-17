@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
-import { AMENITIES } from '../../api/listings';
+import { AMENITIES, CITIES, isCity } from '../../api/options';
 import { ApiError } from '../../api/client';
 import type { ListingDetail, ListingInput, RoomType } from '../../api/types';
 
@@ -25,7 +25,8 @@ function emptyForm(): FormState {
 function formFromListing(listing: ListingDetail): FormState {
   return {
     title: listing.title,
-    city: listing.city,
+    // Una città salvata prima degli elenchi condivisi, e non riconosciuta, va scelta di nuovo
+    city: isCity(listing.city) ? listing.city : '',
     zone: listing.zone,
     roomType: listing.roomType,
     price: String(listing.price),
@@ -113,7 +114,10 @@ export default function ListingForm({ listing, submitLabel, onSubmit }: Props) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <input name="city" type="text" placeholder="Città" value={form.city} onChange={set('city')} maxLength={50} className={inputClass} />
+          <select name="city" value={form.city} onChange={set('city')} className={inputClass}>
+            <option value="">Città</option>
+            {CITIES.map((city) => <option key={city} value={city}>{city}</option>)}
+          </select>
           <FieldError message={errors.city} />
         </div>
         <div>

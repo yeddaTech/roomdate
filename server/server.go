@@ -73,6 +73,7 @@ func New(d Deps) (http.Handler, error) {
 		http.MethodGet: usersHandler.MyProfile, http.MethodPut: usersHandler.UpdateMyProfile, http.MethodDelete: usersHandler.DeleteMe,
 	}))
 	mux.Handle("/api/v1/users/{id}", httpx.Methods(methods{http.MethodGet: usersHandler.PublicProfile}))
+	mux.Handle("/api/v1/roommates", httpx.Methods(methods{http.MethodGet: usersHandler.Roommates}))
 	mux.Handle("/api/v1/health", httpx.Methods(methods{http.MethodGet: health(d.DB).ServeHTTP}))
 
 	mux.Handle("/api/v1/listings", httpx.Methods(methods{http.MethodGet: listingsHandler.List, http.MethodPost: listingsHandler.Create}))
@@ -85,9 +86,7 @@ func New(d Deps) (http.Handler, error) {
 	mux.Handle("/api/v1/listings/{id}/images/{imageId}", httpx.Methods(methods{http.MethodDelete: listingsHandler.DeleteImage}))
 	mux.Handle("/api/v1/me/listings", httpx.Methods(methods{http.MethodGet: listingsHandler.Mine}))
 
-	// API legacy, con percorsi e formati originali: passano a /api/v1 nei moduli successivi
-	// (coinquilini in M1.5, chat in M1.7).
-	mux.Handle("/api/get_roommates", httpx.Methods(methods{http.MethodGet: usersHandler.Roommates}))
+	// API legacy della chat, con percorsi e formati originali: passano a /api/v1 nel modulo M1.7.
 	mux.Handle("/api/start_chat", httpx.Methods(methods{http.MethodPost: chatHandler.StartChat}))
 	mux.Handle("/api/get_chats", httpx.Methods(methods{http.MethodGet: chatHandler.Conversations}))
 	mux.Handle("/api/send_message", httpx.Methods(methods{http.MethodPost: chatHandler.SendMessage}))

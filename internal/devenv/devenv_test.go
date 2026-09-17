@@ -74,3 +74,16 @@ func TestIsLocalHost(t *testing.T) {
 		}
 	}
 }
+
+func TestDirectNeonDSN(t *testing.T) {
+	pooled := "postgresql://neondb_owner:p%40ss@ep-floral-violet-aldznrms-pooler.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require"
+	direct, changed := DirectNeonDSN(pooled)
+	if !changed || direct != "postgresql://neondb_owner:p%40ss@ep-floral-violet-aldznrms.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require" {
+		t.Errorf("DirectNeonDSN = %q, %v", direct, changed)
+	}
+	for _, dsn := range []string{direct, "host=ep-x-pooler.neon.tech dbname=neondb", "read -rs DATABASE_URL"} {
+		if got, changed := DirectNeonDSN(dsn); changed || got != dsn {
+			t.Errorf("DirectNeonDSN(%q) = %q, %v: non doveva cambiare", dsn, got, changed)
+		}
+	}
+}

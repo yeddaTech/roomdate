@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { generateKeyPair, wrapPrivateKey } from '../utils/crypto';
 import { register } from '../api/auth';
 import { ApiError } from '../api/client';
+import { CITIES, OCCUPATIONS } from '../api/options';
+import LifestyleTagsPicker from '../components/profile/LifestyleTagsPicker';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -20,11 +22,7 @@ export default function Register() {
     budgetMax: '',
     occupation: '',
     bio: '',
-    fumatore: false,
-    animali: false,
-    ordinato: false,
-    socievole: false,
-    vegano: false,
+    lifestyleTags: [],
     accettaTermini: false,
     newsletter: false
   });
@@ -63,14 +61,6 @@ export default function Register() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const lifestyleTags = [];
-    if (formData.fumatore) lifestyleTags.push('Fumatore');
-    else lifestyleTags.push('Non Fumatore');
-    if (formData.animali) lifestyleTags.push('Ho animali');
-    if (formData.ordinato) lifestyleTags.push('Ordinato/a');
-    if (formData.socievole) lifestyleTags.push('Socievole');
-    if (formData.vegano) lifestyleTags.push('Vegano/Vegetariano');
-
     try {
       const keys = await generateKeyPair();
       const wrappedData = await wrapPrivateKey(keys.privateKey, formData.password);
@@ -87,7 +77,7 @@ export default function Register() {
         budgetMax: userType === 'cerca' ? (parseInt(formData.budgetMax) || 0) : 0,
         occupation: formData.occupation,
         bio: formData.bio,
-        lifestyleTags: lifestyleTags.join(', '),
+        lifestyleTags: formData.lifestyleTags,
         keys: {
           publicKey: keys.publicKey,
           encryptedPrivateKey: wrappedData.encryptedPrivateKey,
@@ -221,7 +211,7 @@ export default function Register() {
                     <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Città</label>
                     <select name="citta" value={formData.citta} onChange={handleChange} required className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm cursor-pointer">
                       <option value="">Seleziona...</option>
-                      <option>Milano</option><option>Roma</option><option>Torino</option><option>Bologna</option>
+                      {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -240,10 +230,8 @@ export default function Register() {
                 <div className="flex flex-col gap-1.5 mb-5">
                   <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Occupazione</label>
                   <select name="occupation" value={formData.occupation} onChange={handleChange} className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm cursor-pointer">
-                    <option value="">Seleziona...</option>
-                    <option value="Studente">Studente</option>
-                    <option value="Lavoratore">Lavoratore</option>
-                    <option value="Studente e Lavoratore">Studente e Lavoratore</option>
+                    <option value="">Preferisco non indicarla</option>
+                    {OCCUPATIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
                   </select>
                 </div>
 
@@ -252,22 +240,9 @@ export default function Register() {
                   <textarea name="bio" rows="3" placeholder="Ciao! Sto cercando una stanza comoda e luminosa..." value={formData.bio} onChange={handleChange} className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm resize-none placeholder:text-neutral-300"></textarea>
                 </div>
 
-                {/* STILE DI VITA */}
-                <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider mb-3 block">Il tuo Stile di Vita</label>
-                <div className="flex flex-wrap gap-2.5">
-                  {[
-                    { id: 'fumatore', label: '🚬 Fumatore' },
-                    { id: 'animali', label: '🐶 Ho animali' },
-                    { id: 'ordinato', label: '🧹 Ordinato/a' },
-                    { id: 'socievole', label: '🎉 Socievole' },
-                    { id: 'vegano', label: '🥦 Vegano/Vegetariano' }
-                  ].map(tag => (
-                    <label key={tag.id} className={`cursor-pointer px-4 py-2 rounded-full text-[13px] font-bold border transition-all shadow-sm ${formData[tag.id] ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-600 border-neutral-200 hover:border-orange-300 hover:text-orange-600'}`}>
-                      <input type="checkbox" name={tag.id} checked={formData[tag.id]} onChange={handleChange} className="hidden" />
-                      {tag.label}
-                    </label>
-                  ))}
-                </div>
+                {/* STILE DI VITA: solo ciò che l'utente sceglie, nessun valore predefinito */}
+                <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider mb-3 block">Il tuo stile di vita (facoltativo)</span>
+                <LifestyleTagsPicker value={formData.lifestyleTags} onChange={lifestyleTags => setFormData(prev => ({ ...prev, lifestyleTags }))} />
               </div>
 
               {/* TERMINI E CONDIZIONI */}

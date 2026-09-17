@@ -1,5 +1,5 @@
 // Hook per leggere e modificare i dati: le pagine usano questi, non le chiamate API dirette.
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listConversations, startChat } from './chat';
 import {
   createListing,
@@ -32,7 +32,9 @@ export function useUpdateMyProfile() {
           ? { ...current, firstName: profile.firstName, lastName: profile.lastName, userType: profile.userType }
           : current,
       );
+      // Elenco e profili pubblici mostrano cosa si ha in comune, che dipende dal proprio profilo
       queryClient.invalidateQueries({ queryKey: queryKeys.roommates });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
     },
   });
 }
@@ -41,8 +43,15 @@ export function usePublicProfile(id: string) {
   return useQuery({ queryKey: queryKeys.publicProfile(id), queryFn: () => getPublicProfile(id) });
 }
 
-export function useRoommates({ enabled = true } = {}) {
-  return useQuery({ queryKey: queryKeys.roommates, queryFn: listRoommates, enabled });
+/** Coinquilini a pagine: fetchNextPage carica i successivi finché hasNextPage è true. */
+export function useRoommates({ city = '', enabled = true } = {}) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.roommatesList(city),
+    queryFn: ({ pageParam }) => listRoommates({ city, cursor: pageParam }),
+    initialPageParam: '',
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled,
+  });
 }
 
 export function useLatestListings({ enabled = true } = {}) {

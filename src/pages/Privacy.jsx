@@ -43,7 +43,7 @@ export default function Privacy() {
             <p className="mb-3">Raccogliamo solo i dati strettamente necessari all'utilizzo della piattaforma:</p>
             <ul className="list-disc pl-5 flex flex-col gap-2 mb-4 text-neutral-600">
               <li>Dati di registrazione (nome, cognome, email, data di nascita; la password è conservata solo come hash).</li>
-              <li>Dati del profilo (città, occupazione, budget, presentazione, abitudini di vita). Se il profilo è pubblico sono visibili agli altri utenti insieme al nome; cognome, email e data di nascita restano privati.</li>
+              <li>Dati del profilo (città, occupazione, budget, presentazione, abitudini di vita). Se il profilo è pubblico sono visibili agli altri utenti insieme al nome; cognome, email e data di nascita restano privati (agli altri utenti mostriamo solo gli anni compiuti).</li>
               <li>Informazioni sugli annunci inseriti (titolo, città, zona, tipo di stanza, prezzo, descrizione).</li>
               <li>I messaggi della chat, conservati sul server in forma cifrata end-to-end, e le chiavi di cifratura dell'utente (la chiave privata è a sua volta cifrata con la password).</li>
             </ul>

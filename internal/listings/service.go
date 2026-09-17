@@ -17,6 +17,7 @@ import (
 	"roomdate-backend/internal/logx"
 	"roomdate-backend/internal/storage"
 	"roomdate-backend/internal/validate"
+	"roomdate-backend/shared"
 )
 
 const (
@@ -89,15 +90,15 @@ func (s *Service) parseInput(in Input) (Data, error) {
 	}
 
 	var v validate.Validator
-	// Limiti uguali a quelli delle colonne nel database (title VARCHAR(100), city VARCHAR(50))
+	// Limite uguale a quello della colonna nel database (title VARCHAR(100))
 	v.Check(validate.NotBlank(d.Title) && validate.MaxLen(d.Title, 100), "title", "Il titolo è obbligatorio (massimo 100 caratteri)")
-	v.Check(validate.NotBlank(d.City) && validate.MaxLen(d.City, 50), "city", "La città è obbligatoria (massimo 50 caratteri)")
+	v.Check(shared.IsCity(d.City), "city", "Scegli la città dall'elenco")
 	v.Check(validate.MaxLen(d.Zone, 80), "zone", "La zona può avere al massimo 80 caratteri")
 	v.Check(validate.OneOf(d.RoomType, "singola", "doppia"), "roomType", "Tipo di stanza non valido")
 	v.Check(validate.Between(d.Price, 1, 20000), "price", "Il prezzo deve essere compreso tra 1 e 20.000 €")
 	v.Check(validate.NotBlank(d.Description) && validate.MaxLen(d.Description, 5000), "description", "La descrizione è obbligatoria (massimo 5000 caratteri)")
 
-	amenities, ok := normalizeAmenities(in.Amenities)
+	amenities, ok := shared.NormalizeKeys(shared.Amenities, in.Amenities)
 	v.Check(ok, "amenities", "Servizio non valido")
 	d.Amenities = amenities
 

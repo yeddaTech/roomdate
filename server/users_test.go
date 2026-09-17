@@ -95,6 +95,11 @@ func TestRegisterValidation(t *testing.T) {
 		{"data di nascita futura", "birthdate", "2999-01-01", "Data di nascita non valida"},
 		{"budget negativo", "budgetMax", -1, "budget"},
 		{"bio troppo lunga", "bio", strings.Repeat("a", 1001), "bio"},
+		{"città fuori elenco", "city", "Gotham", "Scegli la città dall'elenco"},
+		{"città con maiuscole diverse", "city", "MILANO", "Scegli la città dall'elenco"},
+		{"occupazione come etichetta", "occupation", "Studente", "Occupazione non valida"},
+		{"abitudine sconosciuta", "lifestyleTags", []string{"socievole", "sportivo"}, "Abitudine non valida"},
+		{"fumatore e non fumatore", "lifestyleTags", []string{"fumatore", "non_fumatore"}, "Scegli solo una"},
 		{"chiavi incomplete", "keys", map[string]string{"publicKey": b64("solo-la-pubblica")}, "Chiavi di cifratura non valide"},
 	}
 	for _, c := range cases {
@@ -110,6 +115,43 @@ func TestRegisterValidation(t *testing.T) {
 	t.Run("i dati validi passano", func(t *testing.T) {
 		expect(t, app.do(http.MethodPost, "/api/v1/auth/register", registration("Bruno", "bruno@test.it", "password-bruno", "affitta", false)), http.StatusCreated, `"id":`)
 	})
+
+	t.Run("città, occupazione e abitudini sono facoltative", func(t *testing.T) {
+		body := registration("Carla", "carla@test.it", "password-carla", "cerca", false)
+		body["city"], body["occupation"], body["lifestyleTags"] = "", "", nil
+		expect(t, app.do(http.MethodPost, "/api/v1/auth/register", body), http.StatusCreated, "")
+		cookie := app.login("carla@test.it", "password-carla")
+		expect(t, app.do(http.MethodGet, "/api/v1/me", nil, withSession(cookie)), http.StatusOK, `"city":"","birthdate":"1999-01-01","budgetMax":500,"occupation":"","bio":"ciao","lifestyleTags":[]`)
+		var nulls int
+		testPool.QueryRow(context.Background(), `SELECT count(*) FROM roomdate_app.users WHERE email = 'carla@test.it' AND citta IS NULL AND occupation IS NULL`).Scan(&nulls)
+		if nulls != 1 {
+			t.Error("città e occupazione vuote vanno salvate come NULL")
+		}
+	})
+}
+
+// Anomalia F2: l'email non distingue maiuscole e minuscole, né in registrazione né al login.
+func TestEmailIsCaseInsensitive(t *testing.T) {
+	app := newApp(t)
+	body := registration("Anna", "  Anna.Rossi@Test.IT ", "password-anna", "cerca", false)
+	expect(t, app.do(http.MethodPost, "/api/v1/auth/register", body), http.StatusCreated, "")
+
+	cookie := app.login("ANNA.ROSSI@test.it", "password-anna")
+	expect(t, app.do(http.MethodGet, "/api/v1/me", nil, withSession(cookie)), http.StatusOK, `"email":"anna.rossi@test.it"`)
+
+	rec := app.do(http.MethodPost, "/api/v1/auth/register", registration("Anna", "anna.rossi@test.IT", "altra-password", "cerca", false))
+	expect(t, rec, http.StatusConflict, "registration_failed")
+
+	// Un indirizzo salvato con le maiuscole da un'altra strada (es. a mano nel database) funziona lo stesso
+	testPool.Exec(context.Background(), `UPDATE roomdate_app.users SET email = 'Anna.Rossi@Test.it' WHERE email = 'anna.rossi@test.it'`)
+	app.login("anna.rossi@test.it", "password-anna")
+
+	// Il database rifiuta un doppione con maiuscole diverse
+	_, err := testPool.Exec(context.Background(),
+		`INSERT INTO roomdate_app.users (email, password_hash) VALUES ('ANNA.ROSSI@TEST.IT', 'x')`)
+	if err == nil {
+		t.Fatal("indice unico su lower(email) mancante")
+	}
 }
 
 func TestLoginLockout(t *testing.T) {
@@ -280,43 +322,26 @@ func TestProfilePrivacy(t *testing.T) {
 		expect(t, app.do(http.MethodGet, "/api/v1/users/"+carla.ID, nil, withSession(carla.Cookie)), http.StatusOK, `"firstName":"Carla"`)
 	})
 
-	t.Run("elenco coinquilini senza profili privati né email", func(t *testing.T) {
-		rec := app.do(http.MethodGet, "/api/get_roommates", nil)
-		expect(t, rec, http.StatusOK, "")
-		var roommates []map[string]any
-		decode(t, rec, &roommates)
-		ids := map[string]bool{}
-		for _, r := range roommates {
-			ids[r["id"].(string)] = true
-		}
-		if !ids[anna.ID] || !ids[bruno.ID] || ids[carla.ID] || strings.Contains(rec.Body.String(), "@test.it") {
-			t.Fatalf("elenco = %s", rec.Body.String())
-		}
+	t.Run("età al posto della data di nascita", func(t *testing.T) {
+		// Compleanno oggi: anni compiuti. Compleanno domani: un anno in meno.
+		testPool.Exec(context.Background(), `UPDATE roomdate_app.users SET birthdate = CURRENT_DATE - interval '30 years' WHERE id = $1`, anna.ID)
+		testPool.Exec(context.Background(), `UPDATE roomdate_app.users SET birthdate = CURRENT_DATE - interval '30 years' + interval '1 day' WHERE id = $1`, bruno.ID)
+		expect(t, app.do(http.MethodGet, "/api/v1/users/"+anna.ID, nil), http.StatusOK, `"age":30,`)
+		expect(t, app.do(http.MethodGet, "/api/v1/users/"+bruno.ID, nil), http.StatusOK, `"age":29,`)
 	})
 
-	t.Run("elenco coinquilini senza dati inventati", func(t *testing.T) {
-		// Un profilo senza bio, occupazione né tag resta vuoto: niente testi segnaposto
-		testPool.Exec(context.Background(), `UPDATE roomdate_app.users SET bio = NULL, occupation = NULL, lifestyle_tags = NULL WHERE id = $1`, anna.ID)
-		rec := app.do(http.MethodGet, "/api/get_roommates", nil)
-		var roommates []map[string]any
-		decode(t, rec, &roommates)
-		for _, r := range roommates {
-			for _, fake := range []string{"age", "match"} {
-				if _, found := r[fake]; found {
-					t.Errorf("il profilo contiene %q inventato: %v", fake, r)
-				}
-			}
-			if r["id"] == anna.ID && (r["quote"] != "" || r["job"] != "" || len(r["tags"].([]any)) != 0) {
-				t.Errorf("valori segnaposto al posto dei campi vuoti: %v", r)
-			}
-		}
+	t.Run("compatibilità solo per chi ha una sessione e guarda un altro profilo", func(t *testing.T) {
+		expect(t, app.do(http.MethodGet, "/api/v1/users/"+anna.ID, nil), http.StatusOK, `"compatibility":null`)
+		expect(t, app.do(http.MethodGet, "/api/v1/users/"+anna.ID, nil, withSession(anna.Cookie)), http.StatusOK, `"compatibility":null`)
+		expect(t, app.do(http.MethodGet, "/api/v1/users/"+anna.ID, nil, withSession(bruno.Cookie)), http.StatusOK,
+			`"compatibility":{"sameCity":true,"similarBudget":true,"sharedTags":["socievole"],"smokingMismatch":false}`)
 	})
 }
 
 func profileInput(fields map[string]any) map[string]any {
 	body := map[string]any{
-		"userType": "cerca", "city": "Milano", "budgetMax": 650, "occupation": "Studente",
-		"birthdate": "1999-04-12", "bio": "ciao", "lifestyleTags": "Socievole", "isPublic": true,
+		"userType": "cerca", "city": "Milano", "budgetMax": 650, "occupation": "studente",
+		"birthdate": "1999-04-12", "bio": "ciao", "lifestyleTags": []string{"socievole"}, "isPublic": true,
 	}
 	for k, v := range fields {
 		body[k] = v
@@ -347,6 +372,15 @@ func TestUpdateProfile(t *testing.T) {
 	expect(t, app.do(http.MethodPut, "/api/v1/me", profileInput(map[string]any{"budgetMax": "tanti"}), withSession(u.Cookie)), http.StatusBadRequest, "Dati non validi")
 	expect(t, app.do(http.MethodPut, "/api/v1/me", profileInput(map[string]any{"userType": "admin"}), withSession(u.Cookie)), http.StatusBadRequest, "Tipo di utente")
 	expect(t, app.do(http.MethodPut, "/api/v1/me", profileInput(map[string]any{"birthdate": ""}), withSession(u.Cookie)), http.StatusBadRequest, `"field":"birthdate"`)
+	// Il vecchio formato delle abitudini (testo separato da virgole) non è più accettato
+	expect(t, app.do(http.MethodPut, "/api/v1/me", profileInput(map[string]any{"lifestyleTags": "Socievole, Ordinato/a"}), withSession(u.Cookie)), http.StatusBadRequest, "Dati non validi")
+
+	// Abitudini senza doppioni e nell'ordine dell'elenco; città e occupazione dagli elenchi condivisi
+	rec = app.do(http.MethodPut, "/api/v1/me", profileInput(map[string]any{
+		"lifestyleTags": []string{"socievole", "non_fumatore", "socievole"}, "city": "L'Aquila", "occupation": "studente_lavoratore",
+	}), withSession(u.Cookie))
+	expect(t, rec, http.StatusOK, `"city":"L'Aquila"`)
+	expect(t, rec, http.StatusOK, `"occupation":"studente_lavoratore","bio":"ciao","lifestyleTags":["non_fumatore","socievole"]`)
 }
 
 // Anomalia F6: il ruolo cambiato nel profilo vale subito, senza rifare il login.

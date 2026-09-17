@@ -4,6 +4,7 @@ export const queryKeys = {
   myProfile: ['me'] as const,
   publicProfile: (id: string) => ['users', id] as const,
   roommates: ['roommates'] as const,
+  roommatesList: (city: string) => ['roommates', 'list', city] as const,
   listings: ['listings'] as const,
   latestListings: ['listings', 'latest'] as const,
   listing: (id: string) => ['listings', 'detail', id] as const,
