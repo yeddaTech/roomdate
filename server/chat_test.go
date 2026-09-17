@@ -75,7 +75,7 @@ func TestStartChat(t *testing.T) {
 	t.Run("niente conversazioni con sé stessi", func(t *testing.T) {
 		expect(t, app.do(http.MethodPost, "/api/start_chat", map[string]int{"listingId": 1}, withSession(f.marco.Cookie)), http.StatusBadRequest, "con te stesso")
 		expect(t, app.do(http.MethodPost, "/api/start_chat", map[string]string{"targetId": f.anna.ID}, withSession(f.anna.Cookie)), http.StatusBadRequest, "con te stesso")
-		expect(t, app.do(http.MethodPost, "/api/start_chat", map[string]string{"targetId": "0" + f.anna.ID}, withSession(f.anna.Cookie)), http.StatusBadRequest, "con te stesso")
+		expect(t, app.do(http.MethodPost, "/api/start_chat", map[string]string{"targetId": strings.ToUpper(f.anna.ID)}, withSession(f.anna.Cookie)), http.StatusBadRequest, "con te stesso")
 	})
 
 	t.Run("richieste non valide", func(t *testing.T) {

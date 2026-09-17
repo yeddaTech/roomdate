@@ -54,7 +54,8 @@ func (s *Service) startListingChat(ctx context.Context, userID string, listingID
 		return 0, apperr.BadRequest("invalid_listing_id", "ID annuncio non valido")
 	}
 	ownerID, active, err := s.store.ListingForChat(ctx, listingID)
-	if db.IsNoRows(err) || (err == nil && !active) {
+	// Un annuncio senza proprietario (user_id NULL) non si può contattare
+	if db.IsNoRows(err) || (err == nil && (!active || ownerID == "")) {
 		return 0, apperr.NotFound("listing_not_found", "Annuncio non trovato o non più disponibile")
 	}
 	if err != nil {
@@ -78,7 +79,7 @@ func (s *Service) startDirectChat(ctx context.Context, userID, targetID string) 
 	if !validate.MaxLen(targetID, 64) {
 		return 0, apperr.NotFound("user_not_found", "Utente non trovato")
 	}
-	// ID nella forma salvata nel database (es. "7" anche se il client ha inviato "07")
+	// ID nella forma salvata nel database (UUID in minuscolo anche se il client lo ha inviato in maiuscolo)
 	targetID, err := s.store.UserID(ctx, targetID)
 	if db.IsNoRows(err) {
 		return 0, apperr.NotFound("user_not_found", "Utente non trovato")

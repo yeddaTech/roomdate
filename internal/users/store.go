@@ -35,7 +35,7 @@ type Vault struct {
 	CryptoIV            string `json:"cryptoIv"`
 }
 
-const accountColumns = `id::text, first_name, last_name, email, COALESCE(user_type, ''), password_hash,
+const accountColumns = `id::text, COALESCE(first_name, ''), COALESCE(last_name, ''), email, COALESCE(user_type, ''), password_hash,
     COALESCE(public_key, ''), COALESCE(encrypted_private_key, ''), COALESCE(crypto_salt, ''), COALESCE(crypto_iv, ''),
     COALESCE(failed_login_attempts, 0), locked_until`
 
@@ -160,7 +160,7 @@ type Profile struct {
 func (s *Store) Profile(ctx context.Context, id string) (Profile, error) {
 	var p Profile
 	err := s.db.QueryRow(ctx, `
-        SELECT id::text, first_name, last_name, email,
+        SELECT id::text, COALESCE(first_name, ''), COALESCE(last_name, ''), email,
                COALESCE(user_type, ''), COALESCE(citta, ''), COALESCE(birthdate::text, ''),
                COALESCE(budget_max, 0), COALESCE(occupation, ''), COALESCE(bio, ''), COALESCE(lifestyle_tags, ''),
                COALESCE(is_public, true)
@@ -199,7 +199,7 @@ type RoommateRow struct {
 func (s *Store) PublicRoommates(ctx context.Context, limit int) ([]RoommateRow, error) {
 	rows, err := s.db.Query(ctx, `
         SELECT id::text,
-               first_name,
+               COALESCE(first_name, ''),
                COALESCE(occupation, ''),
                COALESCE(bio, ''),
                COALESCE(lifestyle_tags, ''),

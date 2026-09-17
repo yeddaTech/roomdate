@@ -70,7 +70,8 @@ Migrations are SQL files in `internal/db/migrations` (goose format), embedded in
 
 * `npm run db:status` shows which migrations are applied; `npm run db:migrate` applies the pending ones.
 * To change the schema, add a new file such as `00003_short_description.sql` with `-- +goose Up` and `-- +goose Down` sections. Never edit a migration that has already run in production.
-* `00001_baseline.sql` was reconstructed from the backend queries. Before running migrations on production for the first time, compare it with `pg_dump --schema-only --schema=roomdate_app` and fix any differences. The tool asks for confirmation before changing a non-local database.
+* `00001_baseline.sql` is a copy of the production schema (checked against `pg_dump --schema-only --schema=roomdate_app` in September 2026): user IDs are UUIDs, and some columns are nullable or have `VARCHAR` limits that the API validation follows. The tool asks for confirmation before changing a non-local database.
+* Always migrate the database that Vercel uses: take `DATABASE_URL` from Vercel → Settings → Environment Variables (Production), remove `-pooler` from the host for a direct connection, and check host and database name before confirming.
 
 ### Listing photos (Cloudflare R2)
 
