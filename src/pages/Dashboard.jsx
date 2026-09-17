@@ -51,7 +51,9 @@ export default function Dashboard() {
   if (view === 'createListing' && !isLandlord) view = 'editProfile';
 
   const editing = useListing(editingId ?? 0, { enabled: editingId !== null });
-  const { data: conversations } = useConversations();
+  const conversationsQuery = useConversations();
+  const conversations = conversationsQuery.data?.pages.flatMap(page => page.items);
+  const hasMoreConversations = Boolean(conversationsQuery.hasNextPage);
   const updateProfile = useUpdateMyProfile();
   const createListing = useCreateListing();
   const updateListing = useUpdateListing();
@@ -197,7 +199,7 @@ export default function Dashboard() {
             </div>
           )}
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100 text-center flex flex-col justify-center transition-transform hover:scale-[1.02]">
-            <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">{conversations ? conversations.length : '–'}</div>
+            <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">{conversations ? `${conversations.length}${hasMoreConversations ? '+' : ''}` : '–'}</div>
             <div className="text-[11px] md:text-xs text-neutral-500 font-bold mt-2 uppercase tracking-wider">Chat</div>
           </div>
         </div>

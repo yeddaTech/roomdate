@@ -20,7 +20,7 @@ Chat messages are encrypted and decrypted in the browser; the server stores and 
 *   **Not zero-knowledge (yet):** keys are generated and used client-side, but the private key is wrapped with a key derived from the account password, which the server also receives at login. A server operator could therefore derive the wrapping key. Separating the two is planned in module M3.4.
 *   **Asymmetric Encryption (RSA-OAEP):** Each user generates an RSA key pair upon registration. Public keys are exchanged to facilitate secure message transfer.
 *   **Key Wrapping (AES-GCM & PBKDF2):** Private keys are never stored in plaintext on the server. They are wrapped using AES-GCM, with a key derived from the user's master password via PBKDF2, and stored as an encrypted vault in the database.
-*   **Double Encryption Routing:** Messages are encrypted twice on the client—once utilizing the recipient's public key (for secure delivery) and once utilizing the sender's public key (to securely preserve local chat history).
+*   **Hybrid encryption:** each message is encrypted once with AES-256-GCM, and the message key is then encrypted with RSA-OAEP for every participant (table `message_keys`). Message length no longer depends on RSA, which stops at 190 bytes. Messages written before this change carry `format = 1`, one RSA copy per participant, and stay readable.
 *   **Local Secure Session:** Private keys are temporarily held in `sessionStorage` during active use. `localStorage` persists the encrypted vault, enabling a local cryptographic lock mechanism upon session expiration without exposing plaintext keys to the disk.
 
 ## Local Development
@@ -56,7 +56,9 @@ Both lists answer `{"items": [...], "nextCursor": "…"}` and are paginated by c
 
 Public profiles show the age, never the birth date. For a signed-in viewer, profiles also carry `compatibility`: what the two profiles have in common (same city, budgets within 100 €, shared lifestyle tags) and whether one smokes and the other does not. There is deliberately no percentage score, so every item shown to users has a stated reason.
 
-Chat still uses the legacy endpoints (`/api/start_chat`, `/api/get_chats`, …) with plain-text errors, until module M1.7 moves them to `/api/v1/`.
+* Chat: `conversations` (list, start), `conversations/{id}/messages` (read, send), `conversations/{id}/read`, `conversations/{id}/typing`. The conversation list carries the last message, the unread count and the other participant; messages are paginated newest-first, so opening a chat no longer loads its whole history. Every message the caller receives already contains the ciphertext and the key that caller can open.
+
+Real-time events go to one channel per user (`user-<id>`) and carry only the conversation and message IDs, so a message notifies its participants instead of every connected client. Without the `PUSHER_*` variables the app still works: the chat page refreshes every few seconds instead.
 
 ### Frontend data layer
 

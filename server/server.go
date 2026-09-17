@@ -86,11 +86,14 @@ func New(d Deps) (http.Handler, error) {
 	mux.Handle("/api/v1/listings/{id}/images/{imageId}", httpx.Methods(methods{http.MethodDelete: listingsHandler.DeleteImage}))
 	mux.Handle("/api/v1/me/listings", httpx.Methods(methods{http.MethodGet: listingsHandler.Mine}))
 
-	// API legacy della chat, con percorsi e formati originali: passano a /api/v1 nel modulo M1.7.
-	mux.Handle("/api/start_chat", httpx.Methods(methods{http.MethodPost: chatHandler.StartChat}))
-	mux.Handle("/api/get_chats", httpx.Methods(methods{http.MethodGet: chatHandler.Conversations}))
-	mux.Handle("/api/send_message", httpx.Methods(methods{http.MethodPost: chatHandler.SendMessage}))
-	mux.Handle("/api/typing", httpx.Methods(methods{http.MethodPost: chatHandler.Typing}))
+	mux.Handle("/api/v1/conversations", httpx.Methods(methods{
+		http.MethodGet: chatHandler.Conversations, http.MethodPost: chatHandler.StartChat,
+	}))
+	mux.Handle("/api/v1/conversations/{id}/messages", httpx.Methods(methods{
+		http.MethodGet: chatHandler.Messages, http.MethodPost: chatHandler.SendMessage,
+	}))
+	mux.Handle("/api/v1/conversations/{id}/read", httpx.Methods(methods{http.MethodPost: chatHandler.MarkRead}))
+	mux.Handle("/api/v1/conversations/{id}/typing", httpx.Methods(methods{http.MethodPost: chatHandler.Typing}))
 
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, apperr.NotFound("endpoint_not_found", "Endpoint non trovato"))

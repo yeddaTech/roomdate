@@ -169,22 +169,38 @@ export interface PendingUpload {
   maxBytes: number;
 }
 
+/** Messaggio come arriva dal server: il testo resta cifrato finché il browser non lo apre. */
 export interface ChatMessage {
-  id: number | string;
-  type: 'sent' | 'received';
-  /** Cifrato come arriva dal server; il browser lo decifra prima di mostrarlo. */
-  text: string;
-  time: string;
-  isTemp?: boolean;
+  id: number;
+  senderId: string;
+  /** 1 = una copia cifrata per destinatario (messaggi vecchi), 2 = cifratura ibrida. */
+  format: 1 | 2;
+  body: string;
+  /** Vuoti nel formato 1. */
+  iv: string;
+  key: string;
+  /** Istante in UTC (ISO 8601); il browser lo mostra nell'ora locale. */
+  createdAt: string;
 }
 
 export interface Conversation {
   id: number;
-  name: string;
-  emoji: string;
-  color1: string;
-  color2: string;
-  listing: { emoji: string; title: string; price: number };
-  targetPublicKey: string;
-  messages: ChatMessage[];
+  /** Annuncio da cui è nata la chat; null per le chat dirette o se l'annuncio è stato eliminato. */
+  listing: { id: number; title: string; price: number } | null;
+  /** null se l'altro partecipante ha eliminato l'account. */
+  other: { id: string; firstName: string; publicKey: string } | null;
+  lastMessage: ChatMessage | null;
+  unreadCount: number;
+  updatedAt: string;
+}
+
+export interface ConversationsPage {
+  items: Conversation[];
+  nextCursor: string | null;
+}
+
+export interface MessagesPage {
+  /** Dal più recente al più vecchio. */
+  items: ChatMessage[];
+  nextCursor: string | null;
 }

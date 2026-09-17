@@ -12,15 +12,20 @@ import (
 )
 
 const (
-	channel = "roomdate-channel"
-
 	EventNewMessage = "nuovo-messaggio"
 	EventTyping     = "sta-scrivendo"
 )
 
-// Publisher invia un evento a tutti i client in ascolto.
+// UserChannel è il canale di un singolo utente: riceve solo gli eventi delle sue conversazioni,
+// invece di un canale unico per tutti (anomalia F12). L'ID è un UUID, quindi non è indovinabile;
+// il canale diventa privato e autenticato nel modulo M3.5.
+func UserChannel(userID string) string {
+	return "user-" + userID
+}
+
+// Publisher invia un evento ai client in ascolto su un canale.
 type Publisher interface {
-	Publish(ctx context.Context, event string, data any) error
+	Publish(ctx context.Context, channel, event string, data any) error
 }
 
 // New restituisce il publisher Pusher, o uno che non fa nulla se mancano le credenziali
@@ -42,12 +47,12 @@ func New(cfg config.Pusher) Publisher {
 // Noop è il publisher che non invia nulla.
 type Noop struct{}
 
-func (Noop) Publish(context.Context, string, any) error { return nil }
+func (Noop) Publish(context.Context, string, string, any) error { return nil }
 
 type pusherPublisher struct {
 	client *pusher.Client
 }
 
-func (p *pusherPublisher) Publish(_ context.Context, event string, data any) error {
+func (p *pusherPublisher) Publish(_ context.Context, channel, event string, data any) error {
 	return p.client.Trigger(channel, event, data)
 }

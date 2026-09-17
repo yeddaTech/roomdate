@@ -249,12 +249,9 @@ func TestDeleteAccountWithListingsAndChats(t *testing.T) {
 	listingID := app.createListing(landlord.Cookie, nil)
 	imageKey := app.uploadImage(landlord.Cookie, listingID, "image/jpeg", jpegBytes(100))
 
-	var started struct{ ConversationID int }
-	rec := app.do(http.MethodPost, "/api/start_chat", map[string]int{"listingId": listingID}, withSession(seeker.Cookie))
-	expect(t, rec, http.StatusOK, "")
-	decode(t, rec, &started)
-	expect(t, app.do(http.MethodPost, "/api/send_message", message(started.ConversationID, "domanda"), withSession(seeker.Cookie)), http.StatusOK, "")
-	expect(t, app.do(http.MethodPost, "/api/send_message", message(started.ConversationID, "risposta"), withSession(landlord.Cookie)), http.StatusOK, "")
+	conversationID := app.startChat(seeker.Cookie, map[string]any{"listingId": listingID})
+	app.send(seeker.Cookie, conversationID, message("domanda", seeker, landlord))
+	app.send(landlord.Cookie, conversationID, message("risposta", seeker, landlord))
 
 	expect(t, app.do(http.MethodDelete, "/api/v1/me", nil, withSession(landlord.Cookie)), http.StatusNoContent, "")
 
@@ -267,22 +264,30 @@ func TestDeleteAccountWithListingsAndChats(t *testing.T) {
 		}
 	}
 
-	rec = app.do(http.MethodGet, "/api/get_chats", nil, withSession(seeker.Cookie))
-	var chats []struct {
-		Name     string
-		Messages []struct{ Type, Text string }
+	// La conversazione resta a chi c'è ancora: l'altro partecipante non esiste più
+	chats := app.conversations(seeker.Cookie)
+	if len(chats) != 1 || chats[0].Other != nil || chats[0].UnreadCount != 1 {
+		t.Fatalf("chat dopo l'eliminazione = %+v", chats)
 	}
-	decode(t, rec, &chats)
-	if len(chats) != 1 || chats[0].Name != "Utente eliminato" || len(chats[0].Messages) != 2 ||
-		chats[0].Messages[1].Type != "received" || chats[0].Messages[1].Text != b64("risposta-per-destinatario") {
-		t.Fatalf("chat dopo l'eliminazione = %s", rec.Body.String())
+	received := app.messages(seeker.Cookie, conversationID, "").Items
+	if len(received) != 2 || received[0].Body != b64("risposta") || received[0].SenderID != "" ||
+		received[0].Key != b64("chiave-per-"+seeker.ID) {
+		t.Fatalf("messaggi dopo l'eliminazione = %+v", received)
 	}
 
-	// La copia dei messaggi cifrata per l'utente eliminato non viene conservata
+	// Le chiavi dei messaggi dell'utente eliminato non servono più a nessuno e spariscono
 	var leftovers int
-	testPool.QueryRow(context.Background(), `SELECT count(*) FROM roomdate_app.messages WHERE sender_id IS NULL AND sender_content IS NOT NULL`).Scan(&leftovers)
+	testPool.QueryRow(context.Background(), `
+        SELECT count(*) FROM roomdate_app.message_keys k
+        LEFT JOIN roomdate_app.users u ON u.id = k.user_id WHERE u.id IS NULL`).Scan(&leftovers)
 	if leftovers != 0 {
-		t.Errorf("copie per il mittente eliminato rimaste: %d", leftovers)
+		t.Errorf("chiavi dei messaggi dell'account eliminato rimaste: %d", leftovers)
+	}
+	testPool.QueryRow(context.Background(), `
+        SELECT count(*) FROM roomdate_app.conversation_participants p
+        LEFT JOIN roomdate_app.users u ON u.id = p.user_id WHERE u.id IS NULL`).Scan(&leftovers)
+	if leftovers != 0 {
+		t.Errorf("partecipanti eliminati rimasti: %d", leftovers)
 	}
 }
 

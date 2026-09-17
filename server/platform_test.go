@@ -15,18 +15,16 @@ func TestRoutingAndHeaders(t *testing.T) {
 		t.Errorf("header = %v", rec.Header())
 	}
 
-	// API legacy: errori in testo semplice
-	expect(t, app.do(http.MethodGet, "/api/start_chat", nil), http.StatusMethodNotAllowed, "Metodo non consentito")
-	expect(t, app.do(http.MethodOptions, "/api/get_chats", nil), http.StatusNoContent, "")
-
-	// API v1: errori in JSON
+	// Tutte le API sono v1, con errori in JSON
+	expect(t, app.do(http.MethodOptions, "/api/v1/conversations", nil), http.StatusNoContent, "")
+	expect(t, app.do(http.MethodGet, "/api/v1/conversations/1/typing", nil), http.StatusMethodNotAllowed, `"code":"method_not_allowed"`)
 	expect(t, app.do(http.MethodGet, "/api/v1/auth/login", nil), http.StatusMethodNotAllowed, `"code":"method_not_allowed"`)
 	expect(t, app.do(http.MethodPatch, "/api/v1/me", nil), http.StatusMethodNotAllowed, "")
 	expect(t, app.do(http.MethodGet, "/api/v1/health", nil), http.StatusOK, `{"status":"ok"}`)
 	expect(t, app.do(http.MethodGet, "/api/v1/non_esiste", nil), http.StatusNotFound, `"code":"endpoint_not_found"`)
 
 	// Le vecchie API di accesso, profilo, annunci e coinquilini non esistono più
-	for _, path := range []string{"/api/login", "/api/register", "/api/profile", "/api/get_listings", "/api/get_listing", "/api/create_listing", "/api/get_my_listings", "/api/delete_listing", "/api/get_roommates"} {
+	for _, path := range []string{"/api/login", "/api/register", "/api/profile", "/api/get_listings", "/api/get_listing", "/api/create_listing", "/api/get_my_listings", "/api/delete_listing", "/api/get_roommates", "/api/start_chat", "/api/get_chats", "/api/send_message", "/api/typing"} {
 		expect(t, app.do(http.MethodGet, path, nil), http.StatusNotFound, "")
 	}
 }

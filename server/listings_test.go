@@ -191,7 +191,7 @@ func TestEmptyListsAreArrays(t *testing.T) {
 
 	expect(t, app.do(http.MethodGet, "/api/v1/listings", nil), http.StatusOK, `{"items":[],"nextCursor":null}`)
 	expect(t, app.do(http.MethodGet, "/api/v1/me/listings", nil, withSession(seeker.Cookie)), http.StatusOK, "[]")
-	expect(t, app.do(http.MethodGet, "/api/get_chats", nil, withSession(seeker.Cookie)), http.StatusOK, "[]")
+	expect(t, app.do(http.MethodGet, "/api/v1/conversations", nil, withSession(seeker.Cookie)), http.StatusOK, `{"items":[],"nextCursor":null}`)
 }
 
 func TestUpdateListing(t *testing.T) {
@@ -239,7 +239,7 @@ func TestActivateListing(t *testing.T) {
 		t.Fatalf("il proprietario vede il suo annuncio disattivato: %+v", detail)
 	}
 	expect(t, app.do(http.MethodGet, "/api/v1/me/listings", nil, withSession(owner.Cookie)), http.StatusOK, `"isActive":false`)
-	expect(t, app.do(http.MethodPost, "/api/start_chat", map[string]int{"listingId": id}, withSession(seeker.Cookie)), http.StatusNotFound, "non più disponibile")
+	expect(t, app.do(http.MethodPost, "/api/v1/conversations", map[string]int{"listingId": id}, withSession(seeker.Cookie)), http.StatusNotFound, "non più disponibile")
 
 	expect(t, app.do(http.MethodPut, path, map[string]bool{"active": true}, withSession(owner.Cookie)), http.StatusNoContent, "")
 	if ids := app.publicListingIDs(); len(ids) != 1 {
@@ -262,11 +262,8 @@ func TestDeleteListing(t *testing.T) {
 	expect(t, app.do(http.MethodDelete, "/api/v1/listings/x", nil, withSession(owner.Cookie)), http.StatusNotFound, "")
 
 	// Con una conversazione collegata l'eliminazione funziona (F16) e la conversazione resta
-	var started struct{ ConversationID int }
-	rec := app.do(http.MethodPost, "/api/start_chat", map[string]int{"listingId": id}, withSession(seeker.Cookie))
-	expect(t, rec, http.StatusOK, "")
-	decode(t, rec, &started)
-	expect(t, app.do(http.MethodPost, "/api/send_message", message(started.ConversationID, "ciao"), withSession(seeker.Cookie)), http.StatusOK, "")
+	conversationID := app.startChat(seeker.Cookie, map[string]any{"listingId": id})
+	app.send(seeker.Cookie, conversationID, message("ciao", seeker, owner))
 
 	expect(t, app.do(http.MethodDelete, path, nil, withSession(owner.Cookie)), http.StatusNoContent, "")
 	if _, code := app.listing(id, owner.Cookie); code != http.StatusNotFound {
@@ -278,12 +275,15 @@ func TestDeleteListing(t *testing.T) {
 		}
 	}
 
+	// La conversazione resta a entrambi, senza più l'annuncio, e si può ancora scrivere
 	for _, u := range []user{owner, seeker} {
-		rec := app.do(http.MethodGet, "/api/get_chats", nil, withSession(u.Cookie))
-		expect(t, rec, http.StatusOK, `"id":`+itoa(started.ConversationID))
-		expect(t, rec, http.StatusOK, b64("ciao-per-"))
+		chats := app.conversations(u.Cookie)
+		if len(chats) != 1 || chats[0].ID != conversationID || chats[0].Listing != nil ||
+			chats[0].LastMessage == nil || chats[0].LastMessage.Body != b64("ciao") {
+			t.Fatalf("chat di %s dopo l'eliminazione = %+v", u.Email, chats)
+		}
 	}
-	expect(t, app.do(http.MethodPost, "/api/send_message", message(started.ConversationID, "ancora"), withSession(owner.Cookie)), http.StatusOK, "")
+	app.send(owner.Cookie, conversationID, message("ancora", seeker, owner))
 }
 
 // Chi passa da "affitta" a "cerca" non pubblica più, ma gestisce ancora i propri annunci.
@@ -505,7 +505,7 @@ func TestNullableProductionColumns(t *testing.T) {
 	if detail, code := app.listing(ownerless, seeker.Cookie); detail == nil || detail.IsOwner {
 		t.Fatalf("dettaglio senza proprietario: %d %+v", code, detail)
 	}
-	expect(t, app.do(http.MethodPost, "/api/start_chat", map[string]int{"listingId": ownerless}, withSession(seeker.Cookie)), http.StatusNotFound, "non più disponibile")
+	expect(t, app.do(http.MethodPost, "/api/v1/conversations", map[string]int{"listingId": ownerless}, withSession(seeker.Cookie)), http.StatusNotFound, "non più disponibile")
 	expect(t, app.do(http.MethodGet, "/api/v1/me/listings", nil, withSession(owner.Cookie)), http.StatusOK, "Senza tipo")
 	expect(t, app.do(http.MethodPost, "/api/v1/auth/login", map[string]string{"email": owner.Email, "password": owner.Password}), http.StatusOK, `"firstName":""`)
 	expect(t, app.do(http.MethodGet, "/api/v1/me", nil, withSession(owner.Cookie)), http.StatusOK, `"lastName":""`)
