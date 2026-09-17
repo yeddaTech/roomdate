@@ -15,7 +15,7 @@ import {
 import { queryKeys } from './queryKeys';
 import type { OutgoingMessage } from './chat';
 import type { ListingFilters, ListingInput, SessionUser } from './types';
-import { getMyProfile, getPublicProfile, listRoommates, updateMyProfile } from './users';
+import { getMyProfile, getPublicProfile, listRoommates, listSessions, revokeOtherSessions, revokeSession, updateMyProfile } from './users';
 
 export function useMyProfile() {
   return useQuery({ queryKey: queryKeys.myProfile, queryFn: getMyProfile });
@@ -37,6 +37,27 @@ export function useUpdateMyProfile() {
       queryClient.invalidateQueries({ queryKey: queryKeys.roommates });
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
+  });
+}
+
+/** Dispositivi collegati all'account. */
+export function useSessions() {
+  return useQuery({ queryKey: queryKeys.sessions, queryFn: listSessions });
+}
+
+export function useRevokeSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: revokeSession,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.sessions }),
+  });
+}
+
+export function useRevokeOtherSessions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: revokeOtherSessions,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.sessions }),
   });
 }
 

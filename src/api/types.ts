@@ -23,6 +23,17 @@ export interface CryptoKeys {
 /** Chiave privata cifrata di nuovo con una nuova password (senza chiave pubblica). */
 export type WrappedPrivateKey = Omit<CryptoKeys, 'publicKey'>;
 
+/** Dispositivo con l'accesso aperto. */
+export interface UserSession {
+  id: string;
+  /** Descrizione del browser, per riconoscere il dispositivo. */
+  device: string;
+  createdAt: string;
+  lastUsedAt: string;
+  /** true per la sessione da cui si sta guardando. */
+  current: boolean;
+}
+
 /** Profilo completo dell'utente in sessione. */
 export interface Profile {
   id: string;

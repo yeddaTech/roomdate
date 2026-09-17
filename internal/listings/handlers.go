@@ -18,7 +18,7 @@ func NewHandler(svc *Service, sessions *auth.Manager) *Handler {
 }
 
 func (h *Handler) requireSession(w http.ResponseWriter, r *http.Request) (auth.Session, bool) {
-	session, ok := h.sessions.FromRequest(r)
+	session, ok := h.sessions.FromRequest(r.Context(), r)
 	if !ok {
 		httpx.WriteError(w, r, errSessionInvalid)
 	}
@@ -60,7 +60,7 @@ func (h *Handler) Mine(w http.ResponseWriter, r *http.Request) {
 
 // Get gestisce GET /api/v1/listings/{id}.
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	session, _ := h.sessions.FromRequest(r)
+	session, _ := h.sessions.FromRequest(r.Context(), r)
 	detail, err := h.svc.Get(r.Context(), session.UserID, r.PathValue("id"))
 	if err != nil {
 		httpx.WriteError(w, r, err)

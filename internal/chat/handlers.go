@@ -21,7 +21,7 @@ func NewHandler(svc *Service, sessions *auth.Manager) *Handler {
 var errSessionInvalid = apperr.Unauthorized("session_invalid", "Sessione scaduta: accedi di nuovo")
 
 func (h *Handler) requireSession(w http.ResponseWriter, r *http.Request) (auth.Session, bool) {
-	session, ok := h.sessions.FromRequest(r)
+	session, ok := h.sessions.FromRequest(r.Context(), r)
 	if !ok {
 		httpx.WriteError(w, r, errSessionInvalid)
 	}

@@ -97,6 +97,13 @@ func (s *Store) Create(ctx context.Context, u NewUser) (string, error) {
 	return id, err
 }
 
+// UpdatePasswordHash sostituisce solo l'hash della password, senza toccare le chiavi di cifratura:
+// serve a riscrivere con Argon2id gli hash bcrypt degli account più vecchi.
+func (s *Store) UpdatePasswordHash(ctx context.Context, id, passwordHash string) error {
+	_, err := s.db.Exec(ctx, `UPDATE roomdate_app.users SET password_hash = $2 WHERE id = $1`, id, passwordHash)
+	return err
+}
+
 // UpdatePassword cambia password e chiave privata cifrata in un'unica istruzione.
 // La chiave viene sostituita solo se l'utente ne aveva già una.
 func (s *Store) UpdatePassword(ctx context.Context, id, passwordHash string, vault Vault) error {

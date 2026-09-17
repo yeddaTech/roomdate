@@ -255,14 +255,15 @@ func newAppWithStorage(t *testing.T, st storage.Storage) *testApp {
 		t.Skip("TEST_DATABASE_URL non impostata")
 	}
 	_, err := testPool.Exec(context.Background(),
-		`TRUNCATE roomdate_app.messages, roomdate_app.conversations, roomdate_app.listing_images, roomdate_app.listings, roomdate_app.users RESTART IDENTITY CASCADE`)
+		`TRUNCATE roomdate_app.messages, roomdate_app.conversations, roomdate_app.listing_images, roomdate_app.listings,
+                  roomdate_app.sessions, roomdate_app.security_events, roomdate_app.users RESTART IDENTITY CASCADE`)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	publisher := &recordingPublisher{}
 	handler, err := server.New(server.Deps{
-		Config:    config.Config{JWTSecret: "segreto-di-test", SecureCookies: true},
+		Config:    config.Config{SecretKey: "segreto-di-test", SecureCookies: true},
 		DB:        testPool,
 		Publisher: publisher,
 		Logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -276,10 +277,13 @@ func newAppWithStorage(t *testing.T, st storage.Storage) *testApp {
 
 type option func(*http.Request)
 
+// I test usano i cookie sicuri, come in produzione: il nome ha il prefisso __Host-.
+const sessionCookieName = "__Host-roomdate_session"
+
 func withSession(cookie string) option {
 	return func(r *http.Request) {
 		if cookie != "" {
-			r.AddCookie(&http.Cookie{Name: "roomdate_session", Value: cookie})
+			r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: cookie})
 		}
 	}
 }
@@ -320,10 +324,13 @@ type user struct {
 	ID, Email, Password, Cookie string
 }
 
+// testPassword rispetta le regole del modulo M3.2: lunga, non comune e senza dati personali.
+const testPassword = "tramonto-arancione-42"
+
 // registerUser registra un utente (con chiavi E2EE fittizie se withVault) ed esegue il login.
 func (a *testApp) registerUser(name, userType string, withVault bool) user {
 	a.t.Helper()
-	u := user{Email: strings.ToLower(name) + "@test.it", Password: "password-" + strings.ToLower(name)}
+	u := user{Email: strings.ToLower(name) + "@test.it", Password: testPassword}
 	rec := a.do(http.MethodPost, "/api/v1/auth/register", registration(name, u.Email, u.Password, userType, withVault))
 	if rec.Code != http.StatusCreated {
 		a.t.Fatalf("registrazione di %s: %d %s", name, rec.Code, rec.Body.String())
@@ -362,7 +369,7 @@ func (a *testApp) login(email, password string) string {
 
 func sessionCookie(rec *httptest.ResponseRecorder) string {
 	for _, c := range rec.Result().Cookies() {
-		if c.Name == "roomdate_session" {
+		if c.Name == sessionCookieName {
 			return c.Value
 		}
 	}

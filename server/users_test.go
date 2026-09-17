@@ -41,7 +41,7 @@ func TestRegisterAndLogin(t *testing.T) {
 			t.Errorf("keys = %+v", body.Keys)
 		}
 		cookie := rec.Result().Cookies()[0]
-		if cookie.Name != "roomdate_session" || !cookie.HttpOnly || !cookie.Secure {
+		if cookie.Name != sessionCookieName || !cookie.HttpOnly || !cookie.Secure {
 			t.Errorf("cookie = %+v", cookie)
 		}
 	})
@@ -72,7 +72,7 @@ func TestRegisterAndLogin(t *testing.T) {
 	})
 
 	t.Run("email già registrata", func(t *testing.T) {
-		rec := app.do(http.MethodPost, "/api/v1/auth/register", registration("Altra", u.Email, "password-altra", "cerca", false))
+		rec := app.do(http.MethodPost, "/api/v1/auth/register", registration("Altra", u.Email, testPassword, "cerca", false))
 		expect(t, rec, http.StatusConflict, "Impossibile completare la registrazione")
 		expectNoLeak(t, rec)
 	})
@@ -88,8 +88,10 @@ func TestRegisterValidation(t *testing.T) {
 		{"nome vuoto", "firstName", "   ", "Il nome è obbligatorio"},
 		{"nome solo caratteri invisibili", "firstName", "\x00\x07 ", "Il nome è obbligatorio"},
 		{"email non valida", "email", "bruno", "Inserisci un indirizzo email valido"},
-		{"password corta", "password", "12345", "almeno 6 caratteri"},
-		{"password oltre 72 byte", "password", strings.Repeat("x", 73), "troppo lunga"},
+		{"password corta", "password", "corta1234", "almeno 10 caratteri"},
+		{"password comune", "password", "password123", "tra le più usate"},
+		{"password con il nome", "password", "bruno-e-la-sua-password", "il tuo nome o la tua email"},
+		{"password troppo lunga", "password", strings.Repeat("x", 200), "troppo lunga"},
 		{"tipo utente sconosciuto", "userType", "admin", "Tipo di utente non valido"},
 		{"data di nascita vuota", "birthdate", "", "Data di nascita non valida"},
 		{"data di nascita futura", "birthdate", "2999-01-01", "Data di nascita non valida"},
@@ -104,7 +106,7 @@ func TestRegisterValidation(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			body := registration("Bruno", "bruno@test.it", "password-bruno", "affitta", false)
+			body := registration("Bruno", "bruno@test.it", testPassword, "affitta", false)
 			body[c.field] = c.value
 			rec := app.do(http.MethodPost, "/api/v1/auth/register", body)
 			expect(t, rec, http.StatusBadRequest, c.message)
@@ -113,14 +115,14 @@ func TestRegisterValidation(t *testing.T) {
 	}
 
 	t.Run("i dati validi passano", func(t *testing.T) {
-		expect(t, app.do(http.MethodPost, "/api/v1/auth/register", registration("Bruno", "bruno@test.it", "password-bruno", "affitta", false)), http.StatusCreated, `"id":`)
+		expect(t, app.do(http.MethodPost, "/api/v1/auth/register", registration("Bruno", "bruno@test.it", testPassword, "affitta", false)), http.StatusCreated, `"id":`)
 	})
 
 	t.Run("città, occupazione e abitudini sono facoltative", func(t *testing.T) {
-		body := registration("Carla", "carla@test.it", "password-carla", "cerca", false)
+		body := registration("Carla", "carla@test.it", testPassword, "cerca", false)
 		body["city"], body["occupation"], body["lifestyleTags"] = "", "", nil
 		expect(t, app.do(http.MethodPost, "/api/v1/auth/register", body), http.StatusCreated, "")
-		cookie := app.login("carla@test.it", "password-carla")
+		cookie := app.login("carla@test.it", testPassword)
 		expect(t, app.do(http.MethodGet, "/api/v1/me", nil, withSession(cookie)), http.StatusOK, `"city":"","birthdate":"1999-01-01","budgetMax":500,"occupation":"","bio":"ciao","lifestyleTags":[]`)
 		var nulls int
 		testPool.QueryRow(context.Background(), `SELECT count(*) FROM roomdate_app.users WHERE email = 'carla@test.it' AND citta IS NULL AND occupation IS NULL`).Scan(&nulls)
@@ -133,10 +135,10 @@ func TestRegisterValidation(t *testing.T) {
 // Anomalia F2: l'email non distingue maiuscole e minuscole, né in registrazione né al login.
 func TestEmailIsCaseInsensitive(t *testing.T) {
 	app := newApp(t)
-	body := registration("Anna", "  Anna.Rossi@Test.IT ", "password-anna", "cerca", false)
+	body := registration("Anna", "  Anna.Rossi@Test.IT ", testPassword, "cerca", false)
 	expect(t, app.do(http.MethodPost, "/api/v1/auth/register", body), http.StatusCreated, "")
 
-	cookie := app.login("ANNA.ROSSI@test.it", "password-anna")
+	cookie := app.login("ANNA.ROSSI@test.it", testPassword)
 	expect(t, app.do(http.MethodGet, "/api/v1/me", nil, withSession(cookie)), http.StatusOK, `"email":"anna.rossi@test.it"`)
 
 	rec := app.do(http.MethodPost, "/api/v1/auth/register", registration("Anna", "anna.rossi@test.IT", "altra-password", "cerca", false))
@@ -144,7 +146,7 @@ func TestEmailIsCaseInsensitive(t *testing.T) {
 
 	// Un indirizzo salvato con le maiuscole da un'altra strada (es. a mano nel database) funziona lo stesso
 	testPool.Exec(context.Background(), `UPDATE roomdate_app.users SET email = 'Anna.Rossi@Test.it' WHERE email = 'anna.rossi@test.it'`)
-	app.login("anna.rossi@test.it", "password-anna")
+	app.login("anna.rossi@test.it", testPassword)
 
 	// Il database rifiuta un doppione con maiuscole diverse
 	_, err := testPool.Exec(context.Background(),
@@ -154,18 +156,43 @@ func TestEmailIsCaseInsensitive(t *testing.T) {
 	}
 }
 
-func TestLoginLockout(t *testing.T) {
+// Dopo qualche tentativo fallito bisogna aspettare, ma l'account non si blocca: chiunque conosca
+// un indirizzo email potrebbe altrimenti chiudere fuori quella persona.
+func TestLoginThrottling(t *testing.T) {
 	app := newApp(t)
 	u := app.registerUser("Carla", "cerca", false)
-	login := func(password string) map[string]string {
-		return map[string]string{"email": u.Email, "password": password}
+	login := func(email, password string) map[string]string {
+		return map[string]string{"email": email, "password": password}
 	}
 
 	for i := 1; i < 5; i++ {
-		expect(t, app.do(http.MethodPost, "/api/v1/auth/login", login("no")), http.StatusUnauthorized, "")
+		expect(t, app.do(http.MethodPost, "/api/v1/auth/login", login(u.Email, "no")), http.StatusUnauthorized, "Credenziali non valide")
 	}
-	expect(t, app.do(http.MethodPost, "/api/v1/auth/login", login("no")), http.StatusTooManyRequests, "bloccato")
-	expect(t, app.do(http.MethodPost, "/api/v1/auth/login", login(u.Password)), http.StatusTooManyRequests, "")
+	expect(t, app.do(http.MethodPost, "/api/v1/auth/login", login(u.Email, "no")), http.StatusUnauthorized, "")
+	rec := app.do(http.MethodPost, "/api/v1/auth/login", login(u.Email, u.Password))
+	expect(t, rec, http.StatusTooManyRequests, "Troppi tentativi")
+
+	// Passata l'attesa si rientra: i tentativi contano solo se recenti
+	if _, err := testPool.Exec(context.Background(),
+		`UPDATE roomdate_app.security_events SET created_at = NOW() - interval '30 minutes'`); err != nil {
+		t.Fatal(err)
+	}
+	expect(t, app.do(http.MethodPost, "/api/v1/auth/login", login(u.Email, u.Password)), http.StatusOK, "")
+}
+
+// Chi prova un indirizzo inesistente riceve la stessa risposta di chi sbaglia la password:
+// dalle risposte non si capisce quali email sono registrate.
+func TestLoginDoesNotRevealRegisteredEmails(t *testing.T) {
+	app := newApp(t)
+	u := app.registerUser("Dino", "cerca", false)
+
+	unknown := app.do(http.MethodPost, "/api/v1/auth/login", map[string]string{"email": "nessuno@test.it", "password": "una-password-qualsiasi"})
+	wrong := app.do(http.MethodPost, "/api/v1/auth/login", map[string]string{"email": u.Email, "password": "una-password-qualsiasi"})
+	expect(t, unknown, http.StatusUnauthorized, "Credenziali non valide")
+	expect(t, wrong, http.StatusUnauthorized, "Credenziali non valide")
+	if unknown.Body.String() != wrong.Body.String() {
+		t.Fatalf("risposte diverse: %s e %s", unknown.Body.String(), wrong.Body.String())
+	}
 }
 
 func TestLogoutClearsCookie(t *testing.T) {
@@ -179,6 +206,8 @@ func TestLogoutClearsCookie(t *testing.T) {
 		t.Fatalf("Set-Cookie = %q", header)
 	}
 }
+
+const newTestPassword = "collina-di-lavanda-7"
 
 func TestChangePassword(t *testing.T) {
 	app := newApp(t)
@@ -200,24 +229,24 @@ func TestChangePassword(t *testing.T) {
 	}
 	const path = "/api/v1/auth/password"
 
-	expect(t, app.do(http.MethodPost, path, changePassword(anna.Password, "nuovapass1", true)), http.StatusUnauthorized, "session_invalid")
-	expect(t, app.do(http.MethodPost, path, changePassword(anna.Password, "123", true), withSession(anna.Cookie)), http.StatusBadRequest, "almeno 6")
-	expect(t, app.do(http.MethodPost, path, changePassword(anna.Password, "nuovapass1", false), withSession(anna.Cookie)), http.StatusBadRequest, "Chiavi di cifratura mancanti")
+	expect(t, app.do(http.MethodPost, path, changePassword(anna.Password, newTestPassword, true)), http.StatusUnauthorized, "session_invalid")
+	expect(t, app.do(http.MethodPost, path, changePassword(anna.Password, "corta123", true), withSession(anna.Cookie)), http.StatusBadRequest, "almeno 10")
+	expect(t, app.do(http.MethodPost, path, changePassword(anna.Password, newTestPassword, false), withSession(anna.Cookie)), http.StatusBadRequest, "Chiavi di cifratura mancanti")
 	// Password attuale errata: codice invalid_credentials, che il frontend non scambia per una sessione scaduta
-	expect(t, app.do(http.MethodPost, path, changePassword("sbagliata", "nuovapass1", true), withSession(anna.Cookie)), http.StatusUnauthorized, `"code":"invalid_credentials"`)
+	expect(t, app.do(http.MethodPost, path, changePassword("sbagliata", newTestPassword, true), withSession(anna.Cookie)), http.StatusUnauthorized, `"code":"invalid_credentials"`)
 	if vaultOf(anna.ID) != b64("VAULT-Anna") {
 		t.Fatal("la chiave non deve cambiare dopo un errore")
 	}
 
-	expect(t, app.do(http.MethodPost, path, changePassword(anna.Password, "nuovapass1", true), withSession(anna.Cookie)), http.StatusNoContent, "")
+	expect(t, app.do(http.MethodPost, path, changePassword(anna.Password, newTestPassword, true), withSession(anna.Cookie)), http.StatusNoContent, "")
 	if vaultOf(anna.ID) != b64("VAULT-NEW") {
 		t.Fatal("la chiave privata deve cambiare insieme alla password")
 	}
 	expect(t, app.do(http.MethodPost, "/api/v1/auth/login", map[string]string{"email": anna.Email, "password": anna.Password}), http.StatusUnauthorized, "")
-	expect(t, app.do(http.MethodPost, "/api/v1/auth/login", map[string]string{"email": anna.Email, "password": "nuovapass1"}), http.StatusOK, b64("VAULT-NEW"))
+	expect(t, app.do(http.MethodPost, "/api/v1/auth/login", map[string]string{"email": anna.Email, "password": newTestPassword}), http.StatusOK, b64("VAULT-NEW"))
 
 	// Utente senza chiavi: nessuna chiave richiesta e nessuna chiave aggiunta
-	expect(t, app.do(http.MethodPost, path, changePassword(bruno.Password, "brunopass2", true), withSession(bruno.Cookie)), http.StatusNoContent, "")
+	expect(t, app.do(http.MethodPost, path, changePassword(bruno.Password, "nebbia-sul-lago-9", true), withSession(bruno.Cookie)), http.StatusNoContent, "")
 	if vaultOf(bruno.ID) != "" {
 		t.Fatal("non va aggiunta una chiave a un utente che non l'aveva")
 	}
@@ -227,9 +256,12 @@ func TestDeleteAccount(t *testing.T) {
 	app := newApp(t)
 	u := app.registerUser("Elena", "cerca", false)
 
-	expect(t, app.do(http.MethodDelete, "/api/v1/me", nil), http.StatusUnauthorized, "")
+	expect(t, app.do(http.MethodDelete, "/api/v1/me", map[string]string{"password": u.Password}), http.StatusUnauthorized, "")
+	// Serve la password: una sessione lasciata aperta non basta a cancellare un account
+	expect(t, app.do(http.MethodDelete, "/api/v1/me", map[string]string{"password": "sbagliata"}, withSession(u.Cookie)), http.StatusUnauthorized, "La password non è corretta")
+	expect(t, app.do(http.MethodDelete, "/api/v1/me", nil, withSession(u.Cookie)), http.StatusUnauthorized, "")
 
-	rec := app.do(http.MethodDelete, "/api/v1/me", nil, withSession(u.Cookie))
+	rec := app.do(http.MethodDelete, "/api/v1/me", map[string]string{"password": u.Password}, withSession(u.Cookie))
 	expect(t, rec, http.StatusNoContent, "")
 	if !strings.Contains(rec.Header().Get("Set-Cookie"), "Max-Age=0") {
 		t.Error("il cookie di sessione va cancellato")
@@ -253,7 +285,7 @@ func TestDeleteAccountWithListingsAndChats(t *testing.T) {
 	app.send(seeker.Cookie, conversationID, message("domanda", seeker, landlord))
 	app.send(landlord.Cookie, conversationID, message("risposta", seeker, landlord))
 
-	expect(t, app.do(http.MethodDelete, "/api/v1/me", nil, withSession(landlord.Cookie)), http.StatusNoContent, "")
+	expect(t, app.do(http.MethodDelete, "/api/v1/me", map[string]string{"password": landlord.Password}, withSession(landlord.Cookie)), http.StatusNoContent, "")
 
 	if _, code := app.listing(listingID, ""); code != http.StatusNotFound {
 		t.Errorf("annuncio dell'account eliminato ancora visibile: %d", code)
