@@ -2,28 +2,7 @@ import { ApiError, request } from './client';
 import { prepareImage } from './photos';
 import type { ListingDetail, ListingImage, ListingInput, ListingSummary, PendingUpload } from './types';
 
-/**
- * Servizi che un annuncio può indicare, nell'ordine in cui vengono mostrati.
- * Le chiavi devono coincidere con quelle accettate dal server (internal/listings/amenities.go).
- */
-export const AMENITIES: ReadonlyArray<{ key: string; label: string }> = [
-  { key: 'wifi', label: 'Wi-Fi' },
-  { key: 'arredata', label: 'Arredata' },
-  { key: 'lavatrice', label: 'Lavatrice' },
-  { key: 'lavastoviglie', label: 'Lavastoviglie' },
-  { key: 'aria_condizionata', label: 'Aria condizionata' },
-  { key: 'riscaldamento', label: 'Riscaldamento' },
-  { key: 'balcone', label: 'Balcone o terrazzo' },
-  { key: 'ascensore', label: 'Ascensore' },
-  { key: 'bagno_privato', label: 'Bagno privato' },
-  { key: 'animali_ammessi', label: 'Animali ammessi' },
-];
-
 export const MAX_LISTING_IMAGES = 8;
-
-export function amenityLabel(key: string): string {
-  return AMENITIES.find((a) => a.key === key)?.label ?? key;
-}
 
 /** "Disponibile subito" o "Disponibile dal 1 ottobre 2026"; null se la data non è indicata. */
 export function formatAvailability(availableFrom: string | null, today = new Date()): string | null {

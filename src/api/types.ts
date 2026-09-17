@@ -30,12 +30,15 @@ export interface Profile {
   lastName: string;
   email: string;
   userType: UserType;
+  /** Una delle città di src/api/options.ts, oppure stringa vuota se non indicata. */
   city: string;
   birthdate: string;
   budgetMax: number;
+  /** Chiave di OCCUPATIONS, oppure stringa vuota se non indicata. */
   occupation: string;
   bio: string;
-  lifestyleTags: string;
+  /** Chiavi di LIFESTYLE_TAGS, nell'ordine dell'elenco. */
+  lifestyleTags: string[];
   isPublic: boolean;
 }
 
@@ -52,35 +55,46 @@ export interface RegisterInput {
   budgetMax: number;
   occupation: string;
   bio: string;
-  lifestyleTags: string;
+  lifestyleTags: string[];
   keys: CryptoKeys;
 }
 
-/** Profilo visibile agli altri utenti. */
+/**
+ * Cosa hanno in comune chi guarda e un altro profilo, calcolato dal server sui dati indicati da entrambi.
+ * Non è un punteggio: ogni voce ha un motivo preciso.
+ */
+export interface Compatibility {
+  sameCity: boolean;
+  /** Entrambi hanno un budget e differiscono al massimo di 100 €. */
+  similarBudget: boolean;
+  sharedTags: string[];
+  /** Uno ha indicato "Fumatore" e l'altro "Non fumatore". */
+  smokingMismatch: boolean;
+}
+
+/** Profilo visibile agli altri utenti: niente cognome, email o data di nascita. */
 export interface PublicProfile {
   id: string;
   firstName: string;
+  /** Anni compiuti, o null se la data di nascita non è indicata. */
+  age: number | null;
   userType: UserType;
   city: string;
   budgetMax: number;
   occupation: string;
   bio: string;
-  lifestyleTags: string;
+  lifestyleTags: string[];
+  /** null senza sessione o sul proprio profilo. */
+  compatibility: Compatibility | null;
 }
 
-/** Profilo nell'elenco dei coinquilini. Età e compatibilità reali arrivano con il modulo M1.5. */
-export interface Roommate {
-  id: string;
-  name: string;
-  occupation: string;
-  bio: string;
-  city: string;
-  color1: string;
-  color2: string;
-  emoji: string;
-  tags: string[];
-  userType: UserType;
-  budgetMax: number;
+/** Profilo nell'elenco dei coinquilini (solo chi cerca una stanza, con profilo pubblico). */
+export type Roommate = Omit<PublicProfile, 'userType'>;
+
+export interface RoommatesPage {
+  items: Roommate[];
+  /** Da passare alla richiesta successiva; null se non ci sono altri profili. */
+  nextCursor: string | null;
 }
 
 export type RoomType = 'singola' | 'doppia';

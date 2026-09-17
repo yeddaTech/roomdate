@@ -3,6 +3,10 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../auth/AuthContext';
 import { usePublicProfile, useStartChat } from '../api/hooks';
+import { occupationLabel } from '../api/options';
+import { formatAge } from '../api/users';
+import CompatibilityList from '../components/profile/CompatibilityList';
+import LifestyleTags from '../components/profile/LifestyleTags';
 
 export default function RoommateDetails() {
   const { id } = useParams();
@@ -119,7 +123,7 @@ export default function RoommateDetails() {
           </div>
           <div>
             <h1 className="font-serif text-4xl md:text-5xl font-extrabold mb-2 tracking-tight">
-              {roommate.firstName}
+              {roommate.firstName}{roommate.age !== null ? `, ${roommate.age}` : ''}
             </h1>
             <p className="text-white/90 text-lg font-bold tracking-wide">
               {roommate.userType === 'affitta' ? '🏠 Offre una stanza' : '🔍 Cerca una stanza'}{roommate.city ? ` a ${roommate.city}` : ''}
@@ -143,17 +147,23 @@ export default function RoommateDetails() {
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-neutral-100">
             <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-6 tracking-tight">Stile di vita</h2>
             <div className="flex flex-wrap gap-2.5">
-              {roommate.lifestyleTags ? (
-                roommate.lifestyleTags.split(',').map((tag, idx) => (
-                  <span key={idx} className="bg-orange-50 border border-orange-100 text-orange-600 px-4 py-2 rounded-full font-bold text-sm shadow-sm">
-                    {tag.trim()}
-                  </span>
-                ))
+              {roommate.lifestyleTags.length > 0 ? (
+                <LifestyleTags tags={roommate.lifestyleTags} className="bg-orange-50 border border-orange-100 text-orange-600 px-4 py-2 rounded-full font-bold text-sm shadow-sm" />
               ) : (
-                <span className="text-neutral-400 font-medium italic">Nessun tag specificato.</span>
+                <span className="text-neutral-400 font-medium italic">Nessuna abitudine indicata.</span>
               )}
             </div>
           </div>
+
+          {roommate.compatibility ? (
+            <div className="bg-white p-8 rounded-3xl shadow-sm border border-neutral-100" data-testid="compatibility">
+              <CompatibilityList compatibility={roommate.compatibility} />
+            </div>
+          ) : !user && (
+            <div className="bg-white p-8 rounded-3xl shadow-sm border border-neutral-100 text-neutral-500 font-medium">
+              <Link to="/accedi" className="text-orange-500 font-bold hover:text-orange-600">Accedi</Link> per vedere cosa avete in comune.
+            </div>
+          )}
         </div>
 
         {/* COLONNA DESTRA: INFORMAZIONI E CONTATTO */}
@@ -164,19 +174,31 @@ export default function RoommateDetails() {
               <div className="absolute top-0 right-0 w-32 h-32 bg-orange-400/10 blur-[50px] rounded-full pointer-events-none"></div>
 
               <div className="flex flex-col gap-4 mb-8 relative z-10">
+                {roommate.userType === 'cerca' && (
+                  <div className="flex justify-between items-center border-b border-neutral-100 pb-4">
+                    <span className="text-neutral-500 font-bold text-sm uppercase tracking-wider">Budget max</span>
+                    <span className="font-extrabold text-neutral-900 text-lg">{roommate.budgetMax ? `€${roommate.budgetMax}/mese` : 'Non indicato'}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center border-b border-neutral-100 pb-4">
-                  <span className="text-neutral-500 font-bold text-sm uppercase tracking-wider">Budget / Prezzo</span>
-                  <span className="font-extrabold text-neutral-900 text-lg">{roommate.budgetMax ? `€${roommate.budgetMax}` : 'Non indicato'}</span>
+                  <span className="text-neutral-500 font-bold text-sm uppercase tracking-wider">Età</span>
+                  <span className="font-extrabold text-neutral-900">{formatAge(roommate.age) ?? 'Non indicata'}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-neutral-100 pb-4">
                   <span className="text-neutral-500 font-bold text-sm uppercase tracking-wider">Occupazione</span>
-                  <span className="font-extrabold text-neutral-900 capitalize">{roommate.occupation || 'Non specificata'}</span>
+                  <span className="font-extrabold text-neutral-900">{occupationLabel(roommate.occupation) ?? 'Non indicata'}</span>
                 </div>
               </div>
 
-              <button onClick={handleContact} className="w-full bg-gradient-to-r from-orange-500 to-rose-500 text-white py-4.5 rounded-2xl font-bold shadow-lg hover:shadow-orange-500/25 hover:scale-[1.02] transition-all duration-300 text-lg flex items-center justify-center gap-2 cursor-pointer relative z-10">
-                <span className="text-xl">💬</span> Invia Messaggio
-              </button>
+              {user?.id === roommate.id ? (
+                <Link to="/dashboard" className="w-full block text-center bg-neutral-900 text-white py-4 rounded-2xl font-bold hover:bg-neutral-800 transition-colors relative z-10">
+                  Questo è il tuo profilo: modificalo
+                </Link>
+              ) : (
+                <button onClick={handleContact} className="w-full bg-gradient-to-r from-orange-500 to-rose-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-orange-500/25 hover:scale-[1.02] transition-all duration-300 text-lg flex items-center justify-center gap-2 cursor-pointer relative z-10">
+                  <span className="text-xl">💬</span> Invia Messaggio
+                </button>
+              )}
             </div>
           </div>
         </aside>

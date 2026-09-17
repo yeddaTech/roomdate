@@ -7,8 +7,7 @@ import (
 	"roomdate-backend/internal/httpx"
 )
 
-// Handler espone le API degli utenti: /api/v1/auth, /api/v1/me, /api/v1/users
-// e l'elenco legacy dei coinquilini.
+// Handler espone le API degli utenti: /api/v1/auth, /api/v1/me, /api/v1/users e /api/v1/roommates.
 type Handler struct {
 	svc      *Service
 	sessions *auth.Manager
@@ -197,12 +196,17 @@ func (h *Handler) PublicProfile(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, profile)
 }
 
-// Roommates gestisce GET /api/get_roommates (API legacy: diventa /api/v1/roommates nel modulo M1.5).
+// Roommates gestisce GET /api/v1/roommates?city=&cursor=&limit=. La sessione è facoltativa:
+// serve a escludere chi guarda e a indicare cosa ha in comune con ogni profilo.
 func (h *Handler) Roommates(w http.ResponseWriter, r *http.Request) {
-	roommates, err := h.svc.Roommates(r.Context())
+	session, _ := h.sessions.FromRequest(r)
+	query := r.URL.Query()
+	page, err := h.svc.Roommates(r.Context(), session.UserID, RoommatesParams{
+		City: query.Get("city"), Cursor: query.Get("cursor"), Limit: query.Get("limit"),
+	})
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, roommates)
+	httpx.JSON(w, http.StatusOK, page)
 }

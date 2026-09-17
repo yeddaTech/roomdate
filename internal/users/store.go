@@ -47,8 +47,9 @@ func scanAccount(row interface{ Scan(...any) error }) (Account, error) {
 	return a, err
 }
 
+// AccountByEmail cerca l'account ignorando le maiuscole (usa l'indice users_email_lower_key).
 func (s *Store) AccountByEmail(ctx context.Context, email string) (Account, error) {
-	return scanAccount(s.db.QueryRow(ctx, `SELECT `+accountColumns+` FROM roomdate_app.users WHERE email = $1`, email))
+	return scanAccount(s.db.QueryRow(ctx, `SELECT `+accountColumns+` FROM roomdate_app.users WHERE lower(email) = lower($1)`, email))
 }
 
 func (s *Store) AccountByID(ctx context.Context, id string) (Account, error) {
@@ -75,17 +76,19 @@ type NewUser struct {
 	FirstName, LastName, Email, PasswordHash string
 	City, UserType, Birthdate                string
 	BudgetMax                                int
-	Occupation, Bio, LifestyleTags           string
+	Occupation, Bio                          string
+	LifestyleTags                            []string
 	Vault                                    Vault
 }
 
+// Create inserisce l'utente. Città e occupazione vuote diventano NULL.
 func (s *Store) Create(ctx context.Context, u NewUser) (string, error) {
 	var id string
 	err := s.db.QueryRow(ctx, `
         INSERT INTO roomdate_app.users
             (first_name, last_name, email, password_hash, citta, user_type, birthdate, budget_max,
              occupation, bio, lifestyle_tags, public_key, encrypted_private_key, crypto_salt, crypto_iv)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, $7, $8, NULLIF($9, ''), $10, $11, $12, $13, $14, $15)
         RETURNING id::text`,
 		u.FirstName, u.LastName, u.Email, u.PasswordHash, u.City, u.UserType, u.Birthdate, u.BudgetMax,
 		u.Occupation, u.Bio, u.LifestyleTags,
@@ -143,30 +146,35 @@ func (s *Store) Delete(ctx context.Context, id string) ([]string, error) {
 
 // Profile è il profilo completo, visibile solo al proprietario.
 type Profile struct {
-	ID            string `json:"id"`
-	FirstName     string `json:"firstName"`
-	LastName      string `json:"lastName"`
-	Email         string `json:"email"`
-	UserType      string `json:"userType"`
-	City          string `json:"city"`
-	Birthdate     string `json:"birthdate"`
-	BudgetMax     int    `json:"budgetMax"`
-	Occupation    string `json:"occupation"`
-	Bio           string `json:"bio"`
-	LifestyleTags string `json:"lifestyleTags"`
-	IsPublic      bool   `json:"isPublic"`
+	ID            string   `json:"id"`
+	FirstName     string   `json:"firstName"`
+	LastName      string   `json:"lastName"`
+	Email         string   `json:"email"`
+	UserType      string   `json:"userType"`
+	City          string   `json:"city"`
+	Birthdate     string   `json:"birthdate"`
+	BudgetMax     int      `json:"budgetMax"`
+	Occupation    string   `json:"occupation"`
+	Bio           string   `json:"bio"`
+	LifestyleTags []string `json:"lifestyleTags"`
+	IsPublic      bool     `json:"isPublic"`
+	// Age è calcolata dal database; nil se manca la data di nascita. Il proprietario vede già la data.
+	Age *int `json:"-"`
 }
+
+// ageColumn calcola l'età in anni compiuti, così la data di nascita non esce dal database.
+const ageColumn = `EXTRACT(YEAR FROM age(CURRENT_DATE, birthdate))::int`
 
 func (s *Store) Profile(ctx context.Context, id string) (Profile, error) {
 	var p Profile
 	err := s.db.QueryRow(ctx, `
         SELECT id::text, COALESCE(first_name, ''), COALESCE(last_name, ''), email,
                COALESCE(user_type, ''), COALESCE(citta, ''), COALESCE(birthdate::text, ''),
-               COALESCE(budget_max, 0), COALESCE(occupation, ''), COALESCE(bio, ''), COALESCE(lifestyle_tags, ''),
-               COALESCE(is_public, true)
+               COALESCE(budget_max, 0), COALESCE(occupation, ''), COALESCE(bio, ''), lifestyle_tags,
+               COALESCE(is_public, true), `+ageColumn+`
         FROM roomdate_app.users WHERE id = $1`, id,
 	).Scan(&p.ID, &p.FirstName, &p.LastName, &p.Email, &p.UserType, &p.City, &p.Birthdate,
-		&p.BudgetMax, &p.Occupation, &p.Bio, &p.LifestyleTags, &p.IsPublic)
+		&p.BudgetMax, &p.Occupation, &p.Bio, &p.LifestyleTags, &p.IsPublic, &p.Age)
 	return p, err
 }
 
@@ -175,52 +183,73 @@ type ProfileUpdate struct {
 	UserType, City        string
 	BudgetMax             int
 	Occupation, Birthdate string
-	Bio, LifestyleTags    string
+	Bio                   string
+	LifestyleTags         []string
 	IsPublic              bool
 }
 
 func (s *Store) UpdateProfile(ctx context.Context, id string, u ProfileUpdate) error {
 	_, err := s.db.Exec(ctx, `
         UPDATE roomdate_app.users
-        SET user_type = $2, citta = $3, budget_max = $4, occupation = $5, birthdate = $6,
+        SET user_type = $2, citta = NULLIF($3, ''), budget_max = $4, occupation = NULLIF($5, ''), birthdate = $6,
             bio = $7, lifestyle_tags = $8, is_public = $9
         WHERE id = $1`,
 		id, u.UserType, u.City, u.BudgetMax, u.Occupation, u.Birthdate, u.Bio, u.LifestyleTags, u.IsPublic)
 	return err
 }
 
-// RoommateRow è un profilo pubblico nell'elenco dei coinquilini.
+// RoommateRow è un profilo nell'elenco dei coinquilini.
 type RoommateRow struct {
-	ID, Name, Job, Bio, Tags, City, UserType string
-	BudgetMax                                int
+	ID, FirstName, City, Occupation, Bio string
+	Age                                  *int
+	LifestyleTags                        []string
+	BudgetMax                            int
+	CreatedAt                            time.Time
 }
 
-// PublicRoommates restituisce fino a limit profili pubblici.
-func (s *Store) PublicRoommates(ctx context.Context, limit int) ([]RoommateRow, error) {
+// RoommatesQuery filtra e pagina l'elenco dei coinquilini.
+type RoommatesQuery struct {
+	// ExcludeID è l'utente che guarda (vuoto se non ha una sessione): non vede sé stesso.
+	ExcludeID string
+	// City vuota significa tutte le città.
+	City string
+	// After è la posizione dell'ultimo profilo della pagina precedente, nil per la prima pagina.
+	After *RoommatesCursor
+	Limit int
+}
+
+// RoommatesCursor è la posizione di un profilo nell'ordinamento dell'elenco.
+type RoommatesCursor struct {
+	CreatedAt time.Time
+	ID        string
+}
+
+// Roommates restituisce i profili pubblici di chi cerca una stanza, dal più recente.
+// Gli account senza data di creazione (possibili in produzione) vengono per ultimi.
+func (s *Store) Roommates(ctx context.Context, q RoommatesQuery) ([]RoommateRow, error) {
+	var afterTime *time.Time
+	var afterID string
+	if q.After != nil {
+		afterTime, afterID = &q.After.CreatedAt, q.After.ID
+	}
 	rows, err := s.db.Query(ctx, `
-        SELECT id::text,
-               COALESCE(first_name, ''),
-               COALESCE(occupation, ''),
-               COALESCE(bio, ''),
-               COALESCE(lifestyle_tags, ''),
-               COALESCE(citta, ''),
-               COALESCE(user_type, ''),
-               COALESCE(budget_max, 0)
+        SELECT id::text, COALESCE(first_name, ''), COALESCE(citta, ''), COALESCE(occupation, ''), COALESCE(bio, ''),
+               `+ageColumn+`, lifestyle_tags, COALESCE(budget_max, 0), COALESCE(created_at, 'epoch')
         FROM roomdate_app.users
-        WHERE COALESCE(is_public, true) = true
-        LIMIT $1`, limit)
+        WHERE COALESCE(is_public, true)
+          AND user_type = 'cerca'
+          AND ($1 = '' OR id <> NULLIF($1, '')::uuid)
+          AND ($2 = '' OR citta = $2)
+          AND ($3::timestamptz IS NULL OR (COALESCE(created_at, 'epoch'), id) < ($3::timestamptz, NULLIF($4, '')::uuid))
+        ORDER BY COALESCE(created_at, 'epoch') DESC, id DESC
+        LIMIT $5`,
+		q.ExcludeID, q.City, afterTime, afterID, q.Limit)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var result []RoommateRow
-	for rows.Next() {
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (RoommateRow, error) {
 		var r RoommateRow
-		if err := rows.Scan(&r.ID, &r.Name, &r.Job, &r.Bio, &r.Tags, &r.City, &r.UserType, &r.BudgetMax); err != nil {
-			return nil, err
-		}
-		result = append(result, r)
-	}
-	return result, rows.Err()
+		err := row.Scan(&r.ID, &r.FirstName, &r.City, &r.Occupation, &r.Bio, &r.Age, &r.LifestyleTags, &r.BudgetMax, &r.CreatedAt)
+		return r, err
+	})
 }

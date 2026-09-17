@@ -4,6 +4,10 @@ import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../auth/AuthContext';
 import { useLatestListings, useRoommates, useStartChat } from '../api/hooks';
 import { formatAvailability, formatBills } from '../api/listings';
+import { CITIES, isCity, occupationLabel } from '../api/options';
+import { formatAge } from '../api/users';
+import CompatibilityList from '../components/profile/CompatibilityList';
+import LifestyleTags from '../components/profile/LifestyleTags';
 
 export default function Search() {
   const navigate = useNavigate();
@@ -12,7 +16,8 @@ export default function Search() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const urlIntent = searchParams.get('intent');
-  const currentCity = searchParams.get('citta') || '';
+  // Città fuori elenco (es. da un vecchio link) equivale a "tutte le città"
+  const currentCity = isCity(searchParams.get('citta') || '') ? searchParams.get('citta') : '';
   const currentBudget = searchParams.get('budget') || '';
 
   // 🔴 LOGICA SISTEMATA: L'URL comanda sempre e il default è 'stanza'. Addio conflitti con il ruolo utente.
@@ -26,12 +31,14 @@ export default function Search() {
     setSearchParams(params);
   };
 
-  // Si carica solo l'elenco della modalità attiva; i dati restano in cache passando da una all'altra
-  const roommatesQuery = useRoommates({ enabled: currentIntent === 'coinquilino' });
+  // Si carica solo l'elenco della modalità attiva; i dati restano in cache passando da una all'altra.
+  // I coinquilini arrivano a pagine, già filtrati per città e senza il proprio profilo.
+  const roommatesQuery = useRoommates({ city: currentCity, enabled: currentIntent === 'coinquilino' });
   const listingsQuery = useLatestListings({ enabled: currentIntent === 'stanza' });
   const activeQuery = currentIntent === 'coinquilino' ? roommatesQuery : listingsQuery;
-  const results = activeQuery.data ?? [];
+  const results = (currentIntent === 'coinquilino' ? roommatesQuery.data?.pages.flatMap(page => page.items) : listingsQuery.data) ?? [];
   const loading = activeQuery.isPending;
+  const hasMoreRoommates = currentIntent === 'coinquilino' && roommatesQuery.hasNextPage;
 
   const startChat = useStartChat();
 
@@ -55,17 +62,12 @@ export default function Search() {
     }
   };
 
-  // 🔴 LOGICA FILTRI BLINDATA E TOLLERANTE
+  // Filtri nel browser sugli elementi caricati: passano al server nel modulo M1.6
   const filteredResults = results.filter(item => {
-    // Escludi l'utente stesso dalla visualizzazione dei coinquilini
-    if (user && String(item.id) === String(user.id) && currentIntent === 'coinquilino') {
-      return false;
-    }
-    
     let match = true;
     
-    // Filtro Città tollerante
-    if (currentCity) {
+    // Filtro città sugli annunci (i coinquilini sono già filtrati dal server)
+    if (currentIntent === 'stanza' && currentCity) {
       const itemCity = item.city.toLowerCase().trim();
       if (itemCity && itemCity !== currentCity.toLowerCase().trim()) {
         match = false;
@@ -192,10 +194,7 @@ export default function Search() {
               onChange={(e) => handleTopSearch(currentIntent, e.target.value, currentBudget)}
             >
               <option value="">📍 Tutte le Città</option>
-              <option value="Milano">Milano</option>
-              <option value="Roma">Roma</option>
-              <option value="Bologna">Bologna</option>
-              <option value="Torino">Torino</option>
+              {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             
             <input 
@@ -216,10 +215,16 @@ export default function Search() {
             {currentIntent === 'coinquilino' ? 'Coinquilini disponibili' : 'Stanze in affitto'}
           </h1>
           <p className="text-neutral-500 mb-10 font-medium text-lg">
-            Trovati <span className="font-bold text-orange-500">{filteredResults.length}</span> risultati {currentCity && `a ${currentCity}`}
+            {hasMoreRoommates ? 'Mostrati' : 'Trovati'} <span className="font-bold text-orange-500">{filteredResults.length}</span> risultati {currentCity && `a ${currentCity}`}
           </p>
 
-          {loading ? (
+          {activeQuery.isError ? (
+            <div className="bg-white rounded-3xl border border-rose-200 p-16 text-center shadow-sm">
+              <h3 className="font-serif text-2xl text-neutral-900 mb-3 font-extrabold">Impossibile caricare i risultati</h3>
+              <p className="text-neutral-500 mb-8 font-medium">{activeQuery.error.message}</p>
+              <button className="bg-neutral-900 text-white px-8 py-3.5 rounded-full font-bold cursor-pointer" onClick={() => activeQuery.refetch()}>Riprova</button>
+            </div>
+          ) : loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {[1, 2, 3, 4, 5, 6].map((n) => (
                 <div key={n} className="bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col h-full min-h-[380px]">
@@ -277,25 +282,33 @@ export default function Search() {
                     </div>
                   );
                 } else {
+                  const details = [formatAge(item.age), occupationLabel(item.occupation) ?? 'Occupazione non indicata'].filter(Boolean).join(' · ');
                   return (
-                    <div key={item.id} className="w-full bg-white rounded-3xl shadow-sm border border-neutral-100 p-6 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-orange-100 group relative overflow-hidden">
+                    <div key={item.id} data-testid="roommate-card" className="w-full bg-white rounded-3xl shadow-sm border border-neutral-100 p-6 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-orange-100 group relative overflow-hidden">
                       <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-400/10 rounded-full blur-2xl"></div>
                       
-                      <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 shadow-sm relative z-10 transition-transform duration-500 group-hover:scale-110" style={{ background: `linear-gradient(135deg, ${item.color1 || '#fb923c'}, ${item.color2 || '#e11d48'})` }}>
-                        <span className="drop-shadow-sm">{item.emoji || '👤'}</span>
+                      <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold text-white mx-auto mb-4 shadow-sm relative z-10 bg-gradient-to-br from-orange-400 to-rose-500 transition-transform duration-500 group-hover:scale-110">
+                        {(item.firstName || '?').charAt(0).toUpperCase()}
                       </div>
-                      <div className="text-center font-bold text-neutral-900 text-lg relative z-10 truncate">{item.name}</div>
-                      <div className="text-center text-xs text-neutral-500 mb-4 font-bold uppercase tracking-wider relative z-10">{item.occupation || 'Occupazione non indicata'}</div>
+                      <div className="text-center font-bold text-neutral-900 text-lg relative z-10 truncate">{item.firstName || 'Utente'}</div>
+                      <div className="text-center text-xs text-neutral-500 mb-1 font-bold uppercase tracking-wider relative z-10">{details}</div>
+                      {item.city && <div className="text-center text-xs text-neutral-500 mb-4 font-medium relative z-10">📍 {item.city}</div>}
                       
                       <div className="bg-neutral-50 p-4 rounded-2xl text-sm text-neutral-600 italic text-center mb-5 leading-relaxed relative z-10 border border-neutral-100 line-clamp-3">{item.bio ? `"${item.bio}"` : 'Nessuna presentazione'}</div>
                       
                       <div className="flex flex-wrap justify-center gap-1.5 mb-5 relative z-10">
-                        {item.tags.slice(0, 4).map(t => <span key={t} className="bg-orange-50 text-orange-600 border border-orange-100 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider">{t.trim()}</span>)}
+                        <LifestyleTags tags={item.lifestyleTags} limit={4} className="bg-orange-50 text-orange-600 border border-orange-100 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider" />
                       </div>
 
                       {item.budgetMax > 0 && (
                         <div className="text-center text-sm font-extrabold text-orange-500 mb-5 relative z-10 bg-white border border-neutral-100 py-2 rounded-xl shadow-sm">
                            Budget max: €{item.budgetMax}
+                        </div>
+                      )}
+
+                      {item.compatibility && (
+                        <div className="mb-5 relative z-10">
+                          <CompatibilityList compatibility={item.compatibility} compact />
                         </div>
                       )}
                       
@@ -317,6 +330,18 @@ export default function Search() {
                   );
                 }
               })}
+            </div>
+          )}
+
+          {hasMoreRoommates && !activeQuery.isError && (
+            <div className="flex justify-center mt-10">
+              <button
+                onClick={() => roommatesQuery.fetchNextPage()}
+                disabled={roommatesQuery.isFetchingNextPage}
+                className="bg-white border border-neutral-200 hover:border-orange-300 text-neutral-900 px-8 py-3.5 rounded-full font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                {roommatesQuery.isFetchingNextPage ? 'Caricamento...' : 'Carica altri profili'}
+              </button>
             </div>
           )}
         </main>

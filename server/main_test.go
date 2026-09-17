@@ -339,7 +339,7 @@ func registration(name, email, password, userType string, withVault bool) map[st
 	body := map[string]any{
 		"firstName": name, "lastName": "Rossi", "email": email, "password": password,
 		"city": "Milano", "userType": userType, "birthdate": "1999-01-01", "budgetMax": 500,
-		"occupation": "Studente", "bio": "ciao", "lifestyleTags": "Socievole",
+		"occupation": "studente", "bio": "ciao", "lifestyleTags": []string{"socievole"},
 	}
 	if withVault {
 		body["keys"] = map[string]string{

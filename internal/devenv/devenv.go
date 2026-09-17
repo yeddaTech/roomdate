@@ -71,6 +71,20 @@ func DescribeDSN(dsn string) (host, dbname string) {
 	return host, dbname
 }
 
+// DirectNeonDSN toglie "-pooler" dall'host di Neon, per usare la connessione diretta: le migrazioni
+// non devono passare dal pooler, che non mantiene lo stato della sessione. changed indica se è cambiato.
+func DirectNeonDSN(dsn string) (direct string, changed bool) {
+	if !strings.HasPrefix(dsn, "postgres://") && !strings.HasPrefix(dsn, "postgresql://") {
+		return dsn, false
+	}
+	u, err := url.Parse(dsn)
+	if err != nil || !strings.Contains(u.Host, "-pooler.") {
+		return dsn, false
+	}
+	u.Host = strings.Replace(u.Host, "-pooler.", ".", 1)
+	return u.String(), true
+}
+
 // IsLocalHost indica se l'host è la macchina locale (loopback o socket Unix).
 func IsLocalHost(host string) bool {
 	h := host
