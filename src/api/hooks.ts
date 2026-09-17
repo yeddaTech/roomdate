@@ -1,6 +1,6 @@
 // Hook per leggere e modificare i dati: le pagine usano questi, non le chiamate API dirette.
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { listConversations, startChat } from './chat';
+import { listConversations, listMessages, markConversationRead, sendMessage, startChat } from './chat';
 import {
   createListing,
   deleteListing,
@@ -13,6 +13,7 @@ import {
   uploadListingPhoto,
 } from './listings';
 import { queryKeys } from './queryKeys';
+import type { OutgoingMessage } from './chat';
 import type { ListingFilters, ListingInput, SessionUser } from './types';
 import { getMyProfile, getPublicProfile, listRoommates, updateMyProfile } from './users';
 
@@ -150,9 +151,50 @@ export function useDeleteListingImage() {
   });
 }
 
-/** Conversazioni dell'utente (la pagina Chat le carica per conto suo, con la decifratura). */
-export function useConversations() {
-  return useQuery({ queryKey: queryKeys.conversations, queryFn: listConversations });
+/**
+ * Conversazioni a pagine, con ultimo messaggio e non letti. I testi restano cifrati:
+ * li apre la pagina Chat con la chiave dell'utente.
+ */
+export function useConversations({ enabled = true } = {}) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.conversations,
+    queryFn: ({ pageParam }) => listConversations({ cursor: pageParam }),
+    initialPageParam: '',
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled,
+  });
+}
+
+/** Messaggi di una conversazione, dal più recente: fetchNextPage carica quelli più vecchi. */
+export function useMessages(conversationId: number | null) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.messages(conversationId ?? 0),
+    queryFn: ({ pageParam }) => listMessages(conversationId as number, { cursor: pageParam }),
+    initialPageParam: '',
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled: conversationId !== null,
+  });
+}
+
+export function useSendMessage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ conversationId, message }: { conversationId: number; message: OutgoingMessage }) =>
+      sendMessage(conversationId, message),
+    onSuccess: (_, { conversationId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+    },
+  });
+}
+
+/** Segna letta la conversazione aperta, così il contatore dei non letti torna a zero. */
+export function useMarkConversationRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: markConversationRead,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.conversations }),
+  });
 }
 
 export function useStartChat() {

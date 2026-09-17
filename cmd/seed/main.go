@@ -59,7 +59,7 @@ type seedListing struct {
 type seedMessage struct {
 	from       string
 	minutesAgo int
-	text       string // max ~190 byte: limite di RSA-OAEP (anomalia F8)
+	text       string
 }
 
 type seedConversation struct {
@@ -117,6 +117,12 @@ var conversations = []seedConversation{
 	{tenant: "sara", user2: "giulia", listing: -1, messages: []seedMessage{
 		{"sara", 60, "Ciao! Ho visto che cerchi casa anche tu: ti andrebbe di cercarla insieme?"},
 		{"giulia", 45, "Volentieri! Io però sono a Milano, tu resti a Bologna?"},
+		// Messaggio lungo: con la cifratura ibrida non c'è più il limite di 190 byte (anomalia F8)
+		{"sara", 30, "Sì, per ora resto a Bologna almeno fino a giugno, poi si vedrà: dipende da dove trovo lavoro. " +
+			"Intanto possiamo guardare insieme gli annunci e confrontare i prezzi delle due città, così capiamo " +
+			"quanto budget serve e quali zone conviene guardare. Ho messo da parte qualche annuncio vicino " +
+			"all'università, con le spese incluse e la lavatrice: te li giro appena riesco, insieme ai contatti " +
+			"delle agenzie che mi hanno risposto in modo serio. Fammi sapere quando hai mezz'ora libera!"},
 	}},
 }
 
@@ -195,6 +201,7 @@ func main() {
 func deleteSeedData(tx *sql.Tx) error {
 	seedIDs := `SELECT id FROM roomdate_app.users WHERE email LIKE $1`
 	statements := []string{
+		// message_keys e conversation_participants spariscono a cascata
 		`DELETE FROM roomdate_app.messages WHERE conversation_id IN (
              SELECT c.id FROM roomdate_app.conversations c
              LEFT JOIN roomdate_app.listings l ON c.listing_id = l.id
@@ -270,32 +277,59 @@ func insertSeedData(tx *sql.Tx) error {
 			recipientOf[c.tenant], recipientOf[c.user2] = c.user2, c.tenant
 		}
 
+		tenantID := keys[c.tenant].id
+		otherID, _ := user2ID.(string)
+		dedupKey := "direct:" + min(tenantID, otherID) + ":" + max(tenantID, otherID)
+		if c.listing >= 0 {
+			dedupKey = fmt.Sprintf("listing:%v:%s", listingID, tenantID)
+		}
+
 		var conversationID string
 		err := tx.QueryRow(`
-            INSERT INTO roomdate_app.conversations (listing_id, tenant_id, user2_id)
-            VALUES ($1, $2, $3) RETURNING id::text`,
-			listingID, keys[c.tenant].id, user2ID,
+            INSERT INTO roomdate_app.conversations (listing_id, tenant_id, user2_id, dedup_key)
+            VALUES ($1, $2, $3, $4) RETURNING id::text`,
+			listingID, tenantID, user2ID, dedupKey,
 		).Scan(&conversationID)
 		if err != nil {
 			return fmt.Errorf("conversazione di %s: %w", c.tenant, err)
 		}
+		for _, id := range []string{tenantID, otherID} {
+			_, err = tx.Exec(`
+                INSERT INTO roomdate_app.conversation_participants (conversation_id, user_id)
+                VALUES ($1, $2)`, conversationID, id)
+			if err != nil {
+				return fmt.Errorf("partecipante di %s: %w", c.tenant, err)
+			}
+		}
 
 		for _, m := range c.messages {
-			forRecipient, err := encryptFor(keys[recipientOf[m.from]].publicKey, m.text)
+			// Cifratura ibrida, come nel browser: un solo testo cifrato con AES-GCM e la chiave
+			// del messaggio cifrata con RSA per ogni partecipante.
+			body, iv, messageKey, err := encryptBody(m.text)
 			if err != nil {
 				return fmt.Errorf("messaggio %q: %w", m.text, err)
 			}
-			forSender, err := encryptFor(keys[m.from].publicKey, m.text)
+			var messageID string
+			err = tx.QueryRow(`
+                INSERT INTO roomdate_app.messages (conversation_id, sender_id, format, body, iv, content, created_at)
+                VALUES ($1, $2, 2, $3, $4, '', NOW() - make_interval(mins => $5))
+                RETURNING id::text`,
+				conversationID, keys[m.from].id, body, iv, m.minutesAgo,
+			).Scan(&messageID)
 			if err != nil {
 				return fmt.Errorf("messaggio %q: %w", m.text, err)
 			}
-			_, err = tx.Exec(`
-                INSERT INTO roomdate_app.messages (conversation_id, sender_id, content, sender_content, created_at)
-                VALUES ($1, $2, $3, $4, NOW() - make_interval(mins => $5))`,
-				conversationID, keys[m.from].id, forRecipient, forSender, m.minutesAgo,
-			)
-			if err != nil {
-				return fmt.Errorf("messaggio %q: %w", m.text, err)
+			for _, participant := range []*userKeys{keys[m.from], keys[recipientOf[m.from]]} {
+				wrapped, err := encryptFor(participant.publicKey, string(messageKey))
+				if err != nil {
+					return fmt.Errorf("chiave del messaggio %q: %w", m.text, err)
+				}
+				_, err = tx.Exec(`
+                    INSERT INTO roomdate_app.message_keys (message_id, user_id, wrapped_key)
+                    VALUES ($1, $2, $3)`, messageID, participant.id, wrapped)
+				if err != nil {
+					return fmt.Errorf("chiave del messaggio %q: %w", m.text, err)
+				}
 			}
 		}
 	}
@@ -346,6 +380,26 @@ func newUserKeys(password string) (*userKeys, error) {
 		cryptoSalt: b64(salt),
 		cryptoIv:   b64(iv),
 	}, nil
+}
+
+// encryptBody cifra il testo con AES-256-GCM, come encryptForRecipients di src/utils/crypto.js:
+// restituisce testo cifrato e IV in Base64, più la chiave del messaggio da cifrare per i partecipanti.
+func encryptBody(text string) (body, iv string, messageKey []byte, err error) {
+	messageKey = make([]byte, 32)
+	nonce := make([]byte, 12)
+	rand.Read(messageKey)
+	rand.Read(nonce)
+
+	block, err := aes.NewCipher(messageKey)
+	if err != nil {
+		return "", "", nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", "", nil, err
+	}
+	b64 := base64.StdEncoding.EncodeToString
+	return b64(gcm.Seal(nil, nonce, []byte(text), nil)), b64(nonce), messageKey, nil
 }
 
 // encryptFor replica encryptMessage di src/utils/crypto.js (RSA-OAEP con SHA-256).

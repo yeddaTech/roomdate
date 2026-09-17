@@ -1,32 +1,41 @@
 import { request } from './client';
-import type { Conversation } from './types';
-
-// --- API legacy (diventano /api/v1 nel modulo M1.7) ---
-
-export async function listConversations(): Promise<Conversation[]> {
-  const rows = await request<Conversation[] | null>('/api/get_chats');
-  return (rows ?? []).map((c) => ({ ...c, messages: c.messages ?? [] }));
-}
+import type { ChatMessage, ConversationsPage, MessagesPage } from './types';
 
 export type StartChatTarget = { listingId: number } | { targetId: string };
 
+/** Apre la conversazione (o ne riusa una esistente) e ne restituisce l'ID. */
 export async function startChat(target: StartChatTarget): Promise<number> {
-  const { conversationId } = await request<{ conversationId: number }>('/api/start_chat', { method: 'POST', body: target });
-  return conversationId;
+  const { id } = await request<{ id: number }>('/api/v1/conversations', { method: 'POST', body: target });
+  return id;
 }
 
+/** Una pagina di conversazioni, dalla più attiva, con ultimo messaggio e non letti. */
+export function listConversations({ cursor = '' } = {}): Promise<ConversationsPage> {
+  return request<ConversationsPage>(`/api/v1/conversations${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`);
+}
+
+/** Una pagina di messaggi, dal più recente: il cursore carica quelli più vecchi. */
+export function listMessages(conversationId: number, { cursor = '' } = {}): Promise<MessagesPage> {
+  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+  return request<MessagesPage>(`/api/v1/conversations/${conversationId}/messages${query}`);
+}
+
+/** Messaggio cifrato: un testo e la chiave del messaggio cifrata per ogni partecipante. */
 export interface OutgoingMessage {
-  conversationId: number;
-  /** Cifrato con la chiave pubblica del destinatario. */
-  text: string;
-  /** Cifrato con la chiave pubblica del mittente, per rileggere i propri messaggi. */
-  senderText: string;
+  body: string;
+  iv: string;
+  keys: { userId: string; key: string }[];
 }
 
-export async function sendMessage(message: OutgoingMessage): Promise<void> {
-  await request<unknown>('/api/send_message', { method: 'POST', body: message });
+export function sendMessage(conversationId: number, message: OutgoingMessage): Promise<ChatMessage> {
+  return request<ChatMessage>(`/api/v1/conversations/${conversationId}/messages`, { method: 'POST', body: message });
 }
 
-export async function notifyTyping(conversationId: number): Promise<void> {
-  await request<unknown>('/api/typing', { method: 'POST', body: { conversationId: String(conversationId) } });
+/** Segna come letti i messaggi della conversazione fino a ora. */
+export function markConversationRead(conversationId: number): Promise<void> {
+  return request<void>(`/api/v1/conversations/${conversationId}/read`, { method: 'POST' });
+}
+
+export function notifyTyping(conversationId: number): Promise<void> {
+  return request<void>(`/api/v1/conversations/${conversationId}/typing`, { method: 'POST' });
 }
