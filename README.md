@@ -79,15 +79,15 @@ The browser resizes each photo (longest side 1600 px, JPEG, metadata such as GPS
 One-time setup:
 
 1. In Cloudflare → R2, create a bucket (choose the **EU jurisdiction** if data must stay in the EU; the S3 endpoint then contains `.eu.`).
-2. Bucket → Settings → **Public access**: enable the `r2.dev` domain or connect a custom domain. That address is `R2_PUBLIC_URL`.
-3. Bucket → Settings → **CORS policy**, so browsers can upload from the site:
+2. Bucket → Settings → **Public Development URL** → Enable (or **Custom Domains** → Add, if you have a domain on Cloudflare). That address, without a trailing `/`, is `R2_PUBLIC_URL`. Cloudflare rate-limits `r2.dev` addresses and recommends them only for development: fine to start, but switch to a custom domain when traffic grows.
+3. Bucket → Settings → **CORS Policy** → Add CORS policy → JSON tab, so browsers can upload from the site:
    ```json
    [{ "AllowedOrigins": ["https://roomdate.vercel.app"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["content-type"], "MaxAgeSeconds": 3600 }]
    ```
    Add your preview or local origins (e.g. `http://127.0.0.1:5173`) to a separate development bucket, not to the production one.
-4. Bucket → Settings → **Object lifecycle rules**: delete objects with prefix `pending/` after 1 day (uploads that were never confirmed).
-5. R2 → Manage API tokens: create a token with **Object Read & Write** on this bucket only. Its Access Key ID and Secret are `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`; the S3 endpoint shown there is `R2_ENDPOINT`.
-6. Add the five `R2_*` variables in Vercel → Settings → Environment Variables. `vercel.json` already allows images from `*.r2.dev` and uploads to `*.r2.cloudflarestorage.com` in the Content Security Policy; with a custom domain, add it to `img-src`.
+4. Bucket → Settings → **Object Lifecycle Rules** → Add rule: prefix `pending/`, delete objects after 1 day (uploads that were never confirmed).
+5. R2 overview → **API Tokens** → Manage → Create Account API token, with **Object Read and Write** on this bucket only. Its Access Key ID and Secret Access Key (shown only once) are `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`; the S3 endpoint, **without** the bucket name at the end, is `R2_ENDPOINT` (it contains `.eu.` for an EU bucket).
+6. Add the five `R2_*` variables in Vercel → Settings → Environment Variables, then redeploy: variables only apply to new deployments. `vercel.json` already allows images from `*.r2.dev` and uploads to `*.r2.cloudflarestorage.com` in the Content Security Policy; with a custom domain, add it to `img-src`.
 
 ### Neon branches and Vercel previews
 
