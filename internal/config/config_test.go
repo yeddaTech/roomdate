@@ -8,9 +8,10 @@ import (
 func TestFromEnvRequiresSecrets(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")
 	t.Setenv("JWT_SECRET", "")
+	t.Setenv("APP_SECRET", "")
 
 	_, err := FromEnv()
-	if err == nil || !strings.Contains(err.Error(), "DATABASE_URL") || !strings.Contains(err.Error(), "JWT_SECRET") {
+	if err == nil || !strings.Contains(err.Error(), "DATABASE_URL") || !strings.Contains(err.Error(), "APP_SECRET") {
 		t.Fatalf("errore = %v", err)
 	}
 }

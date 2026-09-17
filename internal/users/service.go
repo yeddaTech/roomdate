@@ -12,6 +12,7 @@ import (
 	"roomdate-backend/internal/apperr"
 	"roomdate-backend/internal/auth"
 	"roomdate-backend/internal/db"
+	"roomdate-backend/internal/logx"
 	"roomdate-backend/internal/page"
 	"roomdate-backend/internal/validate"
 	"roomdate-backend/shared"
@@ -31,20 +32,25 @@ const (
 
 var (
 	errSessionInvalid = apperr.Unauthorized("session_invalid", "Sessione scaduta: accedi di nuovo")
-	errLocked         = apperr.TooManyRequests("account_locked", "Account temporaneamente bloccato per troppi tentativi. Riprova tra 15 minuti.")
-	errTooManyFailed  = apperr.TooManyRequests("account_locked", "Troppi tentativi falliti. Account bloccato per 15 minuti.")
-	errUserNotFound   = apperr.NotFound("user_not_found", "Utente non trovato")
+	// Messaggio unico per email inesistente e password errata: distinguerli direbbe a chiunque
+	// quali indirizzi sono registrati.
+	errInvalidCredentials = apperr.Unauthorized("invalid_credentials", "Credenziali non valide")
+	errUserNotFound       = apperr.NotFound("user_not_found", "Utente non trovato")
 )
 
 type Service struct {
 	store *Store
+	// security registra accessi e operazioni delicate, e conta i tentativi falliti recenti
+	security *auth.Store
+	// hash calcola l'impronta di email e indirizzi IP, che nel registro sostituiscono i valori veri
+	hash func(string) string
 	// images cancella dallo storage le foto degli annunci di un account eliminato
 	images func(ctx context.Context, keys []string)
 	now    func() time.Time
 }
 
-func NewService(store *Store, deleteImages func(ctx context.Context, keys []string)) *Service {
-	return &Service{store: store, images: deleteImages, now: time.Now}
+func NewService(store *Store, security *auth.Store, hash func(string) string, deleteImages func(ctx context.Context, keys []string)) *Service {
+	return &Service{store: store, security: security, hash: hash, images: deleteImages, now: time.Now}
 }
 
 // RegisterInput sono i dati del modulo di registrazione.
@@ -90,7 +96,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (string, error
 	v.Check(validate.NotBlank(u.FirstName) && validate.MaxLen(u.FirstName, 50), "firstName", "Il nome è obbligatorio (massimo 50 caratteri)")
 	v.Check(validate.NotBlank(u.LastName) && validate.MaxLen(u.LastName, 50), "lastName", "Il cognome è obbligatorio (massimo 50 caratteri)")
 	v.Check(validate.Email(u.Email), "email", "Inserisci un indirizzo email valido")
-	checkPassword(&v, "password", in.Password)
+	checkPassword(&v, "password", in.Password, u.Email, u.FirstName)
 	u.LifestyleTags = checkPersonalDetails(&v, s.now(), personalDetails{
 		UserType: u.UserType, City: u.City, Birthdate: u.Birthdate, BudgetMax: u.BudgetMax,
 		Occupation: u.Occupation, Bio: u.Bio, LifestyleTags: in.LifestyleTags,
@@ -117,46 +123,72 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (string, error
 	return id, nil
 }
 
-// Login verifica le credenziali, con blocco temporaneo dopo troppi tentativi errati.
-func (s *Service) Login(ctx context.Context, email, password string) (Account, error) {
-	account, err := s.store.AccountByEmail(ctx, normalizeEmail(email))
+// LoginInput sono i dati di un tentativo di accesso; IPHash identifica la provenienza
+// senza salvare l'indirizzo.
+type LoginInput struct {
+	Email, Password, IPHash string
+}
+
+// Login verifica le credenziali. Dopo qualche tentativo fallito chiede di aspettare, con attese
+// crescenti per indirizzo email e per provenienza: non blocca mai del tutto un account, perché
+// basterebbe conoscere l'email di qualcuno per chiuderlo fuori.
+func (s *Service) Login(ctx context.Context, in LoginInput) (Account, error) {
+	emailHash := s.hash(normalizeEmail(in.Email))
+	if err := s.checkLoginThrottle(ctx, emailHash, in.IPHash); err != nil {
+		return Account{}, err
+	}
+
+	account, err := s.store.AccountByEmail(ctx, normalizeEmail(in.Email))
 	if db.IsNoRows(err) {
-		return Account{}, apperr.Unauthorized("invalid_credentials", "Email non trovata")
+		s.recordFailedLogin(ctx, "", emailHash, in.IPHash)
+		return Account{}, errInvalidCredentials
 	}
 	if err != nil {
 		return Account{}, fmt.Errorf("lettura account: %w", err)
 	}
-	if err := s.verifyPassword(ctx, account, password, "Password errata"); err != nil {
-		return Account{}, err
+
+	ok, legacyHash := auth.CheckPassword(account.PasswordHash, in.Password)
+	if !ok {
+		s.recordFailedLogin(ctx, account.ID, emailHash, in.IPHash)
+		return Account{}, errInvalidCredentials
 	}
+
+	// Gli account registrati con bcrypt passano ad Argon2id al primo accesso riuscito
+	if legacyHash {
+		if hash, err := auth.HashPassword(in.Password); err == nil {
+			if err := s.store.UpdatePasswordHash(ctx, account.ID, hash); err != nil {
+				logx.From(ctx).Warn("aggiornamento dell'hash della password non riuscito", "err", err)
+			}
+		}
+	}
+	s.record(ctx, auth.Event{Kind: auth.EventLoginOK, UserID: account.ID, EmailHash: emailHash, IPHash: in.IPHash})
 	return account, nil
 }
 
-// verifyPassword controlla la password rispettando il blocco dell'account: ogni errore aumenta
-// il contatore e al quinto l'account resta bloccato per 15 minuti. Un successo azzera il contatore.
-func (s *Service) verifyPassword(ctx context.Context, account Account, password, wrongMessage string) error {
-	if account.LockedUntil != nil && account.LockedUntil.After(s.now()) {
-		return errLocked
+// checkLoginThrottle rifiuta il tentativo se bisogna ancora aspettare.
+func (s *Service) checkLoginThrottle(ctx context.Context, emailHash, ipHash string) error {
+	failures, err := s.security.RecentFailedLogins(ctx, emailHash, ipHash, auth.ThrottleWindow)
+	if err != nil {
+		return fmt.Errorf("lettura tentativi recenti: %w", err)
 	}
+	wait := auth.RetryAfter(failures, s.now())
+	if wait <= 0 {
+		return nil
+	}
+	minutes := int(wait.Minutes()) + 1
+	return apperr.TooManyRequests("too_many_attempts",
+		fmt.Sprintf("Troppi tentativi di accesso: riprova tra %d minuti", minutes))
+}
 
-	if !auth.CheckPassword(account.PasswordHash, password) {
-		attempts := account.FailedLogins + 1
-		lock := attempts >= auth.MaxFailedLogins
-		if err := s.store.SetFailedLogins(ctx, account.ID, attempts, lock, auth.LockDuration); err != nil {
-			return fmt.Errorf("aggiornamento tentativi: %w", err)
-		}
-		if lock {
-			return errTooManyFailed
-		}
-		return apperr.Unauthorized("invalid_credentials", wrongMessage)
-	}
+func (s *Service) recordFailedLogin(ctx context.Context, userID, emailHash, ipHash string) {
+	s.record(ctx, auth.Event{Kind: auth.EventLoginFailed, UserID: userID, EmailHash: emailHash, IPHash: ipHash})
+}
 
-	if account.FailedLogins > 0 {
-		if err := s.store.ResetFailedLogins(ctx, account.ID); err != nil {
-			return fmt.Errorf("azzeramento tentativi: %w", err)
-		}
+// record salva un evento di sicurezza: se non riesce, l'operazione dell'utente prosegue comunque.
+func (s *Service) record(ctx context.Context, event auth.Event) {
+	if err := s.security.RecordEvent(ctx, event); err != nil {
+		logx.From(ctx).Warn("evento di sicurezza non registrato", "kind", event.Kind, "err", err)
 	}
-	return nil
 }
 
 // SessionAccount restituisce l'account dell'utente in sessione.
@@ -183,13 +215,6 @@ type ChangePasswordInput struct {
 // ChangePassword richiede la password attuale e, se l'utente ha chiavi E2EE, la chiave privata
 // cifrata di nuovo con la nuova password: senza, i messaggi diventerebbero illeggibili.
 func (s *Service) ChangePassword(ctx context.Context, userID string, in ChangePasswordInput) error {
-	var v validate.Validator
-	v.Check(len(in.NewPassword) >= auth.MinPasswordLength, "newPassword", "La nuova password deve avere almeno 6 caratteri")
-	v.Check(len(in.NewPassword) <= auth.MaxPasswordBytes, "newPassword", "La nuova password è troppo lunga")
-	if err := v.Err(); err != nil {
-		return err
-	}
-
 	account, err := s.store.AccountByID(ctx, userID)
 	if db.IsNoRows(err) || db.IsInvalidInput(err) {
 		return errSessionInvalid
@@ -197,8 +222,11 @@ func (s *Service) ChangePassword(ctx context.Context, userID string, in ChangePa
 	if err != nil {
 		return fmt.Errorf("lettura account: %w", err)
 	}
-	if account.LockedUntil != nil && account.LockedUntil.After(s.now()) {
-		return errLocked
+
+	var v validate.Validator
+	checkPassword(&v, "newPassword", in.NewPassword, account.Email, account.FirstName)
+	if err := v.Err(); err != nil {
+		return err
 	}
 
 	var newVault Vault
@@ -216,8 +244,10 @@ func (s *Service) ChangePassword(ctx context.Context, userID string, in ChangePa
 		}
 	}
 
-	if err := s.verifyPassword(ctx, account, in.CurrentPassword, "La password attuale non è corretta"); err != nil {
-		return err
+	// La password attuale va richiesta di nuovo: un computer lasciato aperto non deve bastare
+	if ok, _ := auth.CheckPassword(account.PasswordHash, in.CurrentPassword); !ok {
+		s.record(ctx, auth.Event{Kind: auth.EventLoginFailed, UserID: account.ID})
+		return apperr.Unauthorized("invalid_credentials", "La password attuale non è corretta")
 	}
 
 	hash, err := auth.HashPassword(in.NewPassword)
@@ -227,17 +257,37 @@ func (s *Service) ChangePassword(ctx context.Context, userID string, in ChangePa
 	if err := s.store.UpdatePassword(ctx, userID, hash, newVault); err != nil {
 		return fmt.Errorf("aggiornamento password: %w", err)
 	}
+	s.record(ctx, auth.Event{Kind: auth.EventPasswordChanged, UserID: account.ID})
 	return nil
 }
 
-// DeleteAccount elimina l'utente, i suoi annunci e le loro foto.
-func (s *Service) DeleteAccount(ctx context.Context, userID string) error {
+// DeleteAccount elimina l'utente, i suoi annunci e le loro foto. La password va inserita di nuovo:
+// è un'operazione irreversibile e non deve bastare una sessione lasciata aperta.
+func (s *Service) DeleteAccount(ctx context.Context, userID, password string) error {
+	account, err := s.store.AccountByID(ctx, userID)
+	if db.IsNoRows(err) || db.IsInvalidInput(err) {
+		return errSessionInvalid
+	}
+	if err != nil {
+		return fmt.Errorf("lettura account: %w", err)
+	}
+	if ok, _ := auth.CheckPassword(account.PasswordHash, password); !ok {
+		return apperr.Unauthorized("invalid_credentials", "La password non è corretta")
+	}
+
 	keys, err := s.store.Delete(ctx, userID)
 	if err != nil {
 		return apperr.Wrap(err, "delete_failed", "Impossibile eliminare l'account in questo momento")
 	}
 	s.images(ctx, keys)
+	// L'evento resta senza utente: la riga dell'account non esiste più
+	s.record(ctx, auth.Event{Kind: auth.EventAccountDeleted})
 	return nil
+}
+
+// RecordSessionsRevoked registra nel registro di sicurezza la chiusura degli altri accessi.
+func (s *Service) RecordSessionsRevoked(ctx context.Context, userID string) {
+	s.record(ctx, auth.Event{Kind: auth.EventSessionsRevoked, UserID: userID})
 }
 
 // MyProfile restituisce il profilo completo dell'utente in sessione.
@@ -485,9 +535,11 @@ func decodeRoommatesCursor(cursor string) (RoommatesCursor, bool) {
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
-func checkPassword(v *validate.Validator, field, password string) {
-	v.Check(len(password) >= auth.MinPasswordLength, field, "La password deve avere almeno 6 caratteri")
-	v.Check(len(password) <= auth.MaxPasswordBytes, field, "La password è troppo lunga")
+// checkPassword applica le regole sulle password (lunghezza, password prevedibili, dati personali).
+func checkPassword(v *validate.Validator, field, password, email, firstName string) {
+	if problem := auth.PasswordProblem(password, email, firstName); problem != "" {
+		v.Check(false, field, problem)
+	}
 }
 
 // personalDetails sono i campi comuni a registrazione e modifica del profilo.

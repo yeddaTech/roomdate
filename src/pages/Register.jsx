@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { generateKeyPair, wrapPrivateKey } from '../utils/crypto';
-import { register } from '../api/auth';
+import { MIN_PASSWORD_LENGTH, register } from '../api/auth';
 import { ApiError } from '../api/client';
 import { CITIES, OCCUPATIONS } from '../api/options';
 import LifestyleTagsPicker from '../components/profile/LifestyleTagsPicker';
@@ -35,24 +35,24 @@ export default function Register() {
     }));
   };
 
+  // Conta la lunghezza, non i simboli: una frase lunga è più difficile da indovinare
+  // di "Ciao1!" e più facile da ricordare (linee guida NIST 800-63B).
   const getPasswordScore = (pw) => {
     if (!pw) return 0;
-    let score = 0;
-    if (pw.length >= 8) score++;
-    if (/[A-Z]/.test(pw)) score++;
-    if (/[0-9]/.test(pw)) score++;
-    if (/[^A-Za-z0-9]/.test(pw)) score++;
-    return score;
+    if (pw.length < MIN_PASSWORD_LENGTH) return 1;
+    if (pw.length < 14) return 2;
+    if (pw.length < 20) return 3;
+    return 4;
   };
 
   const score = getPasswordScore(formData.password);
   
   const strengthLevels = [
     { text: 'Inserisci una password', color: 'text-neutral-400', barClass: 'bg-neutral-200' },
-    { text: 'Troppo corta', color: 'text-rose-500', barClass: 'bg-rose-500' },
-    { text: 'Debole', color: 'text-rose-500', barClass: 'bg-rose-500' },
-    { text: 'Media', color: 'text-orange-400', barClass: 'bg-orange-400' },
-    { text: 'Forte 💪', color: 'text-emerald-500', barClass: 'bg-emerald-500' }
+    { text: `Almeno ${MIN_PASSWORD_LENGTH} caratteri`, color: 'text-rose-500', barClass: 'bg-rose-500' },
+    { text: 'Va bene', color: 'text-orange-400', barClass: 'bg-orange-400' },
+    { text: 'Buona', color: 'text-emerald-500', barClass: 'bg-emerald-500' },
+    { text: 'Ottima 💪', color: 'text-emerald-500', barClass: 'bg-emerald-500' }
   ];
   
   const currentStrength = strengthLevels[score];
@@ -197,6 +197,7 @@ export default function Register() {
                     <div className="flex gap-1.5 mt-2">
                       {[1, 2, 3, 4].map(num => <div key={num} className={`h-1.5 w-full rounded-full transition-colors duration-300 ${score >= num ? currentStrength.barClass : 'bg-neutral-200'}`}></div>)}
                     </div>
+                    <small className="text-[11px] text-neutral-400 font-medium mt-1">Una frase che ricordi facilmente è più sicura di una parola con simboli.</small>
                   </div>
                 </div>
               </div>

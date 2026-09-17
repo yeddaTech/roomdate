@@ -21,8 +21,11 @@ func (p Pusher) Enabled() bool {
 
 type Config struct {
 	DatabaseURL string
-	JWTSecret   string
-	Pusher      Pusher
+	// SecretKey è il segreto dell'applicazione. Dal modulo M3.2 le sessioni non sono più token
+	// firmati, quindi serve solo a calcolare le impronte di email e indirizzi IP nel registro
+	// di sicurezza. Si legge da APP_SECRET, o da JWT_SECRET per le installazioni precedenti.
+	SecretKey string
+	Pusher    Pusher
 
 	// Storage è lo storage delle foto (Cloudflare R2). Facoltativo: senza, il caricamento foto è disattivato.
 	Storage storage.S3Config
@@ -41,7 +44,7 @@ type Config struct {
 func FromEnv() (Config, error) {
 	cfg := Config{
 		DatabaseURL: strings.TrimSpace(os.Getenv("DATABASE_URL")),
-		JWTSecret:   os.Getenv("JWT_SECRET"),
+		SecretKey:   firstNonEmpty(os.Getenv("APP_SECRET"), os.Getenv("JWT_SECRET")),
 		Pusher: Pusher{
 			AppID:   os.Getenv("PUSHER_APP_ID"),
 			Key:     os.Getenv("PUSHER_KEY"),
@@ -68,11 +71,21 @@ func FromEnv() (Config, error) {
 	if cfg.DatabaseURL == "" {
 		missing = append(missing, "DATABASE_URL")
 	}
-	if cfg.JWTSecret == "" {
-		missing = append(missing, "JWT_SECRET")
+	if cfg.SecretKey == "" {
+		missing = append(missing, "APP_SECRET")
 	}
 	if len(missing) > 0 {
 		return cfg, fmt.Errorf("variabili d'ambiente mancanti: %s", strings.Join(missing, ", "))
 	}
 	return cfg, nil
+}
+
+// firstNonEmpty restituisce il primo valore non vuoto.
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }

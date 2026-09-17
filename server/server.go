@@ -41,7 +41,8 @@ type Deps struct {
 
 // New costruisce l'handler HTTP con tutte le rotte /api e i middleware comuni.
 func New(d Deps) (http.Handler, error) {
-	sessions, err := auth.NewManager(d.Config.JWTSecret, d.Config.SecureCookies)
+	security := auth.NewStore(d.DB)
+	sessions, err := auth.NewManager(security, d.Config.SecretKey, d.Config.SecureCookies)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +57,7 @@ func New(d Deps) (http.Handler, error) {
 	}
 	deleteImages := func(ctx context.Context, keys []string) { listings.DeleteObjects(ctx, photos, keys) }
 
-	usersHandler := users.NewHandler(users.NewService(users.NewStore(d.DB), deleteImages), sessions)
+	usersHandler := users.NewHandler(users.NewService(users.NewStore(d.DB), security, sessions.Hash, deleteImages), sessions)
 	listingsHandler := listings.NewHandler(listings.NewService(listings.NewStore(d.DB), photos), sessions)
 	chatHandler := chat.NewHandler(chat.NewService(chat.NewStore(d.DB), d.Publisher), sessions)
 
@@ -85,6 +86,10 @@ func New(d Deps) (http.Handler, error) {
 	mux.Handle("/api/v1/listings/{id}/images", httpx.Methods(methods{http.MethodPost: listingsHandler.ConfirmUpload}))
 	mux.Handle("/api/v1/listings/{id}/images/{imageId}", httpx.Methods(methods{http.MethodDelete: listingsHandler.DeleteImage}))
 	mux.Handle("/api/v1/me/listings", httpx.Methods(methods{http.MethodGet: listingsHandler.Mine}))
+	mux.Handle("/api/v1/me/sessions", httpx.Methods(methods{
+		http.MethodGet: usersHandler.MySessions, http.MethodDelete: usersHandler.RevokeOtherSessions,
+	}))
+	mux.Handle("/api/v1/me/sessions/{id}", httpx.Methods(methods{http.MethodDelete: usersHandler.RevokeSession}))
 
 	mux.Handle("/api/v1/conversations", httpx.Methods(methods{
 		http.MethodGet: chatHandler.Conversations, http.MethodPost: chatHandler.StartChat,

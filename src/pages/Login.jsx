@@ -25,7 +25,9 @@ export default function Login() {
     const newErrors = { email: false, password: false };
 
     if (!email || !/\S+@\S+\.\S+/.test(email)) { newErrors.email = true; isValid = false; }
-    if (!password || password.length < 6) { newErrors.password = true; isValid = false; }
+    // Nessun minimo di lunghezza qui: gli account registrati prima delle nuove regole
+    // hanno password più corte e devono poter entrare lo stesso.
+    if (!password) { newErrors.password = true; isValid = false; }
 
     setErrors(newErrors);
 
@@ -155,7 +157,7 @@ export default function Login() {
                     {showPassword ? 'Nascondi' : 'Mostra'}
                   </button>
                 </div>
-                {errors.password && <div className="text-red-500 text-xs mt-1 ml-1 font-bold">La password deve essere di almeno 6 caratteri.</div>}
+                {errors.password && <div className="text-red-500 text-xs mt-1 ml-1 font-bold">Inserisci la tua password.</div>}
               </div>
 
               <button 

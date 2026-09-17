@@ -13,6 +13,18 @@ The platform operates on a decoupled full-stack architecture:
 *   **Real-time Communication:** Pusher (WebSockets)
 *   **Deployment & CI/CD:** Vercel (Live environment: [roomdate.vercel.app](https://roomdate.vercel.app/))
 
+## Accounts and sessions
+
+Signing in creates a session row in the database; the cookie only carries a 256-bit random token, and the database stores its SHA-256 hash. A session therefore can be revoked for real, and reading the database does not allow creating one.
+
+* The cookie is `__Host-roomdate_session` over HTTPS (`roomdate_session` in local development, where the `__Host-` prefix is not allowed), HttpOnly, Secure and SameSite=Lax.
+* Sessions expire 30 days after they start, or after 7 days without use. `GET /api/v1/me/sessions` lists the devices signed in, `DELETE /api/v1/me/sessions/{id}` closes one and `DELETE /api/v1/me/sessions` closes every other one. Changing the password closes them too.
+* Passwords are hashed with Argon2id (19 MiB, 2 passes); accounts created earlier still carry a bcrypt hash and are upgraded silently at their next sign-in. A password needs at least 10 characters and is refused when it is a common one, a repeated character or sequence, or contains the name, the email or the site name — length matters, not mandatory symbols (NIST 800-63B).
+* Wrong credentials always answer `Credenziali non valide`, whether the email exists or not. After five failed attempts for an email (twenty for a network) the wait grows, without ever locking an account: knowing somebody's address would otherwise be enough to lock them out.
+* Deleting the account asks for the password again, and `security_events` records sign-ins, failures, password changes and deletions, with email and IP stored only as salted hashes.
+
+Password reset by email does not exist yet: it needs an email provider (decision D2 in `piano_refactoring.md`), so today a forgotten password cannot be recovered.
+
 ## Security & Cryptography Infrastructure
 
 Chat messages are encrypted and decrypted in the browser; the server stores and relays only ciphertext.
@@ -48,7 +60,7 @@ User text is stored as typed (only surrounding spaces and invisible control char
 
 Accounts, profiles and listings use the `/api/v1/` endpoints: camelCase JSON, errors as `{"error": {"code", "message", "fields"}}`.
 
-* Accounts and profiles: `auth/session`, `auth/login`, `auth/logout`, `auth/register`, `auth/password`, `me`, `users/{id}`. Emails are stored in lowercase and matched ignoring case.
+* Accounts and profiles: `auth/session`, `auth/login`, `auth/logout`, `auth/register`, `auth/password`, `me`, `me/sessions`, `users/{id}`. Emails are stored in lowercase and matched ignoring case.
 * Roommates: `roommates?city=&minBudget=&cursor=&limit=` lists the public profiles of people looking for a room, newest first, without the viewer's own profile.
 * Listings: `listings` (list, create), `listings/{id}` (read, update, delete), `listings/{id}/active`, `me/listings`, and the photo endpoints `listings/{id}/images/uploads`, `listings/{id}/images`, `listings/{id}/images/{imageId}`. The public list takes `city`, `maxPrice`, `roomType`, `billsIncluded` and `sort` (`recenti`, `prezzo`, `prezzo-desc`).
 
