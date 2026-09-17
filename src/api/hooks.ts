@@ -6,14 +6,14 @@ import {
   deleteListing,
   deleteListingImage,
   getListing,
-  listLatestListings,
+  listListings,
   listMyListings,
   setListingActive,
   updateListing,
   uploadListingPhoto,
 } from './listings';
 import { queryKeys } from './queryKeys';
-import type { ListingInput, SessionUser } from './types';
+import type { ListingFilters, ListingInput, SessionUser } from './types';
 import { getMyProfile, getPublicProfile, listRoommates, updateMyProfile } from './users';
 
 export function useMyProfile() {
@@ -44,18 +44,34 @@ export function usePublicProfile(id: string) {
 }
 
 /** Coinquilini a pagine: fetchNextPage carica i successivi finché hasNextPage è true. */
-export function useRoommates({ city = '', enabled = true } = {}) {
+export function useRoommates({ city = '', minBudget = '', enabled = true } = {}) {
   return useInfiniteQuery({
-    queryKey: queryKeys.roommatesList(city),
-    queryFn: ({ pageParam }) => listRoommates({ city, cursor: pageParam }),
+    queryKey: queryKeys.roommatesList(`${city}|${minBudget}`),
+    queryFn: ({ pageParam }) => listRoommates({ city, minBudget, cursor: pageParam }),
     initialPageParam: '',
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled,
   });
 }
 
-export function useLatestListings({ enabled = true } = {}) {
-  return useQuery({ queryKey: queryKeys.latestListings, queryFn: listLatestListings, enabled });
+/** Gli annunci più recenti per la home (una pagina sola). */
+export function useLatestListings({ limit = 8 } = {}) {
+  return useQuery({
+    queryKey: queryKeys.latestListings,
+    queryFn: () => listListings({}, { limit: String(limit) }),
+    select: (page) => page.items,
+  });
+}
+
+/** Annunci a pagine, filtrati e ordinati dal server. */
+export function useListings(filters: ListingFilters, { enabled = true } = {}) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.listingsSearch(JSON.stringify(filters)),
+    queryFn: ({ pageParam }) => listListings(filters, { cursor: pageParam }),
+    initialPageParam: '',
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled,
+  });
 }
 
 export function useListing(id: string | number, { enabled = true } = {}) {

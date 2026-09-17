@@ -17,11 +17,17 @@ export function getPublicProfile(id: string): Promise<PublicProfile> {
   return request<PublicProfile>(`/api/v1/users/${encodeURIComponent(id)}`);
 }
 
-/** Una pagina dei coinquilini; city vuota significa tutte le città. */
-export function listRoommates({ city = '', cursor = '' }: { city?: string; cursor?: string } = {}): Promise<RoommatesPage> {
+/**
+ * Una pagina dei coinquilini. I filtri vuoti non vengono inviati: city vuota significa tutte le città,
+ * minBudget tiene solo chi può spendere almeno quella cifra.
+ */
+export function listRoommates(
+  { city = '', minBudget = '', cursor = '' }: { city?: string; minBudget?: string; cursor?: string } = {},
+): Promise<RoommatesPage> {
   const params = new URLSearchParams();
-  if (city) params.set('city', city);
-  if (cursor) params.set('cursor', cursor);
+  for (const [name, value] of Object.entries({ city, minBudget, cursor })) {
+    if (value) params.set(name, value);
+  }
   const query = params.toString();
   return request<RoommatesPage>(`/api/v1/roommates${query ? `?${query}` : ''}`);
 }

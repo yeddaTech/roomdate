@@ -25,14 +25,23 @@ func (h *Handler) requireSession(w http.ResponseWriter, r *http.Request) (auth.S
 	return session, ok
 }
 
-// List gestisce GET /api/v1/listings.
+// List gestisce GET /api/v1/listings?city=&maxPrice=&roomType=&billsIncluded=&sort=&cursor=&limit=.
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	listings, err := h.svc.Latest(r.Context())
+	query := r.URL.Query()
+	page, err := h.svc.List(r.Context(), ListParams{
+		City:          query.Get("city"),
+		MaxPrice:      query.Get("maxPrice"),
+		RoomType:      query.Get("roomType"),
+		BillsIncluded: query.Get("billsIncluded"),
+		Sort:          query.Get("sort"),
+		Cursor:        query.Get("cursor"),
+		Limit:         query.Get("limit"),
+	})
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, listings)
+	httpx.JSON(w, http.StatusOK, page)
 }
 
 // Mine gestisce GET /api/v1/me/listings.

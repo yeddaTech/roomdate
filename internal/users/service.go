@@ -2,7 +2,6 @@ package users
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"regexp"
 	"slices"
@@ -13,6 +12,7 @@ import (
 	"roomdate-backend/internal/apperr"
 	"roomdate-backend/internal/auth"
 	"roomdate-backend/internal/db"
+	"roomdate-backend/internal/page"
 	"roomdate-backend/internal/validate"
 	"roomdate-backend/shared"
 )
@@ -383,7 +383,7 @@ type RoommatesPage struct {
 
 // RoommatesParams sono i parametri della richiesta, come arrivano nell'URL.
 type RoommatesParams struct {
-	City, Cursor, Limit string
+	City, MinBudget, Cursor, Limit string
 }
 
 // Roommates restituisce una pagina dei profili pubblici di chi cerca una stanza (anomalia F18),
@@ -393,6 +393,11 @@ func (s *Service) Roommates(ctx context.Context, viewerID string, p RoommatesPar
 
 	var v validate.Validator
 	v.Check(q.City == "" || shared.IsCity(q.City), "city", "Città non valida")
+	if p.MinBudget != "" {
+		minBudget, err := strconv.Atoi(p.MinBudget)
+		v.Check(err == nil && validate.Between(minBudget, 1, 20000), "minBudget", "Il budget deve essere compreso tra 1 e 20.000 €")
+		q.MinBudget = minBudget
+	}
 	if p.Limit != "" {
 		limit, err := strconv.Atoi(p.Limit)
 		ok := err == nil && validate.Between(limit, 1, roommatesMaxLimit)
@@ -416,12 +421,12 @@ func (s *Service) Roommates(ctx context.Context, viewerID string, p RoommatesPar
 		return RoommatesPage{}, fmt.Errorf("elenco coinquilini: %w", err)
 	}
 
-	page := RoommatesPage{Items: make([]RoommateSummary, 0, min(len(rows), limit))}
+	result := RoommatesPage{Items: make([]RoommateSummary, 0, min(len(rows), limit))}
 	if len(rows) > limit {
 		rows = rows[:limit]
 		last := rows[limit-1]
 		cursor := encodeRoommatesCursor(RoommatesCursor{CreatedAt: last.CreatedAt, ID: last.ID})
-		page.NextCursor = &cursor
+		result.NextCursor = &cursor
 	}
 
 	var viewer profileFacts
@@ -448,27 +453,34 @@ func (s *Service) Roommates(ctx context.Context, viewerID string, p RoommatesPar
 			c := compare(viewer, profileFacts{City: r.City, BudgetMax: r.BudgetMax, LifestyleTags: r.LifestyleTags})
 			item.Compatibility = &c
 		}
-		page.Items = append(page.Items, item)
+		result.Items = append(result.Items, item)
 	}
-	return page, nil
+	return result, nil
 }
 
-// Il cursore è la posizione dell'ultimo profilo della pagina: "microsecondi_uuid" in Base64 URL.
+// Il cursore contiene la data di creazione dell'ultimo profilo mostrato (vuota se manca) e il suo ID.
 func encodeRoommatesCursor(c RoommatesCursor) string {
-	return base64.RawURLEncoding.EncodeToString([]byte(strconv.FormatInt(c.CreatedAt.UnixMicro(), 10) + "_" + c.ID))
+	created := ""
+	if c.CreatedAt != nil {
+		created = c.CreatedAt.UTC().Format(time.RFC3339Nano)
+	}
+	return page.Encode(created, c.ID)
 }
 
-func decodeRoommatesCursor(s string) (RoommatesCursor, bool) {
-	raw, err := base64.RawURLEncoding.DecodeString(s)
-	if err != nil {
+func decodeRoommatesCursor(cursor string) (RoommatesCursor, bool) {
+	fields, ok := page.Decode(cursor, 2)
+	if !ok || !uuidPattern.MatchString(fields[1]) {
 		return RoommatesCursor{}, false
 	}
-	micros, id, found := strings.Cut(string(raw), "_")
-	n, err := strconv.ParseInt(micros, 10, 64)
-	if !found || err != nil || !uuidPattern.MatchString(id) {
-		return RoommatesCursor{}, false
+	c := RoommatesCursor{ID: fields[1]}
+	if fields[0] != "" {
+		created, err := time.Parse(time.RFC3339Nano, fields[0])
+		if err != nil {
+			return RoommatesCursor{}, false
+		}
+		c.CreatedAt = &created
 	}
-	return RoommatesCursor{CreatedAt: time.UnixMicro(n).UTC(), ID: id}, true
+	return c, true
 }
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)

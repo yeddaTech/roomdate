@@ -196,13 +196,13 @@ func (h *Handler) PublicProfile(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, profile)
 }
 
-// Roommates gestisce GET /api/v1/roommates?city=&cursor=&limit=. La sessione è facoltativa:
+// Roommates gestisce GET /api/v1/roommates?city=&minBudget=&cursor=&limit=. La sessione è facoltativa:
 // serve a escludere chi guarda e a indicare cosa ha in comune con ogni profilo.
 func (h *Handler) Roommates(w http.ResponseWriter, r *http.Request) {
 	session, _ := h.sessions.FromRequest(r)
 	query := r.URL.Query()
 	page, err := h.svc.Roommates(r.Context(), session.UserID, RoommatesParams{
-		City: query.Get("city"), Cursor: query.Get("cursor"), Limit: query.Get("limit"),
+		City: query.Get("city"), MinBudget: query.Get("minBudget"), Cursor: query.Get("cursor"), Limit: query.Get("limit"),
 	})
 	if err != nil {
 		httpx.WriteError(w, r, err)

@@ -15,13 +15,16 @@ import (
 	"roomdate-backend/internal/apperr"
 	"roomdate-backend/internal/db"
 	"roomdate-backend/internal/logx"
+	"roomdate-backend/internal/page"
 	"roomdate-backend/internal/storage"
 	"roomdate-backend/internal/validate"
 	"roomdate-backend/shared"
 )
 
 const (
-	latestLimit = 50
+	// Dimensioni delle pagine dell'elenco pubblico.
+	defaultLimit = 24
+	maxLimit     = 50
 
 	// Solo chi affitta può pubblicare annunci. Il ruolo si legge dal database a ogni richiesta.
 	landlordUserType = "affitta"
@@ -179,13 +182,110 @@ func (s *Service) summary(r Row) Summary {
 	return sum
 }
 
-// Latest restituisce gli annunci attivi più recenti (filtri e pagine arrivano con il modulo M1.6).
-func (s *Service) Latest(ctx context.Context) ([]Summary, error) {
-	rows, err := s.store.LatestActive(ctx, latestLimit)
-	if err != nil {
-		return nil, fmt.Errorf("elenco annunci: %w", err)
+// ListParams sono i filtri dell'elenco pubblico, come arrivano nell'URL.
+type ListParams struct {
+	City, MaxPrice, RoomType, BillsIncluded, Sort, Cursor, Limit string
+}
+
+// Page è una pagina dell'elenco; NextCursor è null se non ci sono altri annunci.
+type Page struct {
+	Items      []Summary `json:"items"`
+	NextCursor *string   `json:"nextCursor"`
+}
+
+// List restituisce una pagina degli annunci attivi, filtrata e ordinata dal database (anomalia F17).
+func (s *Service) List(ctx context.Context, p ListParams) (Page, error) {
+	q := ListQuery{City: p.City, Sort: SortRecent, Limit: defaultLimit}
+
+	var v validate.Validator
+	v.Check(q.City == "" || shared.IsCity(q.City), "city", "Città non valida")
+	if p.RoomType != "" {
+		v.Check(validate.OneOf(p.RoomType, "singola", "doppia"), "roomType", "Tipo di stanza non valido")
+		q.RoomType = p.RoomType
 	}
-	return s.summaries(rows), nil
+	if p.MaxPrice != "" {
+		maxPrice, err := strconv.Atoi(p.MaxPrice)
+		v.Check(err == nil && validate.Between(maxPrice, 1, 20000), "maxPrice", "Il budget deve essere compreso tra 1 e 20.000 €")
+		q.MaxPrice = maxPrice
+	}
+	if p.BillsIncluded != "" {
+		included := p.BillsIncluded == "true"
+		v.Check(p.BillsIncluded == "true" || p.BillsIncluded == "false", "billsIncluded", "Filtro sulle spese non valido")
+		q.BillsIncluded = &included
+	}
+	if p.Sort != "" {
+		_, known := listOrders[p.Sort]
+		v.Check(known, "sort", "Ordinamento non valido")
+		if known {
+			q.Sort = p.Sort
+		}
+	}
+	if p.Limit != "" {
+		limit, err := strconv.Atoi(p.Limit)
+		v.Check(err == nil && validate.Between(limit, 1, maxLimit), "limit", fmt.Sprintf("Il numero di annunci per pagina deve essere tra 1 e %d", maxLimit))
+		q.Limit = limit
+	}
+	if p.Cursor != "" {
+		after, ok := decodeListCursor(q.Sort, p.Cursor)
+		v.Check(ok, "cursor", "Pagina non valida: ricarica l'elenco")
+		q.After = &after
+	}
+	if err := v.Err(); err != nil {
+		return Page{}, err
+	}
+
+	// Un annuncio in più dice se esiste la pagina successiva
+	limit := q.Limit
+	q.Limit++
+	rows, err := s.store.Active(ctx, q)
+	if err != nil {
+		return Page{}, fmt.Errorf("elenco annunci: %w", err)
+	}
+
+	page := Page{Items: []Summary{}}
+	if len(rows) > limit {
+		rows = rows[:limit]
+		cursor := encodeListCursor(q.Sort, rows[limit-1])
+		page.NextCursor = &cursor
+	}
+	page.Items = s.summaries(rows)
+	return page, nil
+}
+
+// Il cursore contiene la chiave di ordinamento (data o prezzo) e l'ID dell'ultimo annuncio mostrato.
+func encodeListCursor(sort string, r Row) string {
+	key, id := cursorFields(sort, &ListCursor{CreatedAt: r.CreatedAt, Price: r.Price, ID: r.ID})
+	return page.Encode(key, id)
+}
+
+func decodeListCursor(sort, cursor string) (ListCursor, bool) {
+	fields, ok := page.Decode(cursor, 2)
+	if !ok {
+		return ListCursor{}, false
+	}
+	id, ok := validate.PositiveID(fields[1])
+	if !ok {
+		return ListCursor{}, false
+	}
+	c := ListCursor{ID: id}
+	switch sort {
+	case SortPriceAsc, SortPriceDesc:
+		price, err := strconv.Atoi(fields[0])
+		if err != nil {
+			return ListCursor{}, false
+		}
+		c.Price = price
+	default:
+		// Campo vuoto: l'ultimo annuncio mostrato non aveva data di creazione
+		if fields[0] != "" {
+			created, err := time.Parse(cursorTimeLayout, fields[0])
+			if err != nil {
+				return ListCursor{}, false
+			}
+			c.CreatedAt = &created
+		}
+	}
+	return c, true
 }
 
 // Mine restituisce tutti gli annunci dell'utente, anche quelli disattivati.

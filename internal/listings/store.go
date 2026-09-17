@@ -4,6 +4,7 @@ package listings
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -84,20 +85,22 @@ type Row struct {
 	BillsIncluded               *bool
 	AvailableFrom               *time.Time
 	IsActive                    bool
+	// CreatedAt serve a costruire il cursore dell'elenco; è NULL su qualche annuncio vecchio.
+	CreatedAt *time.Time
 	// CoverKey è la chiave della prima foto, se c'è (negli elenchi).
 	CoverKey *string
 }
 
-// Nel database di produzione user_id e room_type possono essere NULL.
+// Nel database di produzione user_id, room_type e created_at possono essere NULL.
 const rowColumns = `l.id, COALESCE(l.user_id::text, ''), COALESCE(u.first_name, ''),
     l.title, l.city, COALESCE(l.zone, ''), COALESCE(l.room_type, ''), l.price, COALESCE(l.description, ''),
-    l.amenities, l.bills_included, l.available_from, l.is_active,
+    l.amenities, l.bills_included, l.available_from, l.is_active, l.created_at,
     (SELECT i.storage_key FROM roomdate_app.listing_images i WHERE i.listing_id = l.id ORDER BY i.position, i.id LIMIT 1)`
 
 func scanRow(row pgx.Row) (Row, error) {
 	var r Row
 	err := row.Scan(&r.ID, &r.OwnerID, &r.OwnerFirstName, &r.Title, &r.City, &r.Zone, &r.RoomType, &r.Price, &r.Description,
-		&r.Amenities, &r.BillsIncluded, &r.AvailableFrom, &r.IsActive, &r.CoverKey)
+		&r.Amenities, &r.BillsIncluded, &r.AvailableFrom, &r.IsActive, &r.CreatedAt, &r.CoverKey)
 	return r, err
 }
 
@@ -109,15 +112,93 @@ func (s *Store) Get(ctx context.Context, id int) (Row, error) {
         WHERE l.id = $1`, id))
 }
 
-// LatestActive restituisce gli annunci attivi più recenti.
-func (s *Store) LatestActive(ctx context.Context, limit int) ([]Row, error) {
+// Ordinamenti ammessi per l'elenco pubblico degli annunci.
+const (
+	SortRecent    = "recenti"
+	SortPriceAsc  = "prezzo"
+	SortPriceDesc = "prezzo-desc"
+)
+
+// ListQuery filtra, ordina e pagina l'elenco pubblico degli annunci.
+// I campi vuoti o a zero non filtrano nulla.
+type ListQuery struct {
+	City          string
+	MaxPrice      int
+	RoomType      string
+	BillsIncluded *bool
+	Sort          string
+	// After è la posizione dell'ultimo annuncio della pagina precedente, nil per la prima pagina.
+	After *ListCursor
+	Limit int
+}
+
+// ListCursor è la posizione di un annuncio nell'ordinamento scelto: la chiave di ordinamento e l'ID.
+// CreatedAt è nil per gli annunci senza data di creazione, che vengono per ultimi.
+type ListCursor struct {
+	CreatedAt *time.Time
+	Price     int
+	ID        int
+}
+
+// Formato della data nel cursore: senza fuso orario, come la colonna created_at.
+const cursorTimeLayout = "2006-01-02T15:04:05.999999"
+
+// Keyset e ordinamento per ciascun ordine. Gli annunci senza data di creazione stanno in fondo,
+// e l'ID (crescente con il tempo) separa quelli a pari valore.
+var listOrders = map[string]struct{ keyset, orderBy string }{
+	SortRecent: {
+		keyset: `($6 = '' OR CASE WHEN $5 = ''
+                 THEN l.created_at IS NULL AND l.id < NULLIF($6, '')::int
+                 ELSE l.created_at IS NULL OR l.created_at < NULLIF($5, '')::timestamp
+                      OR (l.created_at = NULLIF($5, '')::timestamp AND l.id < NULLIF($6, '')::int) END)`,
+		orderBy: `l.created_at DESC NULLS LAST, l.id DESC`,
+	},
+	SortPriceAsc: {
+		keyset:  `($6 = '' OR (l.price, l.id) > (NULLIF($5, '')::int, NULLIF($6, '')::int))`,
+		orderBy: `l.price ASC, l.id ASC`,
+	},
+	SortPriceDesc: {
+		keyset:  `($6 = '' OR (l.price, l.id) < (NULLIF($5, '')::int, NULLIF($6, '')::int))`,
+		orderBy: `l.price DESC, l.id DESC`,
+	},
+}
+
+// cursorFields converte il cursore nei due valori attesi dalla query ("" quando manca).
+func cursorFields(sort string, c *ListCursor) (key, id string) {
+	if c == nil {
+		return "", ""
+	}
+	switch sort {
+	case SortPriceAsc, SortPriceDesc:
+		key = strconv.Itoa(c.Price)
+	default:
+		if c.CreatedAt != nil {
+			key = c.CreatedAt.UTC().Format(cursorTimeLayout)
+		}
+	}
+	return key, strconv.Itoa(c.ID)
+}
+
+// Active restituisce una pagina degli annunci attivi, filtrata e ordinata.
+func (s *Store) Active(ctx context.Context, q ListQuery) ([]Row, error) {
+	order, ok := listOrders[q.Sort]
+	if !ok {
+		order = listOrders[SortRecent]
+	}
+	key, id := cursorFields(q.Sort, q.After)
 	return s.list(ctx, `
         SELECT `+rowColumns+`
         FROM roomdate_app.listings l
         LEFT JOIN roomdate_app.users u ON l.user_id = u.id
         WHERE l.is_active
-        ORDER BY l.created_at DESC
-        LIMIT $1`, limit)
+          AND ($1 = '' OR l.city = $1)
+          AND ($2 = 0 OR l.price <= $2)
+          AND ($3 = '' OR l.room_type = $3)
+          AND ($4::boolean IS NULL OR l.bills_included = $4)
+          AND `+order.keyset+`
+        ORDER BY `+order.orderBy+`
+        LIMIT $7`,
+		q.City, q.MaxPrice, q.RoomType, q.BillsIncluded, key, id, q.Limit)
 }
 
 // ByOwner restituisce tutti gli annunci di un utente, anche quelli disattivati, dal più recente.
