@@ -4,7 +4,20 @@ import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../auth/AuthContext';
 import { changePassword } from '../api/auth';
 import { deleteMyAccount } from '../api/users';
+import { useRevokeOtherSessions, useRevokeSession, useSessions } from '../api/hooks';
 import { prepareKeysForPasswordChange, saveKeysAfterPasswordChange } from '../auth/keyStorage';
+import { MIN_PASSWORD_LENGTH } from '../api/auth';
+
+/** "oggi alle 14:05", "ieri alle 9:12" oppure "12 settembre alle 18:40". */
+function whenLabel(isoDate) {
+  const date = new Date(isoDate);
+  const time = date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((startOfDay(new Date()) - startOfDay(date)) / 86400000);
+  if (days === 0) return `oggi alle ${time}`;
+  if (days === 1) return `ieri alle ${time}`;
+  return `${date.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })} alle ${time}`;
+}
 
 export default function Impostazioni() {
   const navigate = useNavigate();
@@ -40,8 +53,8 @@ export default function Impostazioni() {
         setStatusMsg({ text: 'Le password non coincidono!', type: 'error' });
         return;
       }
-      if (newPassword.length < 6) {
-        setStatusMsg({ text: 'La password deve avere almeno 6 caratteri.', type: 'error' });
+      if (newPassword.length < MIN_PASSWORD_LENGTH) {
+        setStatusMsg({ text: `La password deve avere almeno ${MIN_PASSWORD_LENGTH} caratteri.`, type: 'error' });
         return;
       }
 
@@ -74,16 +87,47 @@ export default function Impostazioni() {
     }
   };
 
+  // --- DISPOSITIVI COLLEGATI ---
+  const sessionsQuery = useSessions();
+  const revokeSession = useRevokeSession();
+  const revokeOthers = useRevokeOtherSessions();
+
+  const handleRevokeSession = async (session) => {
+    try {
+      await revokeSession.mutateAsync(session.id);
+      setStatusMsg({ text: 'Accesso chiuso su quel dispositivo.', type: 'success' });
+    } catch (err) {
+      setStatusMsg({ text: err.message, type: 'error' });
+    }
+  };
+
+  const handleRevokeOthers = async () => {
+    try {
+      const closed = await revokeOthers.mutateAsync();
+      setStatusMsg({
+        text: closed === 0 ? 'Non c\'erano altri dispositivi collegati.' : `Chiusi ${closed} accessi sugli altri dispositivi.`,
+        type: 'success',
+      });
+    } catch (err) {
+      setStatusMsg({ text: err.message, type: 'error' });
+    }
+  };
+
   // --- ELIMINAZIONE ACCOUNT ---
-  const handleDeleteAccount = async () => {
-    if (window.confirm("Sei assolutamente sicuro? Tutti i tuoi dati verranno cancellati per sempre.")) {
-      try {
-        await deleteMyAccount();
-        // Il server ha già chiuso la sessione: resta da pulire il browser (la pagina protetta rimanda alla home)
-        endLocalSession('signed_out');
-      } catch (err) {
-        alert(err.message);
-      }
+  // L'operazione è definitiva: il server richiede la password, che va chiesta qui.
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+
+  const handleDeleteAccount = async (e) => {
+    e.preventDefault();
+    if (!window.confirm('Sei assolutamente sicuro? Tutti i tuoi dati verranno cancellati per sempre.')) return;
+    try {
+      await deleteMyAccount(deletePassword);
+      // Il server ha già chiuso la sessione: resta da pulire il browser (la pagina protetta rimanda alla home)
+      endLocalSession('signed_out');
+    } catch (err) {
+      setDeletePassword('');
+      setStatusMsg({ text: err.message, type: 'error' });
     }
   };
 
@@ -229,6 +273,57 @@ export default function Impostazioni() {
           </form>
         </div>
 
+        {/* DISPOSITIVI COLLEGATI */}
+        <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100 mb-8">
+          <h3 className="text-lg font-extrabold text-neutral-900 border-b border-neutral-100 pb-4 mb-6 flex items-center gap-2">
+            💻 Dispositivi collegati
+          </h3>
+          <p className="text-neutral-500 text-sm font-medium mb-6">
+            Qui vedi da dove è aperto il tuo account. Se non riconosci un dispositivo, chiudine l&apos;accesso e cambia la password.
+          </p>
+
+          {sessionsQuery.isPending ? (
+            <p className="text-neutral-400 font-medium">Caricamento...</p>
+          ) : sessionsQuery.isError ? (
+            <p className="text-rose-600 font-medium">{sessionsQuery.error.message}</p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {sessionsQuery.data.map(session => (
+                <li key={session.id} data-testid="session" className="flex flex-wrap items-center justify-between gap-3 bg-neutral-50 border border-neutral-100 rounded-2xl px-5 py-4">
+                  <div>
+                    <div className="font-bold text-neutral-900">
+                      {session.device}
+                      {session.current && <span className="ml-2 text-[11px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">questo dispositivo</span>}
+                    </div>
+                    <div className="text-xs text-neutral-500 font-medium mt-0.5">
+                      Ultimo utilizzo {whenLabel(session.lastUsedAt)} · accesso {whenLabel(session.createdAt)}
+                    </div>
+                  </div>
+                  {!session.current && (
+                    <button
+                      onClick={() => handleRevokeSession(session)}
+                      disabled={revokeSession.isPending}
+                      className="bg-white border border-neutral-200 text-neutral-700 hover:border-rose-300 hover:text-rose-600 px-5 py-2.5 rounded-full text-sm font-bold transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      Chiudi accesso
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="mt-6 flex justify-end">
+            <button
+              onClick={handleRevokeOthers}
+              disabled={revokeOthers.isPending}
+              className="bg-neutral-900 text-white hover:bg-neutral-800 px-6 py-3 rounded-full font-bold transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {revokeOthers.isPending ? 'Chiusura...' : 'Esci dagli altri dispositivi'}
+            </button>
+          </div>
+        </div>
+
         {/* DANGER ZONE */}
         <div className="bg-rose-50/50 p-6 md:p-10 rounded-3xl shadow-sm border border-rose-100">
           <h3 className="text-rose-600 font-extrabold text-xl mb-3 flex items-center gap-2">
@@ -238,12 +333,40 @@ export default function Impostazioni() {
             Se elimini il tuo account, perderai tutti i tuoi annunci e le conversazioni crittografate. 
             Questa operazione è irreversibile e i tuoi dati verranno cancellati in modo permanente dai nostri server.
           </p>
-          <button 
-            onClick={handleDeleteAccount}
-            className="bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 px-8 py-3.5 rounded-full font-bold transition-all shadow-sm w-full md:w-auto text-center cursor-pointer"
-          >
-            Elimina Account Definitivamente
-          </button>
+          {isDeleting ? (
+            <form onSubmit={handleDeleteAccount} className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              <input
+                type="password"
+                name="deletePassword"
+                autoComplete="current-password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="Conferma con la tua password"
+                className="flex-1 bg-white border border-rose-200 text-neutral-900 rounded-2xl px-5 py-3.5 focus:outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 transition-all font-medium placeholder:text-neutral-400"
+              />
+              <button
+                type="submit"
+                disabled={!deletePassword}
+                className="bg-rose-600 text-white hover:bg-rose-700 px-8 py-3.5 rounded-full font-bold transition-all shadow-sm cursor-pointer disabled:bg-neutral-300 disabled:cursor-not-allowed"
+              >
+                Elimina definitivamente
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsDeleting(false); setDeletePassword(''); }}
+                className="text-neutral-500 hover:text-neutral-900 font-bold px-4 py-3.5 cursor-pointer"
+              >
+                Annulla
+              </button>
+            </form>
+          ) : (
+            <button
+              onClick={() => setIsDeleting(true)}
+              className="bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 px-8 py-3.5 rounded-full font-bold transition-all shadow-sm w-full md:w-auto text-center cursor-pointer"
+            >
+              Elimina Account Definitivamente
+            </button>
+          )}
         </div>
 
       </div>

@@ -2,6 +2,7 @@
 export const queryKeys = {
   session: ['session'] as const,
   myProfile: ['me'] as const,
+  sessions: ['me', 'sessions'] as const,
   publicProfile: (id: string) => ['users', id] as const,
   roommates: ['roommates'] as const,
   roommatesList: (city: string) => ['roommates', 'list', city] as const,

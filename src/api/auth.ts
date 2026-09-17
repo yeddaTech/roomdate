@@ -1,6 +1,12 @@
 import { request } from './client';
 import type { CryptoKeys, RegisterInput, SessionUser, WrappedPrivateKey } from './types';
 
+/**
+ * Lunghezza minima della password, come la applica il server (linee guida NIST 800-63B:
+ * conta la lunghezza, non i simboli obbligatori).
+ */
+export const MIN_PASSWORD_LENGTH = 10;
+
 /** Utente in sessione, o null se non c'è una sessione valida. */
 export async function getSession(): Promise<SessionUser | null> {
   const { user } = await request<{ user: SessionUser | null }>('/api/v1/auth/session');
