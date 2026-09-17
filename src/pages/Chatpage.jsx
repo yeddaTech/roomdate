@@ -1,16 +1,22 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import Pusher from 'pusher-js';
 import { Helmet } from 'react-helmet-async';
-import { encryptMessage, decryptMessage } from '../utils/crypto';
+import { useQueryClient } from '@tanstack/react-query';
+import { encryptForRecipients } from '../utils/crypto';
 import { useAuth } from '../auth/AuthContext';
 import { getPrivateKey, getPublicKey, hasStoredVault, unlockPrivateKey } from '../auth/keyStorage';
-import { listConversations, notifyTyping, sendMessage } from '../api/chat';
+import { useConversations, useMarkConversationRead, useMessages, useSendMessage } from '../api/hooks';
+import { notifyTyping } from '../api/chat';
+import { queryKeys } from '../api/queryKeys';
 import { isSessionExpired } from '../api/client';
+import { useDecryptedTexts } from './chat/useChatMessages';
+import { dayLabel, shortDateLabel, timeLabel } from './chat/time';
 
-// Pusher può mancare in sviluppo locale: in quel caso niente tempo reale né "sta scrivendo"
+// Pusher può mancare in sviluppo locale: in quel caso le chat si aggiornano periodicamente
 const PUSHER_KEY = import.meta.env.VITE_PUSHER_KEY;
 const FALLBACK_REFRESH_MS = 5000;
+const TYPING_NOTICE_MS = 1500;
 
 const QUICK_REPLIES = [
   '📅 Quando sei disponibile?',
@@ -20,7 +26,6 @@ const QUICK_REPLIES = [
   '🚇 Linea metro vicina?',
 ];
 
-// Array unico centralizzato a 5 opzioni per mantenere la coerenza
 const NAV_LINKS = [
   { name: 'Home', path: '/', icon: '🏠' },
   { name: 'Cerca Stanza', path: '/ricerca', icon: '🔍' },
@@ -29,149 +34,89 @@ const NAV_LINKS = [
   { name: 'Impostazioni', path: '/impostazioni', icon: '⚙️' },
 ];
 
-// Iniziale del nome dell'altro partecipante, per l'avatar
+// Nome dell'altro partecipante: chi ha eliminato l'account non ha più un nome da mostrare
+const nameOf = (conversation) => conversation?.other?.firstName || 'Utente eliminato';
 const initial = (name) => (name || '?').charAt(0).toUpperCase();
 
 export default function ChatPage() {
   const navigate = useNavigate();
-  const location = useLocation(); 
-  
-  // La pagina è protetta: l'utente arriva dalla sessione verificata dal server
+  const location = useLocation();
+  const queryClient = useQueryClient();
   const { user, logout, endLocalSession } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
-  const [conversations, setConversations] = useState([]);
-  const [activeConvId, setActiveConvId] = useState(null);
-  const [inputText, setInputText] = useState('');
-  
-  const [searchQuery, setSearchQuery] = useState('');
-  const [mobileView, setMobileView] = useState('list'); 
 
-  const [isLocked, setIsLocked] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [activeId, setActiveId] = useState(null);
+  const [inputText, setInputText] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [mobileView, setMobileView] = useState('list');
+  const [privateKey, setPrivateKey] = useState(() => getPrivateKey());
   const [unlockPassword, setUnlockPassword] = useState('');
   const [unlockError, setUnlockError] = useState('');
-  const [isSending, setIsSending] = useState(false);
-
-  const [typingUsers, setTypingUsers] = useState({});
-  const typingTimeoutsRef = useRef({});
-  const lastTypedRef = useRef(0);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+  const [outgoing, setOutgoing] = useState([]);
+  const [typingIn, setTypingIn] = useState(null);
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
-  const conversationsRef = useRef(conversations);
-  const activeConvIdRef = useRef(activeConvId);
-  const userRef = useRef(user);
+  const lastTypedRef = useRef(0);
+  const typingTimeoutRef = useRef(null);
+  const activeIdRef = useRef(null);
+  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
 
-  useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
-  useEffect(() => { activeConvIdRef.current = activeConvId; }, [activeConvId]);
-  useEffect(() => { userRef.current = user; }, [user]);
-
-  const handleLogout = async () => {
-    setIsMenuOpen(false);
-    navigate('/');
-    await logout();
-  };
-
-  const fetchChats = useCallback(async () => {
-    const currentUser = userRef.current;
-    if (!currentUser) return;
-
-    try {
-      const data = await listConversations();
-
-      if (data) {
-        const myPrivateKey = getPrivateKey();
-
-        if (myPrivateKey) {
-          setIsLocked(false);
-          const decryptedData = await Promise.all(data.map(async (conv) => {
-            const decryptedMessages = await Promise.all((conv.messages || []).map(async (msg) => {
-              try {
-                if (msg.isTemp) return msg; 
-                msg.text = await decryptMessage(msg.text, myPrivateKey);
-              } catch {
-                msg.text = "🔒 [Messaggio non decifrabile]";
-              }
-              return msg;
-            }));
-            return { ...conv, messages: decryptedMessages };
-          }));
-          setConversations(decryptedData);
-        } else {
-          setIsLocked(true);
-          setConversations(data);
-        }
-      }
-    } catch (err) {
-      console.error("Errore caricamento chat:", err);
-      // Sessione scaduta: si torna all'accesso
-      if (isSessionExpired(err)) endLocalSession('expired');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [endLocalSession]);
-
-  const handleUnlock = async (e) => {
-    e.preventDefault();
-    setUnlockError('');
-    setIsLoading(true);
-
-    if (!hasStoredVault()) {
-      setUnlockError('Dati di sicurezza mancanti. Fai il logout e riaccedi.');
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      if (await unlockPrivateKey(unlockPassword)) {
-        setIsLocked(false);
-        setUnlockPassword('');
-        await fetchChats();
-      } else {
-        setUnlockError('Password errata. Riprova.');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Chat aperta da un annuncio o da un profilo: vale una volta sola, poi l'indirizzo torna pulito (anomalia F9)
+  const openChatId = location.state?.openChatId ?? null;
   useEffect(() => {
-    if (!user) return;
-    
-    fetchChats();
+    if (openChatId === null) return;
+    setActiveId(openChatId);
+    setMobileView('chat');
+    navigate(location.pathname, { replace: true, state: null });
+  }, [openChatId, location.pathname, navigate]);
 
-    if (!PUSHER_KEY) {
-      // Senza Pusher (sviluppo locale) si aggiornano le chat periodicamente
-      const interval = setInterval(fetchChats, FALLBACK_REFRESH_MS);
-      return () => clearInterval(interval);
-    }
+  const conversationsQuery = useConversations();
+  const conversations = useMemo(
+    () => conversationsQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [conversationsQuery.data],
+  );
+  const activeConv = conversations.find((c) => c.id === activeId) ?? null;
 
-    const pusher = new Pusher(PUSHER_KEY, {
-      cluster: import.meta.env.VITE_PUSHER_CLUSTER
+  // I messaggi arrivano a pagine, dal più recente: qui si mostrano dal più vecchio (anomalia F12)
+  const messagesQuery = useMessages(activeId);
+  const messages = useMemo(
+    () => (messagesQuery.data?.pages.flatMap((page) => page.items) ?? []).slice().reverse(),
+    [messagesQuery.data],
+  );
+
+  const lastMessages = useMemo(
+    () => conversations.map((c) => c.lastMessage).filter(Boolean),
+    [conversations],
+  );
+  const previewTexts = useDecryptedTexts(lastMessages, privateKey);
+  const messageTexts = useDecryptedTexts(messages, privateKey);
+  const isLocked = !privateKey;
+
+  const sendMessage = useSendMessage();
+  const { mutate: markConversationRead } = useMarkConversationRead();
+
+  // Aprire una conversazione azzera i suoi messaggi non letti
+  const unreadHere = activeConv?.unreadCount ?? 0;
+  useEffect(() => {
+    if (activeId && unreadHere > 0) markConversationRead(activeId);
+  }, [activeId, unreadHere, markConversationRead]);
+
+  // Eventi in tempo reale del solo utente: arriva l'avviso, non l'intera lista (anomalia F12)
+  useEffect(() => {
+    if (!user || !PUSHER_KEY) return undefined;
+    const pusher = new Pusher(PUSHER_KEY, { cluster: import.meta.env.VITE_PUSHER_CLUSTER });
+    const channel = pusher.subscribe(`user-${user.id}`);
+
+    channel.bind('nuovo-messaggio', ({ conversationId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+      queryClient.invalidateQueries({ queryKey: queryKeys.messages(Number(conversationId)) });
     });
-
-    const channel = pusher.subscribe('roomdate-channel');
-    
-    channel.bind('nuovo-messaggio', () => fetchChats());
-    channel.bind('nuova-chat', () => fetchChats());
-    
-    channel.bind('sta-scrivendo', (data) => {
-      const convId = String(data.conversationId);
-      const senderId = String(data.senderId);
-      const myId = String(userRef.current?.id);
-
-      if (senderId !== myId) {
-        setTypingUsers(prev => ({ ...prev, [convId]: true }));
-        
-        if (typingTimeoutsRef.current[convId]) {
-          clearTimeout(typingTimeoutsRef.current[convId]);
-        }
-        
-        typingTimeoutsRef.current[convId] = setTimeout(() => {
-          setTypingUsers(prev => ({ ...prev, [convId]: false }));
-        }, 3000);
-      }
+    channel.bind('sta-scrivendo', ({ conversationId }) => {
+      setTypingIn(Number(conversationId));
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => setTypingIn(null), 3000);
     });
 
     return () => {
@@ -179,99 +124,118 @@ export default function ChatPage() {
       channel.unsubscribe();
       pusher.disconnect();
     };
-  }, [user, fetchChats]);
+  }, [user, queryClient]);
 
-  const activeConv = conversations.find(c => String(c.id) === String(activeConvId));
-
+  // Senza Pusher (sviluppo locale) si controlla periodicamente
   useEffect(() => {
-    if (messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [activeConv?.messages, typingUsers]);
+    if (!user || PUSHER_KEY) return undefined;
+    const timer = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+      if (activeIdRef.current) queryClient.invalidateQueries({ queryKey: queryKeys.messages(activeIdRef.current) });
+    }, FALLBACK_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [user, queryClient]);
 
+  // Sessione scaduta mentre la pagina è aperta: si torna all'accesso
   useEffect(() => {
-    if (location.state?.openChatId && conversations.length > 0) {
-      setActiveConvId(location.state.openChatId);
-      setMobileView('chat');
-    }
-  }, [conversations, location.state]);
+    const error = conversationsQuery.error ?? messagesQuery.error;
+    if (error && isSessionExpired(error)) endLocalSession('expired');
+  }, [conversationsQuery.error, messagesQuery.error, endLocalSession]);
 
-  const handleSelectConv = (conv) => {
-    setActiveConvId(conv.id);
-    setMobileView('chat');
-    setTimeout(() => {
-        if (textareaRef.current) textareaRef.current.focus();
-    }, 100);
+  const pendingHere = outgoing.filter((m) => m.conversationId === activeId);
+  const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null;
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [activeId, lastMessageId, pendingHere.length, typingIn]);
+
+  const handleLogout = async () => {
+    setIsMenuOpen(false);
+    navigate('/');
+    await logout();
   };
 
-  const handleTextareaChange = (e) => {
-    setInputText(e.target.value);
-    const ta = e.target;
-    ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  const handleUnlock = async (e) => {
+    e.preventDefault();
+    setUnlockError('');
+    if (!hasStoredVault()) {
+      setUnlockError('Dati di sicurezza mancanti. Esci e accedi di nuovo.');
+      return;
+    }
+    setIsUnlocking(true);
+    try {
+      if (await unlockPrivateKey(unlockPassword)) {
+        setPrivateKey(getPrivateKey());
+        setUnlockPassword('');
+      } else {
+        setUnlockError('Password errata. Riprova.');
+      }
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
 
-    const now = Date.now();
-    if (PUSHER_KEY && activeConvId && user && (now - lastTypedRef.current > 1500)) {
-      lastTypedRef.current = now;
-      notifyTyping(activeConvId).catch(err => console.error("Errore typing:", err));
+  const handleSelectConv = (conversation) => {
+    setActiveId(conversation.id);
+    setMobileView('chat');
+    setTimeout(() => textareaRef.current?.focus(), 100);
+  };
+
+  /**
+   * Invia un messaggio: si cifra una volta sola e la chiave del messaggio viene cifrata
+   * per ogni partecipante. Se l'invio fallisce il testo resta a schermo, con "Riprova" (anomalia F10).
+   */
+  const deliver = async (text, id) => {
+    const myPublicKey = getPublicKey();
+    const recipients = [];
+    if (myPublicKey) recipients.push({ userId: user.id, publicKey: myPublicKey });
+    if (activeConv?.other?.publicKey) recipients.push({ userId: activeConv.other.id, publicKey: activeConv.other.publicKey });
+
+    try {
+      const encrypted = await encryptForRecipients(text, recipients);
+      await sendMessage.mutateAsync({ conversationId: activeConv.id, message: encrypted });
+      setOutgoing((current) => current.filter((m) => m.id !== id));
+    } catch (err) {
+      if (isSessionExpired(err)) {
+        endLocalSession('expired');
+        return;
+      }
+      setOutgoing((current) => current.map((m) => (m.id === id ? { ...m, isPending: false, isFailed: true } : m)));
     }
   };
 
   const handleSend = () => {
-    if (!inputText.trim() || !activeConvId || !user || isSending) return;
-    
-    const textToSend = inputText.trim();
-    setInputText(''); 
+    const text = inputText.trim();
+    if (!text || !activeConv) return;
+    setInputText('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
-    setIsSending(true);
 
-    const tempMsg = {
-      id: `temp-${Date.now()}`, 
-      type: 'sent',
-      text: textToSend,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isTemp: true
-    };
+    const id = `temp-${Date.now()}`;
+    setOutgoing((current) => [...current, {
+      id, conversationId: activeConv.id, senderId: user.id, text, createdAt: new Date().toISOString(), isPending: true,
+    }]);
+    deliver(text, id);
+  };
 
-    setConversations(prev => prev.map(conv => {
-      if (String(conv.id) === String(activeConvId)) {
-        return { ...conv, messages: [...(conv.messages || []), tempMsg] };
-      }
-      return conv;
-    }));
+  const handleRetry = (message) => {
+    setOutgoing((current) => current.map((m) => (m.id === message.id ? { ...m, isPending: true, isFailed: false } : m)));
+    deliver(message.text, message.id);
+  };
 
-    setTimeout(async () => {
-      try {
-        const targetPubKey = activeConv?.targetPublicKey;
-        const myPublicKey = getPublicKey();
+  const handleDiscard = (message) => {
+    setOutgoing((current) => current.filter((m) => m.id !== message.id));
+  };
 
-        if (!targetPubKey || !myPublicKey) throw new Error("Chiavi crittografiche mancanti.");
+  const handleTextareaChange = (e) => {
+    setInputText(e.target.value);
+    const area = e.target;
+    area.style.height = 'auto';
+    area.style.height = Math.min(area.scrollHeight, 120) + 'px';
 
-        const encryptedForTarget = await encryptMessage(textToSend, targetPubKey);
-        const encryptedForMe = await encryptMessage(textToSend, myPublicKey);
-
-        await sendMessage({
-          conversationId: activeConvId,
-          text: encryptedForTarget,
-          senderText: encryptedForMe
-        });
-      } catch (err) {
-        console.error(err);
-        if (isSessionExpired(err)) {
-          endLocalSession('expired');
-          return;
-        }
-        alert("Errore durante l'invio sicuro. Riprova.");
-        setConversations(prev => prev.map(conv => {
-            if (String(conv.id) === String(activeConvId)) {
-              return { ...conv, messages: conv.messages.filter(m => m.id !== tempMsg.id) };
-            }
-            return conv;
-        }));
-      } finally {
-        setIsSending(false);
-      }
-    }, 10);
+    const now = Date.now();
+    if (PUSHER_KEY && activeId && now - lastTypedRef.current > TYPING_NOTICE_MS) {
+      lastTypedRef.current = now;
+      notifyTyping(activeId).catch(() => {});
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -281,19 +245,35 @@ export default function ChatPage() {
     }
   };
 
-  const handleQuickReply = (qr) => {
-    setInputText(qr);
-    if (textareaRef.current) {
-        textareaRef.current.focus();
-        textareaRef.current.value = qr;
-        handleTextareaChange({ target: textareaRef.current });
-    }
+  const handleQuickReply = (reply) => {
+    setInputText(reply);
+    textareaRef.current?.focus();
   };
 
-  const filteredConvs = conversations.filter(c => {
-    const lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1].text : '';
-    return c.name.toLowerCase().includes(searchQuery.toLowerCase()) || lastMsg.toLowerCase().includes(searchQuery.toLowerCase());
+  const previewOf = (conversation) => {
+    if (!conversation.lastMessage) return 'Nessun messaggio';
+    if (isLocked) return '🔒 Messaggi protetti';
+    return previewTexts[conversation.lastMessage.id] ?? '…';
+  };
+
+  const search = searchQuery.trim().toLowerCase();
+  const filteredConvs = conversations.filter((c) => {
+    if (!search) return true;
+    return nameOf(c).toLowerCase().includes(search) ||
+      (c.listing?.title ?? '').toLowerCase().includes(search) ||
+      previewOf(c).toLowerCase().includes(search);
   });
+
+  // Messaggi da mostrare: quelli salvati più quelli ancora in viaggio
+  const visibleMessages = [
+    ...messages.map((m) => ({
+      id: m.id,
+      senderId: m.senderId,
+      createdAt: m.createdAt,
+      text: isLocked ? '🔒 Messaggio protetto' : messageTexts[m.id] ?? '…',
+    })),
+    ...pendingHere,
+  ];
 
   return (
     <div className="flex flex-col h-[100dvh] w-full max-w-[100vw] bg-white font-sans overflow-hidden selection:bg-orange-200">
@@ -447,10 +427,10 @@ export default function ChatPage() {
               />
             </div>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto custom-scrollbar bg-white">
-            {isLoading && conversations.length === 0 ? (
-              [1, 2, 3, 4, 5].map(n => (
+            {conversationsQuery.isPending ? (
+              [1, 2, 3, 4, 5].map((n) => (
                 <div key={n} className="flex gap-4 p-5 border-b border-neutral-50 pointer-events-none">
                   <div className="w-14 h-14 bg-neutral-100 animate-pulse rounded-full shrink-0"></div>
                   <div className="flex flex-col gap-2 w-full justify-center">
@@ -459,52 +439,81 @@ export default function ChatPage() {
                   </div>
                 </div>
               ))
+            ) : conversationsQuery.isError ? (
+              <div className="p-10 text-center flex flex-col items-center gap-4">
+                <p className="font-medium text-neutral-500">{conversationsQuery.error.message}</p>
+                <button onClick={() => conversationsQuery.refetch()} className="bg-neutral-900 text-white px-6 py-3 rounded-2xl font-bold cursor-pointer">Riprova</button>
+              </div>
             ) : filteredConvs.length === 0 ? (
               <div className="p-12 text-center flex flex-col items-center justify-center h-full text-neutral-400">
                 <div className="text-6xl mb-4 opacity-50">📭</div>
                 <p className="font-medium text-neutral-500">Nessuna conversazione trovata.</p>
               </div>
-            ) : filteredConvs.map(conv => {
-              const lastMsg = conv.messages && conv.messages.length > 0 ? conv.messages[conv.messages.length - 1].text : 'Nessun messaggio';
-              const isActive = String(conv.id) === String(activeConvId);
-              
-              return (
-                <div 
-                  key={conv.id} 
-                  className={`flex gap-4 p-5 cursor-pointer transition-all border-b border-neutral-50/50 ${isActive ? 'bg-orange-50/50 relative' : 'hover:bg-neutral-50'}`} 
-                  onClick={() => handleSelectConv(conv)}
-                >
-                  {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500 rounded-r-md"></div>}
-                  <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white shrink-0 shadow-sm relative transition-transform duration-300 hover:scale-105" style={{ background: `linear-gradient(135deg, ${conv.color1}, ${conv.color2})` }}>
-                    <span className="drop-shadow-sm">{initial(conv.name)}</span>
-                  </div>
-                  <div className="flex flex-col justify-center overflow-hidden w-full">
-                    <div className="font-bold text-neutral-900 text-[15px] truncate">{conv.name}</div>
-                    {conv.listing && (
-                      <div className="text-[10px] text-orange-600 font-extrabold mb-0.5 truncate uppercase tracking-wider">
-                        {conv.listing.emoji} {conv.listing.title}
+            ) : (
+              <>
+                {filteredConvs.map((conversation) => {
+                  const isActive = conversation.id === activeId;
+                  return (
+                    <div
+                      key={conversation.id}
+                      data-testid="conversation"
+                      className={`flex gap-4 p-5 cursor-pointer transition-all border-b border-neutral-50/50 ${isActive ? 'bg-orange-50/50 relative' : 'hover:bg-neutral-50'}`}
+                      onClick={() => handleSelectConv(conversation)}
+                    >
+                      {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500 rounded-r-md"></div>}
+                      <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white shrink-0 shadow-sm bg-gradient-to-br from-orange-400 to-rose-500">
+                        <span className="drop-shadow-sm">{initial(nameOf(conversation))}</span>
                       </div>
-                    )}
-                    <div className={`text-sm truncate mt-0.5 ${isActive ? 'text-orange-600 font-medium' : 'text-neutral-500'}`}>
-                      {typingUsers[conv.id] ? (
-                        <div className="flex gap-0.5 items-center mt-1">
-                          <span className="typing-dot-sidebar"></span>
-                          <span className="typing-dot-sidebar"></span>
-                          <span className="typing-dot-sidebar"></span>
+                      <div className="flex flex-col justify-center overflow-hidden w-full">
+                        <div className="flex justify-between items-center gap-2">
+                          <div className="font-bold text-neutral-900 text-[15px] truncate">{nameOf(conversation)}</div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {conversation.lastMessage && (
+                              <span className="text-[11px] text-neutral-400 font-medium">{shortDateLabel(conversation.lastMessage.createdAt)}</span>
+                            )}
+                            {conversation.unreadCount > 0 && (
+                              <span data-testid="unread-badge" className="bg-orange-500 text-white text-[11px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">
+                                {conversation.unreadCount}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        lastMsg
-                      )}
+                        {conversation.listing && (
+                          <div className="text-[10px] text-orange-600 font-extrabold mb-0.5 truncate uppercase tracking-wider">
+                            🏠 {conversation.listing.title}
+                          </div>
+                        )}
+                        <div className={`text-sm truncate mt-0.5 ${conversation.unreadCount > 0 ? 'text-neutral-900 font-semibold' : 'text-neutral-500'}`}>
+                          {typingIn === conversation.id ? (
+                            <div className="flex gap-0.5 items-center mt-1">
+                              <span className="typing-dot-sidebar"></span>
+                              <span className="typing-dot-sidebar"></span>
+                              <span className="typing-dot-sidebar"></span>
+                            </div>
+                          ) : (
+                            previewOf(conversation)
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
+                {conversationsQuery.hasNextPage && (
+                  <button
+                    onClick={() => conversationsQuery.fetchNextPage()}
+                    disabled={conversationsQuery.isFetchingNextPage}
+                    className="w-full py-4 text-sm font-bold text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer"
+                  >
+                    {conversationsQuery.isFetchingNextPage ? 'Caricamento...' : 'Carica altre conversazioni'}
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </aside>
 
         {/* ── CHAT MAIN AREA ── */}
-        <main className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 flex-col h-full bg-[#FAFAFA] w-full max-w-full relative`}>
+        <main className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 min-w-0 flex-col h-full bg-[#FAFAFA] w-full max-w-full relative`}>
           {!activeConv ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-[#FAFAFA]">
               <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-sm mb-6 border border-neutral-100">
@@ -518,53 +527,81 @@ export default function ChatPage() {
               {/* Header Chat Attiva */}
               <div className="bg-white/90 backdrop-blur-md px-4 md:px-6 py-4 border-b border-neutral-100 flex items-center gap-4 shrink-0 shadow-sm z-10 w-full">
                 <button className="md:hidden text-2xl text-neutral-500 hover:text-neutral-900 px-2 cursor-pointer transition-colors" onClick={() => setMobileView('list')}>←</button>
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-sm shrink-0" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
-                  <span className="drop-shadow-sm">{initial(activeConv.name)}</span>
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-sm shrink-0 bg-gradient-to-br from-orange-400 to-rose-500">
+                  <span className="drop-shadow-sm">{initial(nameOf(activeConv))}</span>
                 </div>
                 <div className="overflow-hidden">
-                  <h3 className="font-bold text-neutral-900 leading-tight truncate text-lg">{activeConv.name}</h3>
-                  <p className="text-xs text-neutral-500 font-medium truncate h-4 mt-0.5">{activeConv.listing.emoji} {activeConv.listing.title}</p>
+                  <h3 className="font-bold text-neutral-900 leading-tight truncate text-lg">{nameOf(activeConv)}</h3>
+                  <p className="text-xs text-neutral-500 font-medium truncate h-4 mt-0.5">
+                    {activeConv.listing ? `🏠 ${activeConv.listing.title} · €${activeConv.listing.price}/mese` : 'Chat diretta'}
+                  </p>
                 </div>
               </div>
 
               {/* Area Messaggi */}
               <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 flex flex-col gap-6 w-full custom-scrollbar bg-[#FAFAFA]">
-                {!activeConv.messages || activeConv.messages.length === 0 ? (
+                {messagesQuery.hasNextPage && (
+                  <button
+                    onClick={() => messagesQuery.fetchNextPage()}
+                    disabled={messagesQuery.isFetchingNextPage}
+                    className="self-center bg-white border border-neutral-200 text-neutral-600 text-sm font-bold px-5 py-2.5 rounded-full hover:bg-neutral-50 transition-colors cursor-pointer shadow-sm"
+                  >
+                    {messagesQuery.isFetchingNextPage ? 'Caricamento...' : 'Carica messaggi precedenti'}
+                  </button>
+                )}
+
+                {visibleMessages.length === 0 ? (
                   <div className="text-center p-6 text-neutral-500 text-sm font-medium bg-white rounded-3xl border border-neutral-100 shadow-sm self-center my-auto">
-                    👋 Invia il primo messaggio a {activeConv.name} per iniziare!
+                    👋 Invia il primo messaggio a {nameOf(activeConv)} per iniziare!
                   </div>
                 ) : (
-                  activeConv.messages.map(msg => {
-                    const isMine = msg.type === 'sent';
+                  visibleMessages.map((message, index) => {
+                    const isMine = message.senderId === user?.id;
+                    const previous = visibleMessages[index - 1];
+                    const newDay = !previous || dayLabel(previous.createdAt) !== dayLabel(message.createdAt);
                     return (
-                      <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end gap-3 w-full ${msg.isTemp ? 'opacity-70 transition-opacity' : ''}`}>
-                        {!isMine && (
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-sm relative bottom-1" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
-                            {initial(activeConv.name)}
+                      <div key={message.id} className="flex flex-col gap-6 w-full min-w-0">
+                        {newDay && (
+                          <div className="self-center bg-white border border-neutral-100 text-neutral-500 text-[11px] font-bold px-4 py-1.5 rounded-full shadow-sm">
+                            {dayLabel(message.createdAt)}
                           </div>
                         )}
-                        <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[85%] md:max-w-[70%]`}>
-                          <div className={`px-5 py-3.5 text-[15px] shadow-sm break-words whitespace-pre-wrap w-full leading-relaxed ${
-                            isMine 
-                            ? 'bg-neutral-900 text-white rounded-3xl rounded-br-sm' 
-                            : 'bg-white border border-neutral-100 text-neutral-800 rounded-3xl rounded-bl-sm'
-                          }`}>
-                            {msg.text}
+                        <div className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end gap-3 w-full ${message.isPending ? 'opacity-70' : ''}`}>
+                          {!isMine && (
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-sm relative bottom-1 bg-gradient-to-br from-orange-400 to-rose-500">
+                              {initial(nameOf(activeConv))}
+                            </div>
+                          )}
+                          <div className={`flex flex-col min-w-0 ${isMine ? 'items-end' : 'items-start'} max-w-[85%] md:max-w-[70%]`}>
+                            <div className={`px-5 py-3.5 text-[15px] shadow-sm break-words whitespace-pre-wrap w-full leading-relaxed ${
+                              isMine
+                                ? `bg-neutral-900 text-white rounded-3xl rounded-br-sm ${message.isFailed ? 'ring-2 ring-rose-300' : ''}`
+                                : 'bg-white border border-neutral-100 text-neutral-800 rounded-3xl rounded-bl-sm'
+                            }`}>
+                              {message.text}
+                            </div>
+                            {message.isFailed ? (
+                              <span className="text-[11px] text-rose-500 mt-1.5 px-1 font-bold flex gap-2 items-center">
+                                Non inviato
+                                <button onClick={() => handleRetry(message)} className="underline cursor-pointer">Riprova</button>
+                                <button onClick={() => handleDiscard(message)} className="underline cursor-pointer text-neutral-400">Elimina</button>
+                              </span>
+                            ) : (
+                              <span data-testid="message-time" className="text-[11px] text-neutral-400 mt-1.5 px-1 font-medium">
+                                {timeLabel(message.createdAt)}{message.isPending && ' • Inviando...'}
+                              </span>
+                            )}
                           </div>
-                          <span className="text-[11px] text-neutral-400 mt-1.5 px-1 font-medium">
-                              {msg.time} {msg.isTemp && ' • Inviando...'}
-                          </span>
                         </div>
                       </div>
                     );
                   })
                 )}
-                
-                {/* Bolla Puntini Scrittura */}
-                {typingUsers[activeConv.id] && (
+
+                {typingIn === activeConv.id && (
                   <div className="flex justify-start items-end gap-3 w-full mt-2 animate-fade-in-up">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-sm opacity-60 relative bottom-1" style={{ background: `linear-gradient(135deg, ${activeConv.color1}, ${activeConv.color2})` }}>
-                      {initial(activeConv.name)}
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-sm opacity-60 relative bottom-1 bg-gradient-to-br from-orange-400 to-rose-500">
+                      {initial(nameOf(activeConv))}
                     </div>
                     <div className="bg-white border border-neutral-100 px-5 py-4 rounded-3xl rounded-bl-sm shadow-sm flex gap-1.5 items-center h-[42px]">
                       <span className="typing-dot"></span>
@@ -578,13 +615,13 @@ export default function ChatPage() {
 
               {/* Quick Replies */}
               <div className="shrink-0 bg-white border-t border-neutral-100 p-3 md:px-6 md:py-4 overflow-x-auto flex gap-2 w-full custom-scrollbar">
-                {QUICK_REPLIES.map(qr => (
-                  <button 
-                    key={qr} 
-                    className="shrink-0 bg-white border border-neutral-200 text-neutral-600 text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-neutral-50 hover:border-orange-300 hover:text-orange-600 transition-all cursor-pointer whitespace-nowrap shadow-sm" 
-                    onClick={() => handleQuickReply(qr)}
+                {QUICK_REPLIES.map((reply) => (
+                  <button
+                    key={reply}
+                    className="shrink-0 bg-white border border-neutral-200 text-neutral-600 text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-neutral-50 hover:border-orange-300 hover:text-orange-600 transition-all cursor-pointer whitespace-nowrap shadow-sm"
+                    onClick={() => handleQuickReply(reply)}
                   >
-                    {qr}
+                    {reply}
                   </button>
                 ))}
               </div>
@@ -600,10 +637,10 @@ export default function ChatPage() {
                   onKeyDown={handleKeyDown}
                   rows={1}
                 />
-                <button 
-                  className={`shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-white font-bold transition-all duration-200 ${(!inputText.trim() || isSending) ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed shadow-none' : 'bg-gradient-to-r from-orange-500 to-rose-500 hover:scale-[1.05] shadow-lg hover:shadow-orange-500/25 cursor-pointer'}`}
-                  onClick={handleSend} 
-                  disabled={!inputText.trim() || isSending}
+                <button
+                  className={`shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-white font-bold transition-all duration-200 ${!inputText.trim() ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed shadow-none' : 'bg-gradient-to-r from-orange-500 to-rose-500 hover:scale-[1.05] shadow-lg hover:shadow-orange-500/25 cursor-pointer'}`}
+                  onClick={handleSend}
+                  disabled={!inputText.trim()}
                   aria-label="Invia messaggio"
                 >
                   <svg className="w-5 h-5 md:w-6 md:h-6 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
@@ -612,7 +649,7 @@ export default function ChatPage() {
             </>
           )}
         </main>
-        
+
         {/* 🔐 OVERLAY SBLOCCO CRITTOGRAFIA */}
         {isLocked && (
           <div className="absolute inset-0 z-[1100] bg-white/60 backdrop-blur-xl flex items-center justify-center p-4">
@@ -637,10 +674,10 @@ export default function ChatPage() {
                 
                 <button
                   type="submit"
-                  disabled={!unlockPassword || isLoading}
+                  disabled={!unlockPassword || isUnlocking}
                   className="w-full bg-neutral-900 text-white py-4 rounded-2xl font-bold hover:bg-neutral-800 transition-colors shadow-lg disabled:bg-neutral-300 disabled:shadow-none cursor-pointer mt-2"
                 >
-                  {isLoading ? 'Sblocco in corso...' : 'Sblocca Messaggi'}
+                  {isUnlocking ? 'Sblocco in corso...' : 'Sblocca Messaggi'}
                 </button>
               </form>
             </div>

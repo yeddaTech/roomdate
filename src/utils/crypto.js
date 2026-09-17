@@ -107,7 +107,7 @@ export async function rewrapPrivateKey(cryptoData, currentPassword, newPassword,
   return wrapPrivateKey(privateKey, newPassword);
 }
 
-// --- FUNZIONE DI SUPPORTO ---
+// --- FUNZIONI DI SUPPORTO ---
 // Trasforma una stringa Base64 in un ArrayBuffer (necessario per le API crittografiche)
 function base64ToArrayBuffer(base64) {
   const binaryString = atob(base64);
@@ -118,6 +118,33 @@ function base64ToArrayBuffer(base64) {
   return bytes.buffer;
 }
 
+// Trasforma dati binari in Base64, a blocchi: con un messaggio lungo l'intero array
+// come argomenti di una sola chiamata supererebbe il limite dello stack.
+function toBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  }
+  return btoa(binary);
+}
+
+// Cifra dati binari con la chiave pubblica RSA di un utente.
+async function encryptBytes(data, publicKeyBase64) {
+  const publicKey = await window.crypto.subtle.importKey(
+    "spki", base64ToArrayBuffer(publicKeyBase64), { name: "RSA-OAEP", hash: "SHA-256" }, false, ["encrypt"]
+  );
+  return toBase64(await window.crypto.subtle.encrypt({ name: "RSA-OAEP" }, publicKey, data));
+}
+
+// Decifra dati binari con la propria chiave privata RSA.
+async function decryptBytes(encryptedBase64, privateKeyBase64) {
+  const privateKey = await window.crypto.subtle.importKey(
+    "pkcs8", base64ToArrayBuffer(privateKeyBase64), { name: "RSA-OAEP", hash: "SHA-256" }, false, ["decrypt"]
+  );
+  return window.crypto.subtle.decrypt({ name: "RSA-OAEP" }, privateKey, base64ToArrayBuffer(encryptedBase64));
+}
+
 /**
  * Cifra un messaggio in chiaro usando la chiave PUBBLICA in Base64 del destinatario.
  * @param {string} text - Il messaggio in chiaro.
@@ -125,29 +152,52 @@ function base64ToArrayBuffer(base64) {
  * @returns {Promise<string>} - Il messaggio cifrato in formato Base64.
  */
 export async function encryptMessage(text, publicKeyBase64) {
-  // 1. Convertiamo la stringa Base64 della chiave pubblica in un oggetto CryptoKey
-  const keyBuffer = base64ToArrayBuffer(publicKeyBase64);
-  const cryptoPublicKey = await window.crypto.subtle.importKey(
-    "spki",
-    keyBuffer,
-    { name: "RSA-OAEP", hash: "SHA-256" },
-    false,
-    ["encrypt"]
+  return encryptBytes(new TextEncoder().encode(text), publicKeyBase64);
+}
+
+/**
+ * Cifra un messaggio per più destinatari (cifratura ibrida).
+ *
+ * Il testo viene cifrato una sola volta con AES-256-GCM; la chiave del messaggio viene poi cifrata
+ * con RSA-OAEP per ogni partecipante. Così la lunghezza del messaggio non dipende più da RSA,
+ * che si ferma a 190 byte (anomalia F8).
+ *
+ * @param {string} text - Il messaggio in chiaro.
+ * @param {Array<{userId: string, publicKey: string}>} recipients - Partecipanti con chiave pubblica.
+ * @returns {Promise<{body: string, iv: string, keys: Array<{userId: string, key: string}>}>}
+ */
+export async function encryptForRecipients(text, recipients) {
+  const messageKey = await window.crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    messageKey,
+    new TextEncoder().encode(text)
   );
+  const rawKey = await window.crypto.subtle.exportKey("raw", messageKey);
 
-  // 2. Cifriamo il messaggio
-  const encoder = new TextEncoder();
-  const encodedText = encoder.encode(text);
+  const keys = [];
+  for (const recipient of recipients) {
+    keys.push({ userId: recipient.userId, key: await encryptBytes(rawKey, recipient.publicKey) });
+  }
+  return { body: toBase64(encrypted), iv: toBase64(iv), keys };
+}
 
-  const encryptedBuffer = await window.crypto.subtle.encrypt(
-    { name: "RSA-OAEP" },
-    cryptoPublicKey,
-    encodedText
+/**
+ * Decifra un messaggio in cifratura ibrida: prima la chiave del messaggio con RSA, poi il testo.
+ *
+ * @param {{body: string, iv: string, key: string}} message - Testo cifrato, IV e chiave per chi legge.
+ * @param {string} privateKeyBase64 - La chiave privata dell'utente.
+ */
+export async function decryptFromRecipients({ body, iv, key }, privateKeyBase64) {
+  const rawKey = await decryptBytes(key, privateKeyBase64);
+  const messageKey = await window.crypto.subtle.importKey("raw", rawKey, { name: "AES-GCM" }, false, ["decrypt"]);
+  const decrypted = await window.crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: new Uint8Array(base64ToArrayBuffer(iv)) },
+    messageKey,
+    base64ToArrayBuffer(body)
   );
-
-  // 3. Ritorniamo il messaggio cifrato in Base64
-  const encryptedArray = Array.from(new Uint8Array(encryptedBuffer));
-  return btoa(String.fromCharCode.apply(null, encryptedArray));
+  return new TextDecoder().decode(decrypted);
 }
 
 /**
@@ -157,24 +207,5 @@ export async function encryptMessage(text, publicKeyBase64) {
  * @returns {Promise<string>} - Il messaggio decifrato in chiaro.
  */
 export async function decryptMessage(encryptedBase64, privateKeyBase64) {
-  // 1. Convertiamo la stringa Base64 della chiave privata in un oggetto CryptoKey
-  const keyBuffer = base64ToArrayBuffer(privateKeyBase64);
-  const cryptoPrivateKey = await window.crypto.subtle.importKey(
-    "pkcs8",
-    keyBuffer,
-    { name: "RSA-OAEP", hash: "SHA-256" },
-    false,
-    ["decrypt"]
-  );
-
-  // 2. Decifriamo il messaggio
-  const encryptedBuffer = base64ToArrayBuffer(encryptedBase64);
-  const decryptedBuffer = await window.crypto.subtle.decrypt(
-    { name: "RSA-OAEP" },
-    cryptoPrivateKey,
-    encryptedBuffer
-  );
-
-  const decoder = new TextDecoder();
-  return decoder.decode(decryptedBuffer);
+  return new TextDecoder().decode(await decryptBytes(encryptedBase64, privateKeyBase64));
 }

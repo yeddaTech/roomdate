@@ -120,8 +120,9 @@ func repoRoot() (string, bool) {
 // --- Applicazione di test ---
 
 type event struct {
-	Name string
-	Data any
+	Channel string
+	Name    string
+	Data    any
 }
 
 // recordingPublisher registra gli eventi in tempo reale invece di inviarli.
@@ -131,13 +132,13 @@ type recordingPublisher struct {
 	fail   bool
 }
 
-func (p *recordingPublisher) Publish(_ context.Context, name string, data any) error {
+func (p *recordingPublisher) Publish(_ context.Context, channel, name string, data any) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.fail {
 		return fmt.Errorf("pusher: 500 Internal Server Error (dettaglio interno)")
 	}
-	p.events = append(p.events, event{Name: name, Data: data})
+	p.events = append(p.events, event{Channel: channel, Name: name, Data: data})
 	return nil
 }
 

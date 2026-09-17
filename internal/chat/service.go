@@ -4,22 +4,32 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"roomdate-backend/internal/apperr"
 	"roomdate-backend/internal/db"
 	"roomdate-backend/internal/logx"
+	"roomdate-backend/internal/page"
 	"roomdate-backend/internal/realtime"
 	"roomdate-backend/internal/validate"
 )
 
-// Dimensione massima di un messaggio cifrato (Base64). RSA-OAEP a 2048 bit produce 344 caratteri:
-// il margine serve alla cifratura ibrida prevista nel modulo M1.7.
-const maxCiphertextLength = 8192
+const (
+	// Con la cifratura ibrida il limite non dipende più da RSA (anomalia F8): il testo cifrato
+	// cresce poco più del messaggio scritto, e questo margine copre messaggi molto lunghi.
+	maxBodyLength = 24000
+	maxKeyLength  = 1024
+	// Dimensione delle pagine di conversazioni e messaggi.
+	conversationsLimit = 30
+	messagesLimit      = 40
+	maxLimit           = 100
+)
 
 var (
 	errSelfChat            = apperr.BadRequest("self_chat", "Non puoi avviare una conversazione con te stesso")
 	errInvalidConversation = apperr.BadRequest("invalid_conversation", "Conversazione non valida")
 	errNotParticipant      = apperr.Forbidden("not_participant", "Accesso negato a questa conversazione")
+	errKeysMismatch        = apperr.BadRequest("keys_mismatch", "Chiavi del messaggio non valide: ricarica la pagina e riprova")
 )
 
 type Service struct {
@@ -65,10 +75,8 @@ func (s *Service) startListingChat(ctx context.Context, userID string, listingID
 		return 0, errSelfChat
 	}
 
-	id, err := s.store.FindListingConversation(ctx, listingID, userID)
-	if db.IsNoRows(err) {
-		id, err = s.store.CreateListingConversation(ctx, listingID, userID, ownerID)
-	}
+	key := fmt.Sprintf("listing:%d:%s", listingID, userID)
+	id, err := s.store.EnsureConversation(ctx, key, &listingID, userID, ownerID)
 	if err != nil {
 		return 0, apperr.Wrap(err, "chat_start_failed", "Errore interno database")
 	}
@@ -91,145 +99,317 @@ func (s *Service) startDirectChat(ctx context.Context, userID, targetID string) 
 		return 0, errSelfChat
 	}
 
-	id, err := s.store.FindDirectConversation(ctx, userID, targetID)
-	if db.IsNoRows(err) {
-		id, err = s.store.CreateDirectConversation(ctx, userID, targetID)
+	// La chiave non dipende da chi apre la conversazione: la coppia ne ha sempre una sola
+	first, second := userID, targetID
+	if second < first {
+		first, second = second, first
 	}
+	id, err := s.store.EnsureConversation(ctx, "direct:"+first+":"+second, nil, userID, targetID)
 	if err != nil {
 		return 0, apperr.Wrap(err, "chat_start_failed", "Errore interno database")
 	}
 	return id, nil
 }
 
-type ListingSummary struct {
-	Emoji string `json:"emoji"`
+// Message è un messaggio come lo riceve chi lo legge: il testo resta cifrato, insieme
+// agli elementi che servono al browser per decifrarlo.
+type Message struct {
+	ID       int    `json:"id"`
+	SenderID string `json:"senderId"`
+	// Format 1 = una copia cifrata per destinatario (messaggi vecchi), 2 = cifratura ibrida.
+	Format int    `json:"format"`
+	Body   string `json:"body"`
+	// IV e Key sono vuoti nel formato 1.
+	IV  string `json:"iv"`
+	Key string `json:"key"`
+	// CreatedAt è in UTC: il browser lo mostra nell'ora locale (anomalia F11).
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+func message(r MessageRow) Message {
+	return Message{ID: r.ID, SenderID: r.SenderID, Format: r.Format, Body: r.Body, IV: r.IV, Key: r.WrappedKey, CreatedAt: r.CreatedAt.UTC()}
+}
+
+// Listing è l'annuncio da cui è nata la conversazione, se esiste ancora.
+type Listing struct {
+	ID    int    `json:"id"`
 	Title string `json:"title"`
 	Price int    `json:"price"`
 }
 
-type Message struct {
-	ID   int    `json:"id"`
-	Type string `json:"type"` // "sent" o "received", rispetto a chi legge
-	Text string `json:"text"` // cifrato: il browser lo decifra
-	Time string `json:"time"`
+// Participant è l'altro partecipante; è null se ha eliminato l'account.
+type OtherParticipant struct {
+	ID        string `json:"id"`
+	FirstName string `json:"firstName"`
+	PublicKey string `json:"publicKey"`
 }
 
-// Conversation è una conversazione con i suoi messaggi (formato JSON delle API legacy).
+// Conversation è una conversazione nell'elenco.
 type Conversation struct {
-	ID              int            `json:"id"`
-	Name            string         `json:"name"`
-	Emoji           string         `json:"emoji"`
-	Color1          string         `json:"color1"`
-	Color2          string         `json:"color2"`
-	Listing         ListingSummary `json:"listing"`
-	TargetPublicKey string         `json:"targetPublicKey"`
-	Messages        []Message      `json:"messages"`
+	ID          int               `json:"id"`
+	Listing     *Listing          `json:"listing"`
+	Other       *OtherParticipant `json:"other"`
+	LastMessage *Message          `json:"lastMessage"`
+	UnreadCount int               `json:"unreadCount"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
 }
 
-// Conversations restituisce tutte le conversazioni dell'utente con tutti i messaggi.
-// Una query per conversazione e nessuna paginazione: vengono riprogettate nel modulo M1.7.
-func (s *Service) Conversations(ctx context.Context, userID string) ([]Conversation, error) {
-	rows, err := s.store.ConversationsFor(ctx, userID)
-	if err != nil {
-		return nil, apperr.Wrap(err, "chats_read_failed", "Errore caricamento chat")
-	}
-
-	colors := [][]string{{"#F5C29A", "#C4603A"}, {"#A8D8EA", "#4A90D9"}}
-	conversations := make([]Conversation, 0, len(rows))
-	for i, row := range rows {
-		c := Conversation{
-			ID:              row.ID,
-			Name:            row.OtherName,
-			Emoji:           "👤",
-			Color1:          colors[i%len(colors)][0],
-			Color2:          colors[i%len(colors)][1],
-			Listing:         ListingSummary{Emoji: "🏠", Title: row.ListingTitle, Price: row.ListingPrice},
-			TargetPublicKey: row.OtherPublicKey,
-			Messages:        []Message{},
-		}
-		if c.Name == "" {
-			// L'altro partecipante non esiste più
-			c.Name = "Utente eliminato"
-		}
-		if row.ListingPrice == 0 {
-			c.Listing.Emoji = "💬"
-		}
-
-		messages, err := s.store.MessagesFor(ctx, row.ID, userID)
-		if err != nil {
-			return nil, apperr.Wrap(err, "chats_read_failed", "Errore caricamento chat")
-		}
-		for _, m := range messages {
-			msgType := "received"
-			if m.SenderID == userID {
-				msgType = "sent"
-			}
-			c.Messages = append(c.Messages, Message{ID: m.ID, Type: msgType, Text: m.Content, Time: m.CreatedAt.Format("15:04")})
-		}
-		conversations = append(conversations, c)
-	}
-	return conversations, nil
+// ConversationsPage è una pagina dell'elenco delle conversazioni.
+type ConversationsPage struct {
+	Items      []Conversation `json:"items"`
+	NextCursor *string        `json:"nextCursor"`
 }
 
-// SendMessageInput contiene il messaggio cifrato due volte: per il destinatario e per il mittente.
-type SendMessageInput struct {
-	ConversationID int    `json:"conversationId"`
-	Text           string `json:"text"`
-	SenderText     string `json:"senderText"`
+// MessagesPage è una pagina di messaggi, dal più recente al più vecchio.
+type MessagesPage struct {
+	Items      []Message `json:"items"`
+	NextCursor *string   `json:"nextCursor"`
 }
 
-func (s *Service) SendMessage(ctx context.Context, userID string, in SendMessageInput) error {
-	if in.ConversationID <= 0 {
-		return errInvalidConversation
-	}
+// Conversations restituisce una pagina delle conversazioni dell'utente, con l'ultimo messaggio
+// e quanti messaggi non ha ancora letto.
+func (s *Service) Conversations(ctx context.Context, userID, cursor, rawLimit string) (ConversationsPage, error) {
+	q := ConversationsQuery{UserID: userID, Limit: conversationsLimit}
+
 	var v validate.Validator
-	v.Check(validate.NotBlank(in.Text) && validate.MaxLen(in.Text, maxCiphertextLength), "text", "Messaggio non valido")
-	v.Check(validate.NotBlank(in.SenderText) && validate.MaxLen(in.SenderText, maxCiphertextLength), "senderText", "Messaggio non valido")
+	if rawLimit != "" {
+		limit, err := strconv.Atoi(rawLimit)
+		v.Check(err == nil && validate.Between(limit, 1, maxLimit), "limit",
+			fmt.Sprintf("Il numero di conversazioni per pagina deve essere tra 1 e %d", maxLimit))
+		q.Limit = limit
+	}
+	if cursor != "" {
+		after, ok := decodeConversationsCursor(cursor)
+		v.Check(ok, "cursor", "Pagina non valida: ricarica le conversazioni")
+		q.After = &after
+	}
 	if err := v.Err(); err != nil {
-		return err
+		return ConversationsPage{}, err
 	}
 
-	if err := s.requireParticipant(ctx, in.ConversationID, userID); err != nil {
-		return err
+	// Una conversazione in più dice se esiste la pagina successiva
+	limit := q.Limit
+	q.Limit++
+	rows, err := s.store.Conversations(ctx, q)
+	if err != nil {
+		return ConversationsPage{}, apperr.Wrap(err, "chats_read_failed", "Errore caricamento chat")
 	}
-	if err := s.store.InsertMessage(ctx, in.ConversationID, userID, in.Text, in.SenderText); err != nil {
-		return apperr.Wrap(err, "message_send_failed", "Impossibile inviare il messaggio")
+
+	result := ConversationsPage{Items: []Conversation{}}
+	if len(rows) > limit {
+		rows = rows[:limit]
+		last := rows[len(rows)-1]
+		cursor := page.Encode(last.LastActivity.UTC().Format(time.RFC3339Nano), strconv.Itoa(last.ID))
+		result.NextCursor = &cursor
+	}
+	for _, r := range rows {
+		c := Conversation{ID: r.ID, UnreadCount: r.UnreadCount, UpdatedAt: r.LastActivity.UTC()}
+		if r.ListingID != nil {
+			c.Listing = &Listing{ID: *r.ListingID, Title: r.ListingTitle, Price: r.ListingPrice}
+		}
+		if r.OtherID != "" {
+			c.Other = &OtherParticipant{ID: r.OtherID, FirstName: r.OtherFirstName, PublicKey: r.OtherPublicKey}
+		}
+		if r.LastMessage != nil {
+			last := message(*r.LastMessage)
+			c.LastMessage = &last
+		}
+		result.Items = append(result.Items, c)
+	}
+	return result, nil
+}
+
+// Messages restituisce una pagina di messaggi, dal più recente: il cursore serve a caricare i più vecchi.
+func (s *Service) Messages(ctx context.Context, userID, rawConversationID, cursor, rawLimit string) (MessagesPage, error) {
+	conversationID, err := s.requireParticipantByID(ctx, userID, rawConversationID)
+	if err != nil {
+		return MessagesPage{}, err
+	}
+
+	q := MessagesQuery{ConversationID: conversationID, ReaderID: userID, Limit: messagesLimit}
+	var v validate.Validator
+	if rawLimit != "" {
+		limit, err := strconv.Atoi(rawLimit)
+		v.Check(err == nil && validate.Between(limit, 1, maxLimit), "limit",
+			fmt.Sprintf("Il numero di messaggi per pagina deve essere tra 1 e %d", maxLimit))
+		q.Limit = limit
+	}
+	if cursor != "" {
+		after, ok := decodeMessagesCursor(cursor)
+		v.Check(ok, "cursor", "Pagina non valida: ricarica la conversazione")
+		q.After = &after
+	}
+	if err := v.Err(); err != nil {
+		return MessagesPage{}, err
+	}
+
+	limit := q.Limit
+	q.Limit++
+	rows, err := s.store.Messages(ctx, q)
+	if err != nil {
+		return MessagesPage{}, apperr.Wrap(err, "chats_read_failed", "Errore caricamento messaggi")
+	}
+
+	result := MessagesPage{Items: []Message{}}
+	if len(rows) > limit {
+		rows = rows[:limit]
+		last := rows[len(rows)-1]
+		cursor := page.Encode(last.CreatedAt.UTC().Format(time.RFC3339Nano), strconv.Itoa(last.ID))
+		result.NextCursor = &cursor
+	}
+	for _, r := range rows {
+		result.Items = append(result.Items, message(r))
+	}
+	return result, nil
+}
+
+// SendMessageInput è un messaggio cifrato: il testo una volta sola, e la chiave del messaggio
+// cifrata per ogni partecipante.
+type SendMessageInput struct {
+	Body string `json:"body"`
+	IV   string `json:"iv"`
+	Keys []struct {
+		UserID string `json:"userId"`
+		Key    string `json:"key"`
+	} `json:"keys"`
+}
+
+// SendMessage salva il messaggio e avvisa i partecipanti.
+func (s *Service) SendMessage(ctx context.Context, userID, rawConversationID string, in SendMessageInput) (Message, error) {
+	conversationID, err := s.requireParticipantByID(ctx, userID, rawConversationID)
+	if err != nil {
+		return Message{}, err
+	}
+
+	var v validate.Validator
+	v.Check(validate.NotBlank(in.Body) && validate.Base64(in.Body, maxBodyLength), "body", "Messaggio non valido")
+	v.Check(validate.Base64(in.IV, 64) && in.IV != "", "iv", "Messaggio non valido")
+	if err := v.Err(); err != nil {
+		return Message{}, err
+	}
+
+	participants, err := s.store.Participants(ctx, conversationID)
+	if err != nil {
+		return Message{}, fmt.Errorf("lettura partecipanti: %w", err)
+	}
+
+	// Serve una chiave per ogni partecipante che ha una chiave pubblica, e nessuna in più
+	keys := make(map[string]string, len(in.Keys))
+	for _, k := range in.Keys {
+		if !validate.Base64(k.Key, maxKeyLength) || k.Key == "" {
+			return Message{}, errKeysMismatch
+		}
+		keys[k.UserID] = k.Key
+	}
+	expected := 0
+	for _, p := range participants {
+		if p.PublicKey == "" {
+			continue
+		}
+		expected++
+		if keys[p.UserID] == "" {
+			return Message{}, errKeysMismatch
+		}
+	}
+	if len(keys) != expected {
+		return Message{}, errKeysMismatch
+	}
+
+	saved, err := s.store.InsertMessage(ctx, NewMessage{
+		ConversationID: conversationID, SenderID: userID, Body: in.Body, IV: in.IV, Keys: keys,
+	})
+	if err != nil {
+		return Message{}, apperr.Wrap(err, "message_send_failed", "Impossibile inviare il messaggio")
 	}
 
 	// Il messaggio è salvato: se la notifica in tempo reale fallisce, i client lo vedranno al prossimo aggiornamento
-	if err := s.publisher.Publish(ctx, realtime.EventNewMessage, map[string]any{"conversationId": in.ConversationID}); err != nil {
-		logx.From(ctx).Warn("notifica nuovo messaggio non inviata", "err", err)
+	for _, p := range participants {
+		if p.UserID == userID {
+			continue
+		}
+		err := s.publisher.Publish(ctx, realtime.UserChannel(p.UserID), realtime.EventNewMessage,
+			map[string]int{"conversationId": conversationID, "messageId": saved.ID})
+		if err != nil {
+			logx.From(ctx).Warn("notifica nuovo messaggio non inviata", "err", err)
+		}
 	}
-	return nil
+	return message(saved), nil
 }
 
-// Typing segnala agli altri client che l'utente sta scrivendo. Il mittente è sempre quello della sessione.
-func (s *Service) Typing(ctx context.Context, userID, rawConversationID string) error {
-	conversationID, ok := validate.PositiveID(rawConversationID)
-	if !ok {
-		return errInvalidConversation
-	}
-	if err := s.requireParticipant(ctx, conversationID, userID); err != nil {
+// MarkRead segna come letti i messaggi della conversazione fino a ora.
+func (s *Service) MarkRead(ctx context.Context, userID, rawConversationID string) error {
+	conversationID, err := s.requireParticipantByID(ctx, userID, rawConversationID)
+	if err != nil {
 		return err
 	}
-
-	err := s.publisher.Publish(ctx, realtime.EventTyping, map[string]string{
-		"conversationId": strconv.Itoa(conversationID),
-		"senderId":       userID,
-	})
-	if err != nil {
-		return apperr.Wrap(err, "realtime_failed", "Errore di trasmissione in tempo reale")
+	if err := s.store.MarkRead(ctx, conversationID, userID); err != nil {
+		return apperr.Wrap(err, "mark_read_failed", "Impossibile aggiornare i messaggi letti")
 	}
 	return nil
 }
 
-func (s *Service) requireParticipant(ctx context.Context, conversationID int, userID string) error {
-	ok, err := s.store.IsParticipant(ctx, conversationID, userID)
+// Typing segnala agli altri partecipanti che l'utente sta scrivendo.
+func (s *Service) Typing(ctx context.Context, userID, rawConversationID string) error {
+	conversationID, err := s.requireParticipantByID(ctx, userID, rawConversationID)
 	if err != nil {
-		return fmt.Errorf("verifica partecipante: %w", err)
+		return err
 	}
-	if !ok {
-		return errNotParticipant
+	participants, err := s.store.Participants(ctx, conversationID)
+	if err != nil {
+		return fmt.Errorf("lettura partecipanti: %w", err)
+	}
+	for _, p := range participants {
+		if p.UserID == userID {
+			continue
+		}
+		err := s.publisher.Publish(ctx, realtime.UserChannel(p.UserID), realtime.EventTyping,
+			map[string]string{"conversationId": strconv.Itoa(conversationID), "senderId": userID})
+		if err != nil {
+			return apperr.Wrap(err, "realtime_failed", "Errore di trasmissione in tempo reale")
+		}
 	}
 	return nil
+}
+
+// requireParticipantByID converte l'ID nell'URL e verifica che l'utente faccia parte della conversazione.
+func (s *Service) requireParticipantByID(ctx context.Context, userID, rawConversationID string) (int, error) {
+	conversationID, ok := validate.PositiveID(rawConversationID)
+	if !ok {
+		return 0, errInvalidConversation
+	}
+	participant, err := s.store.IsParticipant(ctx, conversationID, userID)
+	if err != nil {
+		return 0, fmt.Errorf("verifica partecipante: %w", err)
+	}
+	if !participant {
+		return 0, errNotParticipant
+	}
+	return conversationID, nil
+}
+
+func decodeConversationsCursor(cursor string) (ConversationsCursor, bool) {
+	activity, id, ok := decodeTimeCursor(cursor)
+	return ConversationsCursor{LastActivity: activity, ID: id}, ok
+}
+
+func decodeMessagesCursor(cursor string) (MessagesCursor, bool) {
+	created, id, ok := decodeTimeCursor(cursor)
+	return MessagesCursor{CreatedAt: created, ID: id}, ok
+}
+
+// decodeTimeCursor legge un cursore "data|id".
+func decodeTimeCursor(cursor string) (time.Time, int, bool) {
+	fields, ok := page.Decode(cursor, 2)
+	if !ok {
+		return time.Time{}, 0, false
+	}
+	moment, err := time.Parse(time.RFC3339Nano, fields[0])
+	if err != nil {
+		return time.Time{}, 0, false
+	}
+	id, ok := validate.PositiveID(fields[1])
+	if !ok {
+		return time.Time{}, 0, false
+	}
+	return moment, id, true
 }
