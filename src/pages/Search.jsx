@@ -1,13 +1,29 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../auth/AuthContext';
-import { useLatestListings, useRoommates, useStartChat } from '../api/hooks';
+import { useListings, useRoommates, useStartChat } from '../api/hooks';
 import { formatAvailability, formatBills } from '../api/listings';
 import { CITIES, isCity, occupationLabel } from '../api/options';
 import { formatAge } from '../api/users';
 import CompatibilityList from '../components/profile/CompatibilityList';
 import LifestyleTags from '../components/profile/LifestyleTags';
+
+const ROOM_TYPES = ['singola', 'doppia'];
+const SORTS = ['recenti', 'prezzo', 'prezzo-desc'];
+const MAX_BUDGET = 20000;
+
+/** Valore ammesso, oppure stringa vuota. */
+function oneOf(value, allowed) {
+  return allowed.includes(value) ? value : '';
+}
+
+/** Budget come lo accetta il server: solo cifre, al massimo 20.000 €. */
+function budgetFromUrl(value) {
+  const digits = (value ?? '').replace(/\D/g, '').slice(0, 6);
+  if (!digits || Number(digits) === 0) return '';
+  return String(Math.min(Number(digits), MAX_BUDGET));
+}
 
 export default function Search() {
   const navigate = useNavigate();
@@ -15,30 +31,54 @@ export default function Search() {
   const { user, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const urlIntent = searchParams.get('intent');
-  // Città fuori elenco (es. da un vecchio link) equivale a "tutte le città"
-  const currentCity = isCity(searchParams.get('citta') || '') ? searchParams.get('citta') : '';
-  const currentBudget = searchParams.get('budget') || '';
+  // L'URL è l'unica fonte dei filtri: le query seguono i parametri, non il contrario.
+  // Valori non ammessi (vecchi link, modifiche a mano) valgono come "nessun filtro".
+  const currentIntent = searchParams.get('intent') === 'coinquilino' ? 'coinquilino' : 'stanza';
+  const currentCity = isCity(searchParams.get('citta') ?? '') ? searchParams.get('citta') : '';
+  const currentBudget = budgetFromUrl(searchParams.get('budget'));
+  const currentRoomType = oneOf(searchParams.get('tipo'), ROOM_TYPES);
+  const currentBills = oneOf(searchParams.get('spese'), ['true', 'false']);
+  const currentSort = oneOf(searchParams.get('ordina'), SORTS) || 'recenti';
 
-  // 🔴 LOGICA SISTEMATA: L'URL comanda sempre e il default è 'stanza'. Addio conflitti con il ruolo utente.
-  const currentIntent = urlIntent === 'coinquilino' ? 'coinquilino' : 'stanza';
-
-  const handleTopSearch = (newIntent, newCity, newBudget) => {
-    const params = new URLSearchParams();
-    params.append('intent', newIntent);
-    if (newCity) params.append('citta', newCity);
-    if (newBudget) params.append('budget', newBudget);
-    setSearchParams(params);
+  const setFilters = (changes, { replace = false } = {}) => {
+    const params = new URLSearchParams(searchParams);
+    for (const [name, value] of Object.entries(changes)) {
+      if (value) params.set(name, value);
+      else params.delete(name);
+    }
+    setSearchParams(params, { replace });
   };
 
+  // Il budget si digita: si aspetta la fine della digitazione e si sostituisce la voce nella cronologia,
+  // così il tasto "indietro" non ripercorre ogni tasto premuto (anomalia F17).
+  const [budgetInput, setBudgetInput] = useState(currentBudget);
+  useEffect(() => setBudgetInput(currentBudget), [currentBudget]);
+  useEffect(() => {
+    const cleaned = budgetFromUrl(budgetInput);
+    if (cleaned === currentBudget) return undefined;
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams(searchParams);
+      if (cleaned) params.set('budget', cleaned);
+      else params.delete('budget');
+      setSearchParams(params, { replace: true });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [budgetInput, currentBudget, searchParams, setSearchParams]);
+
   // Si carica solo l'elenco della modalità attiva; i dati restano in cache passando da una all'altra.
-  // I coinquilini arrivano a pagine, già filtrati per città e senza il proprio profilo.
-  const roommatesQuery = useRoommates({ city: currentCity, enabled: currentIntent === 'coinquilino' });
-  const listingsQuery = useLatestListings({ enabled: currentIntent === 'stanza' });
+  // Filtri, ordinamento e pagine li applica il server.
+  const roommatesQuery = useRoommates({
+    city: currentCity,
+    minBudget: currentBudget,
+    enabled: currentIntent === 'coinquilino',
+  });
+  const listingsQuery = useListings(
+    { city: currentCity, maxPrice: currentBudget, roomType: currentRoomType, billsIncluded: currentBills, sort: currentSort },
+    { enabled: currentIntent === 'stanza' },
+  );
   const activeQuery = currentIntent === 'coinquilino' ? roommatesQuery : listingsQuery;
-  const results = (currentIntent === 'coinquilino' ? roommatesQuery.data?.pages.flatMap(page => page.items) : listingsQuery.data) ?? [];
+  const results = activeQuery.data?.pages.flatMap(page => page.items) ?? [];
   const loading = activeQuery.isPending;
-  const hasMoreRoommates = currentIntent === 'coinquilino' && roommatesQuery.hasNextPage;
 
   const startChat = useStartChat();
 
@@ -61,42 +101,6 @@ export default function Search() {
       alert("Errore nell'avvio della chat: " + err.message);
     }
   };
-
-  // Filtri nel browser sugli elementi caricati: passano al server nel modulo M1.6
-  const filteredResults = results.filter(item => {
-    let match = true;
-    
-    // Filtro città sugli annunci (i coinquilini sono già filtrati dal server)
-    if (currentIntent === 'stanza' && currentCity) {
-      const itemCity = item.city.toLowerCase().trim();
-      if (itemCity && itemCity !== currentCity.toLowerCase().trim()) {
-        match = false;
-      }
-    }
-    
-    // Filtro Budget tollerante per le stanze
-    if (currentIntent === 'stanza' && currentBudget) {
-      const itemPrice = item.price;
-      const targetBudget = Number(currentBudget);
-      if (targetBudget > 0 && itemPrice > 0 && itemPrice > targetBudget) {
-        match = false;
-      }
-    }
-    
-    // Filtro Budget tollerante per i coinquilini
-    if (currentIntent === 'coinquilino' && currentBudget) {
-      const budgetCoinquilino = item.budgetMax;
-      const targetBudget = Number(currentBudget);
-      
-      // 🔴 FIX: Segno invertito (da < a >)
-      // Se il budget del coinquilino è MAGGIORE del budget cercato, nascondiamo il profilo.
-      if (targetBudget > 0 && budgetCoinquilino > 0 && budgetCoinquilino > targetBudget) {
-        match = false;
-      }
-    }
-
-    return match;
-  });
 
   return (
     <div className="min-h-[100dvh] bg-[#FAFAFA] pb-20 md:pb-0 font-sans selection:bg-orange-200">
@@ -175,13 +179,13 @@ export default function Search() {
           <div className="flex gap-2 bg-neutral-100 p-1.5 rounded-2xl mb-8 max-w-md mx-auto shadow-inner">
             <button 
               className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${currentIntent === 'stanza' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`} 
-              onClick={() => handleTopSearch('stanza', currentCity, currentBudget)}
+              onClick={() => setFilters({ intent: 'stanza' })}
             >
               🔍 Cerca Stanza
             </button>
             <button 
               className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${currentIntent === 'coinquilino' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`} 
-              onClick={() => handleTopSearch('coinquilino', currentCity, '')}
+              onClick={() => setFilters({ intent: 'coinquilino', tipo: '', spese: '', ordina: '' })}
             >
               👥 Cerca Coinquilini
             </button>
@@ -189,22 +193,48 @@ export default function Search() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <select 
+              name="citta"
+              aria-label="Città"
               className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 text-base rounded-2xl px-5 py-4 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium cursor-pointer"
               value={currentCity} 
-              onChange={(e) => handleTopSearch(currentIntent, e.target.value, currentBudget)}
+              onChange={(e) => setFilters({ citta: e.target.value })}
             >
-              <option value="">📍 Tutte le Città</option>
+              <option value="">📍 Tutte le città</option>
               {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             
             <input 
               type="number" 
-              placeholder={currentIntent === 'stanza' ? "💶 Budget max (€/mese)" : "💶 Costo della tua stanza (€)"} 
+              name="budget"
+              min="1"
+              max={MAX_BUDGET}
+              aria-label={currentIntent === 'stanza' ? 'Budget massimo al mese' : 'Budget minimo del coinquilino'}
+              placeholder={currentIntent === 'stanza' ? "💶 Budget max (€/mese)" : "💶 Budget del coinquilino da (€)"} 
               className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 text-base rounded-2xl px-5 py-4 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium placeholder:text-neutral-400"
-              value={currentBudget}
-              onChange={(e) => handleTopSearch(currentIntent, currentCity, e.target.value)}
+              value={budgetInput}
+              onChange={(e) => setBudgetInput(e.target.value)}
             />
           </div>
+
+          {currentIntent === 'stanza' && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+              <select name="tipo" aria-label="Tipo di stanza" className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 text-base rounded-2xl px-5 py-4 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium cursor-pointer" value={currentRoomType} onChange={(e) => setFilters({ tipo: e.target.value })}>
+                <option value="">🏠 Singola o doppia</option>
+                <option value="singola">Solo singole</option>
+                <option value="doppia">Solo doppie</option>
+              </select>
+              <select name="spese" aria-label="Spese" className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 text-base rounded-2xl px-5 py-4 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium cursor-pointer" value={currentBills} onChange={(e) => setFilters({ spese: e.target.value })}>
+                <option value="">💡 Spese: indifferente</option>
+                <option value="true">Solo con spese incluse</option>
+                <option value="false">Solo con spese escluse</option>
+              </select>
+              <select name="ordina" aria-label="Ordinamento" className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 text-base rounded-2xl px-5 py-4 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium cursor-pointer" value={currentSort} onChange={(e) => setFilters({ ordina: e.target.value })}>
+                <option value="recenti">↕️ Più recenti</option>
+                <option value="prezzo">Prezzo crescente</option>
+                <option value="prezzo-desc">Prezzo decrescente</option>
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -215,7 +245,7 @@ export default function Search() {
             {currentIntent === 'coinquilino' ? 'Coinquilini disponibili' : 'Stanze in affitto'}
           </h1>
           <p className="text-neutral-500 mb-10 font-medium text-lg">
-            {hasMoreRoommates ? 'Mostrati' : 'Trovati'} <span className="font-bold text-orange-500">{filteredResults.length}</span> risultati {currentCity && `a ${currentCity}`}
+            {activeQuery.hasNextPage ? 'Mostrati' : 'Trovati'} <span className="font-bold text-orange-500">{results.length}</span> risultati {currentCity && `a ${currentCity}`}
           </p>
 
           {activeQuery.isError ? (
@@ -237,14 +267,14 @@ export default function Search() {
                 </div>
               ))}
             </div>
-          ) : filteredResults.length === 0 ? (
+          ) : results.length === 0 ? (
             <div className="bg-white rounded-3xl border border-dashed border-neutral-200 p-16 text-center shadow-sm">
               <span className="text-6xl block mb-6 opacity-50">🏜️</span>
               <h3 className="font-serif text-2xl text-neutral-900 mb-3 font-extrabold">Nessun risultato trovato</h3>
               <p className="text-neutral-500 mb-8 font-medium">Non ci sono {currentIntent === 'coinquilino' ? 'profili in cerca' : 'stanze'} che corrispondono ai tuoi criteri.</p>
               <button 
                 className="bg-white border border-neutral-200 hover:border-orange-300 text-neutral-900 px-8 py-3.5 rounded-full font-bold transition-all shadow-sm cursor-pointer"
-                onClick={() => handleTopSearch(currentIntent, '', '')}
+                onClick={() => setFilters({ citta: '', budget: '', tipo: '', spese: '' })}
               >
                 Azzera Filtri
               </button>
@@ -252,7 +282,7 @@ export default function Search() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               
-              {filteredResults.map(item => {
+              {results.map(item => {
                 if (currentIntent === 'stanza') {
                   return (
                     <div key={item.id} className="w-full bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-orange-100 cursor-pointer overflow-hidden group">
@@ -333,14 +363,14 @@ export default function Search() {
             </div>
           )}
 
-          {hasMoreRoommates && !activeQuery.isError && (
+          {activeQuery.hasNextPage && !activeQuery.isError && (
             <div className="flex justify-center mt-10">
               <button
-                onClick={() => roommatesQuery.fetchNextPage()}
-                disabled={roommatesQuery.isFetchingNextPage}
+                onClick={() => activeQuery.fetchNextPage()}
+                disabled={activeQuery.isFetchingNextPage}
                 className="bg-white border border-neutral-200 hover:border-orange-300 text-neutral-900 px-8 py-3.5 rounded-full font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
               >
-                {roommatesQuery.isFetchingNextPage ? 'Caricamento...' : 'Carica altri profili'}
+                {activeQuery.isFetchingNextPage ? 'Caricamento...' : (currentIntent === 'coinquilino' ? 'Carica altri profili' : 'Carica altri annunci')}
               </button>
             </div>
           )}

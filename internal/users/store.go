@@ -204,46 +204,51 @@ type RoommateRow struct {
 	Age                                  *int
 	LifestyleTags                        []string
 	BudgetMax                            int
-	CreatedAt                            time.Time
+	CreatedAt                            *time.Time
 }
 
-// RoommatesQuery filtra e pagina l'elenco dei coinquilini.
+// RoommatesQuery filtra e pagina l'elenco dei coinquilini. I campi vuoti o a zero non filtrano nulla.
 type RoommatesQuery struct {
 	// ExcludeID è l'utente che guarda (vuoto se non ha una sessione): non vede sé stesso.
 	ExcludeID string
-	// City vuota significa tutte le città.
-	City string
+	City      string
+	// MinBudget tiene solo chi può spendere almeno questa cifra (es. il costo di una stanza libera).
+	MinBudget int
 	// After è la posizione dell'ultimo profilo della pagina precedente, nil per la prima pagina.
 	After *RoommatesCursor
 	Limit int
 }
 
 // RoommatesCursor è la posizione di un profilo nell'ordinamento dell'elenco.
+// CreatedAt è nil per gli account senza data di creazione, che vengono per ultimi.
 type RoommatesCursor struct {
-	CreatedAt time.Time
+	CreatedAt *time.Time
 	ID        string
 }
 
 // Roommates restituisce i profili pubblici di chi cerca una stanza, dal più recente.
-// Gli account senza data di creazione (possibili in produzione) vengono per ultimi.
 func (s *Store) Roommates(ctx context.Context, q RoommatesQuery) ([]RoommateRow, error) {
 	var afterTime *time.Time
 	var afterID string
 	if q.After != nil {
-		afterTime, afterID = &q.After.CreatedAt, q.After.ID
+		afterTime, afterID = q.After.CreatedAt, q.After.ID
 	}
 	rows, err := s.db.Query(ctx, `
         SELECT id::text, COALESCE(first_name, ''), COALESCE(citta, ''), COALESCE(occupation, ''), COALESCE(bio, ''),
-               `+ageColumn+`, lifestyle_tags, COALESCE(budget_max, 0), COALESCE(created_at, 'epoch')
+               `+ageColumn+`, lifestyle_tags, COALESCE(budget_max, 0), created_at
         FROM roomdate_app.users
         WHERE COALESCE(is_public, true)
           AND user_type = 'cerca'
           AND ($1 = '' OR id <> NULLIF($1, '')::uuid)
           AND ($2 = '' OR citta = $2)
-          AND ($3::timestamptz IS NULL OR (COALESCE(created_at, 'epoch'), id) < ($3::timestamptz, NULLIF($4, '')::uuid))
-        ORDER BY COALESCE(created_at, 'epoch') DESC, id DESC
-        LIMIT $5`,
-		q.ExcludeID, q.City, afterTime, afterID, q.Limit)
+          AND ($3 = 0 OR COALESCE(budget_max, 0) >= $3)
+          AND ($5 = '' OR CASE WHEN $4::timestamptz IS NULL
+               THEN created_at IS NULL AND id < NULLIF($5, '')::uuid
+               ELSE created_at IS NULL OR created_at < $4::timestamptz
+                    OR (created_at = $4::timestamptz AND id < NULLIF($5, '')::uuid) END)
+        ORDER BY created_at DESC NULLS LAST, id DESC
+        LIMIT $6`,
+		q.ExcludeID, q.City, q.MinBudget, afterTime, afterID, q.Limit)
 	if err != nil {
 		return nil, err
 	}

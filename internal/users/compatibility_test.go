@@ -1,10 +1,12 @@
 package users
 
 import (
-	"encoding/base64"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
+
+	"roomdate-backend/internal/page"
 )
 
 func TestCompare(t *testing.T) {
@@ -49,13 +51,20 @@ func TestCompare(t *testing.T) {
 }
 
 func TestRoommatesCursor(t *testing.T) {
-	want := RoommatesCursor{CreatedAt: time.Date(2026, 9, 17, 10, 30, 0, 123456000, time.UTC), ID: "3f0c7e2a-8b1d-4c5e-9f6a-0b1c2d3e4f5a"}
-	if got, ok := decodeRoommatesCursor(encodeRoommatesCursor(want)); !ok || !got.CreatedAt.Equal(want.CreatedAt) || got.ID != want.ID {
+	created := time.Date(2026, 9, 17, 10, 30, 0, 123456000, time.UTC)
+	id := "3f0c7e2a-8b1d-4c5e-9f6a-0b1c2d3e4f5a"
+	got, ok := decodeRoommatesCursor(encodeRoommatesCursor(RoommatesCursor{CreatedAt: &created, ID: id}))
+	if !ok || got.CreatedAt == nil || !got.CreatedAt.Equal(created) || got.ID != id {
 		t.Errorf("andata e ritorno = %+v, %v", got, ok)
 	}
+	// Profilo senza data di creazione: il cursore la lascia vuota
+	got, ok = decodeRoommatesCursor(encodeRoommatesCursor(RoommatesCursor{ID: id}))
+	if !ok || got.CreatedAt != nil || got.ID != id {
+		t.Errorf("cursore senza data = %+v, %v", got, ok)
+	}
 
-	raw := func(s string) string { return base64.RawURLEncoding.EncodeToString([]byte(s)) }
-	for _, bad := range []string{"", "!!", raw("123"), raw("12_non-uuid"), raw("x_3f0c7e2a-8b1d-4c5e-9f6a-0b1c2d3e4f5a"), raw("12_3F0C7E2A-8B1D-4C5E-9F6A-0B1C2D3E4F5A'")} {
+	for _, bad := range []string{"", "!!", page.Encode("2026-09-17T10:30:00Z"), page.Encode("2026-09-17T10:30:00Z", "non-uuid"),
+		page.Encode("ieri", id), page.Encode("2026-09-17T10:30:00Z", strings.ToUpper(id))} {
 		if _, ok := decodeRoommatesCursor(bad); ok {
 			t.Errorf("cursore %q accettato", bad)
 		}
