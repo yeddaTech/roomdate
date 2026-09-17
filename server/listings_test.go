@@ -99,7 +99,8 @@ func TestCreateListing(t *testing.T) {
 	}{
 		{"title", "  "},
 		{"title", strings.Repeat("a", 101)},
-		{"city", strings.Repeat("c", 51)},
+		{"city", "Gotham"},
+		{"city", "milano"},
 		{"roomType", "suite"},
 		{"price", 0},
 		{"price", 20001},
@@ -446,16 +447,18 @@ func TestListingImagesWithoutStorage(t *testing.T) {
 	expect(t, app.do(http.MethodDelete, "/api/v1/listings/"+itoa(id), nil, withSession(owner.Cookie)), http.StatusNoContent, "")
 }
 
-// Il testo al limite delle colonne VARCHAR del database si salva senza errori.
+// Il testo al limite delle colonne VARCHAR del database si salva senza errori, così come
+// la città dal nome più lungo e quella con l'apostrofo.
 func TestListingTextAtColumnLimits(t *testing.T) {
 	app := newApp(t)
 	owner := app.registerUser("Marco", "affitta", false)
 	title := strings.Repeat("è", 100)
-	city := strings.Repeat("à", 50)
-	id := app.createListing(owner.Cookie, map[string]any{"title": title, "city": city, "zone": strings.Repeat("z", 80)})
-	detail, _ := app.listing(id, "")
-	if detail.Title != title || detail.City != city {
-		t.Fatalf("testo salvato = %q, %q", detail.Title, detail.City)
+	for _, city := range []string{"Reggio Calabria", "L'Aquila", "Forlì"} {
+		id := app.createListing(owner.Cookie, map[string]any{"title": title, "city": city, "zone": strings.Repeat("z", 80)})
+		detail, _ := app.listing(id, "")
+		if detail.Title != title || detail.City != city {
+			t.Fatalf("testo salvato = %q, %q", detail.Title, detail.City)
+		}
 	}
 }
 
@@ -472,6 +475,9 @@ func TestNullableProductionColumns(t *testing.T) {
 		`UPDATE roomdate_app.listings SET user_id = NULL WHERE title = 'Senza proprietario'`,
 		`UPDATE roomdate_app.listings SET room_type = NULL WHERE title = 'Senza tipo'`,
 		`UPDATE roomdate_app.users SET first_name = NULL, last_name = NULL WHERE email = 'marco@test.it'`,
+		`UPDATE roomdate_app.users SET first_name = NULL, last_name = NULL, citta = NULL, occupation = NULL, bio = NULL,
+             birthdate = NULL, budget_max = NULL, is_public = NULL, user_type = 'cerca', created_at = NULL
+         WHERE email = 'giulia@test.it'`,
 	} {
 		if _, err := testPool.Exec(ctx, query); err != nil {
 			t.Fatal(err)
@@ -488,7 +494,9 @@ func TestNullableProductionColumns(t *testing.T) {
 	expect(t, app.do(http.MethodGet, "/api/v1/me/listings", nil, withSession(owner.Cookie)), http.StatusOK, "Senza tipo")
 	expect(t, app.do(http.MethodPost, "/api/v1/auth/login", map[string]string{"email": owner.Email, "password": owner.Password}), http.StatusOK, `"firstName":""`)
 	expect(t, app.do(http.MethodGet, "/api/v1/me", nil, withSession(owner.Cookie)), http.StatusOK, `"lastName":""`)
-	expect(t, app.do(http.MethodGet, "/api/get_roommates", nil), http.StatusOK, `"name":""`)
+	expect(t, app.do(http.MethodGet, "/api/v1/roommates", nil, withSession(owner.Cookie)), http.StatusOK,
+		`"firstName":"","age":null,"city":"","occupation":"","bio":"","lifestyleTags":["socievole"],"budgetMax":0`)
+	expect(t, app.do(http.MethodGet, "/api/v1/users/"+seeker.ID, nil, withSession(owner.Cookie)), http.StatusOK, `"age":null`)
 }
 
 func TestListingConstraintsInDatabase(t *testing.T) {

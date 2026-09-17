@@ -42,7 +42,8 @@ const (
 type seedUser struct {
 	key, nome, cognome, citta, userType, nascita string
 	budget                                       int
-	occupation, bio, tags                        string
+	occupation, bio                              string
+	tags                                         []string // chiavi di shared/options.json
 	public                                       bool
 }
 
@@ -69,21 +70,27 @@ type seedConversation struct {
 
 // I testi contengono apposta apostrofi e "&": devono comparire così nell'app (anomalia F1).
 var users = []seedUser{
-	{"giulia", "Giulia", "Bianchi", "Milano", "cerca", "1999-04-12", 650, "Studente",
+	{"giulia", "Giulia", "Bianchi", "Milano", "cerca", "1999-04-12", 650, "studente",
 		"Studentessa al Politecnico, cerco una stanza luminosa vicino all'università. Amo cucinare & tenere la casa in ordine.",
-		"Non Fumatore, Ordinato/a, Socievole", true},
-	{"marco", "Marco", "Rossi", "Milano", "affitta", "1990-09-03", 0, "Lavoratore",
+		[]string{"non_fumatore", "ordinato", "socievole"}, true},
+	{"marco", "Marco", "Rossi", "Milano", "affitta", "1990-09-03", 0, "lavoratore",
 		"Ho una singola libera in zona Isola: casa tranquilla, ben collegata e con un gatto molto socievole.",
-		"Non Fumatore, Ho animali", true},
-	{"sara", "Sara", "Conti", "Bologna", "cerca", "2001-01-20", 450, "Studente",
+		[]string{"non_fumatore", "animali"}, true},
+	{"sara", "Sara", "Conti", "Bologna", "cerca", "2001-01-20", 450, "studente",
 		"Fuorisede a Bologna, cerco coinquilini con cui condividere cene e serate film.",
-		"Non Fumatore, Socievole, Vegano/Vegetariano", true},
-	{"luca", "Luca", "Ferri", "Roma", "affitta", "1987-06-15", 0, "Lavoratore",
+		[]string{"non_fumatore", "socievole", "vegetariano"}, true},
+	{"luca", "Luca", "Ferri", "Roma", "affitta", "1987-06-15", 0, "lavoratore",
 		"Affitto stanze a Roma a studenti e giovani lavoratori. Rispondo in giornata.",
-		"Fumatore", true},
-	{"elena", "Elena", "Galli", "Torino", "cerca", "1998-11-02", 500, "Studente e Lavoratore",
+		[]string{"fumatore"}, true},
+	{"elena", "Elena", "Galli", "Torino", "cerca", "1998-11-02", 500, "studente_lavoratore",
 		"Profilo privato di prova: non deve comparire nella ricerca dei coinquilini.",
-		"Non Fumatore", false},
+		[]string{"non_fumatore"}, false},
+	{"davide", "Davide", "Moretti", "Milano", "cerca", "2000-07-08", 600, "studente_lavoratore",
+		"Lavoro part-time e studio in Statale. Cerco casa in zona Città Studi con persone ordinate.",
+		[]string{"non_fumatore", "ordinato"}, true},
+	{"chiara", "Chiara", "Esposito", "Milano", "cerca", "1996-03-25", 900, "lavoratore",
+		"Nuova a Milano per lavoro, fumo solo sul balcone. Mi piacciono i coinquilini con cui fare due chiacchiere.",
+		[]string{"fumatore", "animali", "socievole"}, true},
 }
 
 var listings = []seedListing{

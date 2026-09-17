@@ -14,9 +14,11 @@ import {
   useUpdateMyProfile,
 } from '../api/hooks';
 import { formatAvailability, formatBills } from '../api/listings';
+import { CITIES, OCCUPATIONS, isCity } from '../api/options';
 import PageLoader from '../components/PageLoader';
 import ListingForm from '../components/listings/ListingForm';
 import ListingPhotos from '../components/listings/ListingPhotos';
+import LifestyleTagsPicker from '../components/profile/LifestyleTagsPicker';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -33,7 +35,9 @@ export default function Dashboard() {
   const profileQuery = useMyProfile();
   const [form, setForm] = useState(null);
   useEffect(() => {
-    if (profileQuery.data) setForm(profileQuery.data);
+    const profile = profileQuery.data;
+    // Una città salvata prima degli elenchi condivisi, e non riconosciuta, va scelta di nuovo
+    if (profile) setForm({ ...profile, city: isCity(profile.city) ? profile.city : '' });
   }, [profileQuery.data]);
 
   // Solo chi affitta pubblica annunci (conta il ruolo salvato, non quello in modifica).
@@ -83,19 +87,6 @@ export default function Dashboard() {
     } catch (err) {
       alert("❌ " + err.message);
     }
-  };
-
-  const handleToggleTag = (tagText) => {
-    const rawTag = tagText.split(' ')[1] || tagText;
-    let currentTags = form.lifestyleTags ? form.lifestyleTags.split(', ') : [];
-
-    if (currentTags.includes(rawTag)) {
-      currentTags = currentTags.filter(t => t !== rawTag);
-    } else {
-      currentTags.push(rawTag);
-    }
-
-    setForm({ ...form, lifestyleTags: currentTags.join(', ') });
   };
 
   const handleSaveProfile = async (e) => {
@@ -350,21 +341,21 @@ export default function Dashboard() {
                       onChange={e => setForm({...form, occupation: e.target.value})}
                       className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all"
                     >
-                      <option value="">Seleziona...</option>
-                      <option value="studente">Studente</option>
-                      <option value="lavoratore">Lavoratore</option>
-                      <option value="misto">Studente/Lavoratore</option>
+                      <option value="">Non indicata</option>
+                      {OCCUPATIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
                     </select>
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-bold text-neutral-900">Città di interesse</label>
-                    <input 
-                      name="citta" 
-                      type="text" 
+                    <select 
+                      name="city" 
                       value={form.city}
                       onChange={e => setForm({...form, city: e.target.value})}
                       className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 
-                    />
+                    >
+                      <option value="">Non indicata</option>
+                      {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-bold text-neutral-900">Data di Nascita</label>
@@ -391,28 +382,8 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex flex-col gap-4 mt-4">
-                  <label className="text-sm font-bold text-neutral-900">Stile di Vita (Tags)</label>
-                  <div className="flex flex-wrap gap-3">
-                    {['🚬 Fumatore', '🚭 Non Fumatore', '🐶 Ho animali', '🧹 Ordinato/a', '🎉 Socievole', '🥦 Vegano/Vegetariano'].map(tag => {
-                      const tagValue = tag.split(' ')[1] || tag;
-                      const isChecked = form.lifestyleTags.includes(tagValue);
-                      
-                      return (
-                        <label key={tag} className="relative cursor-pointer group">
-                          <input 
-                            type="checkbox" 
-                            name="tags_visual"
-                            checked={isChecked} 
-                            onChange={() => handleToggleTag(tag)}
-                            className="peer sr-only" 
-                          />
-                          <span className="block px-5 py-2.5 bg-white border border-neutral-200 rounded-full text-sm font-semibold text-neutral-500 peer-checked:bg-neutral-900 peer-checked:text-white peer-checked:border-neutral-900 transition-all shadow-sm group-hover:border-neutral-300">
-                            {tag}
-                          </span>
-                        </label>
-                      )
-                    })}
-                  </div>
+                  <span className="text-sm font-bold text-neutral-900">Stile di vita</span>
+                  <LifestyleTagsPicker value={form.lifestyleTags} onChange={lifestyleTags => setForm({...form, lifestyleTags})} />
                 </div>
 
                 <div className="flex flex-col gap-3 mt-6 pt-8 border-t border-neutral-100">

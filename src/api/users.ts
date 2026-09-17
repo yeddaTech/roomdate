@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { Profile, ProfileInput, PublicProfile, Roommate, UserType } from './types';
+import type { Profile, ProfileInput, PublicProfile, RoommatesPage } from './types';
 
 export function getMyProfile(): Promise<Profile> {
   return request<Profile>('/api/v1/me');
@@ -17,35 +17,16 @@ export function getPublicProfile(id: string): Promise<PublicProfile> {
   return request<PublicProfile>(`/api/v1/users/${encodeURIComponent(id)}`);
 }
 
-// --- API legacy (diventano /api/v1 nel modulo M1.5) ---
-
-interface LegacyRoommate {
-  id: string;
-  name: string;
-  job: string;
-  quote: string;
-  city: string;
-  color1: string;
-  color2: string;
-  emoji: string;
-  tags: string[] | null;
-  user_type: UserType;
-  budget_max: number;
+/** Una pagina dei coinquilini; city vuota significa tutte le città. */
+export function listRoommates({ city = '', cursor = '' }: { city?: string; cursor?: string } = {}): Promise<RoommatesPage> {
+  const params = new URLSearchParams();
+  if (city) params.set('city', city);
+  if (cursor) params.set('cursor', cursor);
+  const query = params.toString();
+  return request<RoommatesPage>(`/api/v1/roommates${query ? `?${query}` : ''}`);
 }
 
-export async function listRoommates(): Promise<Roommate[]> {
-  const rows = await request<LegacyRoommate[] | null>('/api/get_roommates');
-  return (rows ?? []).map((r) => ({
-    id: r.id,
-    name: r.name,
-    occupation: r.job,
-    bio: r.quote,
-    city: r.city,
-    color1: r.color1,
-    color2: r.color2,
-    emoji: r.emoji,
-    tags: r.tags ?? [],
-    userType: r.user_type,
-    budgetMax: r.budget_max,
-  }));
+/** "25 anni", oppure null se l'età non è indicata. */
+export function formatAge(age: number | null): string | null {
+  return age === null ? null : `${age} anni`;
 }

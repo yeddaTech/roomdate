@@ -5,8 +5,12 @@
 //	go run ./cmd/migrate up-by-one  applica solo la prossima
 //	go run ./cmd/migrate down       annulla l'ultima
 //
-// Legge DATABASE_URL dall'ambiente o da .env.local. Con Neon usa la connessione diretta
-// (host senza "-pooler"). Su un database non locale chiede conferma prima di modificarlo.
+// Legge DATABASE_URL dall'ambiente o da .env.local. Con Neon usa sempre la connessione diretta
+// (toglie "-pooler" dall'host). Su un database non locale chiede conferma prima di modificarlo.
+//
+// Per la produzione indicare anche l'host atteso: se DATABASE_URL punta altrove non parte nulla.
+//
+//	go run ./cmd/migrate -host ep-floral-violet-aldznrms up
 package main
 
 import (
@@ -29,8 +33,9 @@ func main() {
 	log.SetFlags(0)
 	yes := flag.Bool("yes", false, "non chiedere conferma sui database non locali")
 	envFile := flag.String("env", ".env.local", "file con le variabili d'ambiente")
+	expectedHost := flag.String("host", "", "host atteso del database, anche solo l'inizio (es. ep-floral-violet-aldznrms)")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Uso: go run ./cmd/migrate [-yes] [-env file] status|version|validate|up|up-by-one|down")
+		fmt.Fprintln(os.Stderr, "Uso: go run ./cmd/migrate [-yes] [-env file] [-host host] status|version|validate|up|up-by-one|down")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -52,10 +57,18 @@ func main() {
 		log.Fatal("DATABASE_URL non impostata: copia .env.example in .env.local e compilala")
 	}
 
+	dsn, direct := devenv.DirectNeonDSN(dsn)
 	host, dbname := devenv.DescribeDSN(dsn)
 	log.Printf("Database: %s / %s", host, dbname)
+	if direct {
+		log.Print("Uso la connessione diretta: tolto \"-pooler\" dall'host")
+	}
+	if *expectedHost != "" && !strings.HasPrefix(host, *expectedHost) {
+		log.Fatalf("DATABASE_URL non punta al database atteso (%s): nessuna operazione eseguita.", *expectedHost)
+	}
 
-	if writeCommands[command] && !devenv.IsLocalHost(host) && !*yes && !confirm(fmt.Sprintf("Eseguire \"%s\" su questo database NON locale?", command)) {
+	if writeCommands[command] && !devenv.IsLocalHost(host) && !*yes &&
+		!confirm(fmt.Sprintf("Eseguire \"%s\" su questo database NON locale? Prima crea un branch di backup su Neon.", command)) {
 		log.Fatal("Operazione annullata")
 	}
 

@@ -3,7 +3,8 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../auth/AuthContext';
 import { useListing, useStartChat } from '../api/hooks';
-import { amenityLabel, formatAvailability, formatBills } from '../api/listings';
+import { formatAvailability, formatBills } from '../api/listings';
+import { amenityLabel } from '../api/options';
 
 export default function ListingDetails() {
   const { id } = useParams();

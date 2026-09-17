@@ -1,0 +1,40 @@
+{
+  "cities": [
+    "Agrigento", "Alessandria", "Ancona", "Andria", "Aosta", "Arezzo", "Ascoli Piceno", "Asti", "Avellino",
+    "Bari", "Barletta", "Belluno", "Benevento", "Bergamo", "Biella", "Bologna", "Bolzano", "Brescia", "Brindisi",
+    "Cagliari", "Caltanissetta", "Campobasso", "Carbonia", "Caserta", "Catania", "Catanzaro", "Cesena", "Chieti",
+    "Como", "Cosenza", "Cremona", "Crotone", "Cuneo", "Enna", "Fermo", "Ferrara", "Firenze", "Foggia", "Forlì",
+    "Frosinone", "Genova", "Gorizia", "Grosseto", "Imperia", "Isernia", "L'Aquila", "La Spezia", "Latina", "Lecce",
+    "Lecco", "Livorno", "Lodi", "Lucca", "Macerata", "Mantova", "Massa", "Matera", "Messina", "Milano", "Modena",
+    "Monza", "Napoli", "Novara", "Nuoro", "Olbia", "Oristano", "Padova", "Palermo", "Parma", "Pavia", "Perugia",
+    "Pesaro", "Pescara", "Piacenza", "Pisa", "Pistoia", "Pordenone", "Potenza", "Prato", "Ragusa", "Ravenna",
+    "Reggio Calabria", "Reggio Emilia", "Rieti", "Rimini", "Roma", "Rovigo", "Salerno", "Sassari", "Savona", "Siena",
+    "Siracusa", "Sondrio", "Taranto", "Teramo", "Terni", "Torino", "Trani", "Trapani", "Trento", "Treviso", "Trieste",
+    "Udine", "Urbino", "Varese", "Venezia", "Verbania", "Vercelli", "Verona", "Vibo Valentia", "Vicenza", "Viterbo"
+  ],
+  "occupations": [
+    { "key": "studente", "label": "Studente" },
+    { "key": "lavoratore", "label": "Lavoratore" },
+    { "key": "studente_lavoratore", "label": "Studente e lavoratore" }
+  ],
+  "lifestyleTags": [
+    { "key": "non_fumatore", "label": "Non fumatore", "emoji": "🚭" },
+    { "key": "fumatore", "label": "Fumatore", "emoji": "🚬" },
+    { "key": "animali", "label": "Ho animali", "emoji": "🐶" },
+    { "key": "ordinato", "label": "Ordinato/a", "emoji": "🧹" },
+    { "key": "socievole", "label": "Socievole", "emoji": "🎉" },
+    { "key": "vegetariano", "label": "Vegano/Vegetariano", "emoji": "🥦" }
+  ],
+  "amenities": [
+    { "key": "wifi", "label": "Wi-Fi" },
+    { "key": "arredata", "label": "Arredata" },
+    { "key": "lavatrice", "label": "Lavatrice" },
+    { "key": "lavastoviglie", "label": "Lavastoviglie" },
+    { "key": "aria_condizionata", "label": "Aria condizionata" },
+    { "key": "riscaldamento", "label": "Riscaldamento" },
+    { "key": "balcone", "label": "Balcone o terrazzo" },
+    { "key": "ascensore", "label": "Ascensore" },
+    { "key": "bagno_privato", "label": "Bagno privato" },
+    { "key": "animali_ammessi", "label": "Animali ammessi" }
+  ]
+}

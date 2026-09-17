@@ -2,7 +2,11 @@ package users
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -10,6 +14,7 @@ import (
 	"roomdate-backend/internal/auth"
 	"roomdate-backend/internal/db"
 	"roomdate-backend/internal/validate"
+	"roomdate-backend/shared"
 )
 
 // Tipi di utente ammessi.
@@ -18,7 +23,11 @@ const (
 	UserTypeLandlord = "affitta"
 )
 
-const roommatesLimit = 8
+// Dimensioni delle pagine dell'elenco dei coinquilini.
+const (
+	roommatesDefaultLimit = 24
+	roommatesMaxLimit     = 50
+)
 
 var (
 	errSessionInvalid = apperr.Unauthorized("session_invalid", "Sessione scaduta: accedi di nuovo")
@@ -40,33 +49,38 @@ func NewService(store *Store, deleteImages func(ctx context.Context, keys []stri
 
 // RegisterInput sono i dati del modulo di registrazione.
 type RegisterInput struct {
-	FirstName     string `json:"firstName"`
-	LastName      string `json:"lastName"`
-	Email         string `json:"email"`
-	Password      string `json:"password"`
-	City          string `json:"city"`
-	UserType      string `json:"userType"`
-	Birthdate     string `json:"birthdate"`
-	BudgetMax     int    `json:"budgetMax"`
-	Occupation    string `json:"occupation"`
-	Bio           string `json:"bio"`
-	LifestyleTags string `json:"lifestyleTags"`
-	Keys          *Vault `json:"keys"`
+	FirstName  string `json:"firstName"`
+	LastName   string `json:"lastName"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	City       string `json:"city"`
+	UserType   string `json:"userType"`
+	Birthdate  string `json:"birthdate"`
+	BudgetMax  int    `json:"budgetMax"`
+	Occupation string `json:"occupation"`
+	Bio        string `json:"bio"`
+	// LifestyleTags sono chiavi di shared.LifestyleTags.
+	LifestyleTags []string `json:"lifestyleTags"`
+	Keys          *Vault   `json:"keys"`
+}
+
+// normalizeEmail rende uguali gli indirizzi che differiscono solo per maiuscole o spazi (anomalia F2).
+func normalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
 }
 
 // Register crea l'account e restituisce l'ID del nuovo utente.
 func (s *Service) Register(ctx context.Context, in RegisterInput) (string, error) {
 	u := NewUser{
-		FirstName:     validate.Text(in.FirstName),
-		LastName:      validate.Text(in.LastName),
-		Email:         strings.TrimSpace(in.Email),
-		City:          validate.Text(in.City),
-		UserType:      in.UserType,
-		Birthdate:     in.Birthdate,
-		BudgetMax:     in.BudgetMax,
-		Occupation:    validate.Text(in.Occupation),
-		Bio:           validate.Text(in.Bio),
-		LifestyleTags: validate.Text(in.LifestyleTags),
+		FirstName:  validate.Text(in.FirstName),
+		LastName:   validate.Text(in.LastName),
+		Email:      normalizeEmail(in.Email),
+		City:       validate.Text(in.City),
+		UserType:   in.UserType,
+		Birthdate:  in.Birthdate,
+		BudgetMax:  in.BudgetMax,
+		Occupation: in.Occupation,
+		Bio:        validate.Text(in.Bio),
 	}
 	if in.Keys != nil {
 		u.Vault = *in.Keys
@@ -77,7 +91,10 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (string, error
 	v.Check(validate.NotBlank(u.LastName) && validate.MaxLen(u.LastName, 50), "lastName", "Il cognome è obbligatorio (massimo 50 caratteri)")
 	v.Check(validate.Email(u.Email), "email", "Inserisci un indirizzo email valido")
 	checkPassword(&v, "password", in.Password)
-	checkPersonalDetails(&v, s.now(), u.UserType, u.City, u.Birthdate, u.BudgetMax, u.Occupation, u.Bio, u.LifestyleTags)
+	u.LifestyleTags = checkPersonalDetails(&v, s.now(), personalDetails{
+		UserType: u.UserType, City: u.City, Birthdate: u.Birthdate, BudgetMax: u.BudgetMax,
+		Occupation: u.Occupation, Bio: u.Bio, LifestyleTags: in.LifestyleTags,
+	})
 	checkVault(&v, u.Vault)
 	if err := v.Err(); err != nil {
 		return "", err
@@ -102,7 +119,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (string, error
 
 // Login verifica le credenziali, con blocco temporaneo dopo troppi tentativi errati.
 func (s *Service) Login(ctx context.Context, email, password string) (Account, error) {
-	account, err := s.store.AccountByEmail(ctx, email)
+	account, err := s.store.AccountByEmail(ctx, normalizeEmail(email))
 	if db.IsNoRows(err) {
 		return Account{}, apperr.Unauthorized("invalid_credentials", "Email non trovata")
 	}
@@ -235,16 +252,20 @@ func (s *Service) MyProfile(ctx context.Context, userID string) (Profile, error)
 	return profile, nil
 }
 
-// PublicProfile è ciò che gli altri utenti possono vedere: niente email, cognome o data di nascita.
+// PublicProfile è ciò che gli altri utenti possono vedere: niente email, cognome o data di nascita,
+// di cui si mostra solo l'età.
 type PublicProfile struct {
-	ID            string `json:"id"`
-	FirstName     string `json:"firstName"`
-	UserType      string `json:"userType"`
-	City          string `json:"city"`
-	BudgetMax     int    `json:"budgetMax"`
-	Occupation    string `json:"occupation"`
-	Bio           string `json:"bio"`
-	LifestyleTags string `json:"lifestyleTags"`
+	ID            string   `json:"id"`
+	FirstName     string   `json:"firstName"`
+	Age           *int     `json:"age"`
+	UserType      string   `json:"userType"`
+	City          string   `json:"city"`
+	BudgetMax     int      `json:"budgetMax"`
+	Occupation    string   `json:"occupation"`
+	Bio           string   `json:"bio"`
+	LifestyleTags []string `json:"lifestyleTags"`
+	// Compatibility è null se chi guarda non ha una sessione o guarda il proprio profilo.
+	Compatibility *Compatibility `json:"compatibility"`
 }
 
 // PublicProfile restituisce il profilo pubblico di un utente.
@@ -263,45 +284,73 @@ func (s *Service) PublicProfile(ctx context.Context, viewerID, targetID string) 
 	if !profile.IsPublic && profile.ID != viewerID {
 		return PublicProfile{}, errUserNotFound
 	}
-	return PublicProfile{
+
+	public := PublicProfile{
 		ID:            profile.ID,
 		FirstName:     profile.FirstName,
+		Age:           profile.Age,
 		UserType:      profile.UserType,
 		City:          profile.City,
 		BudgetMax:     profile.BudgetMax,
 		Occupation:    profile.Occupation,
 		Bio:           profile.Bio,
 		LifestyleTags: profile.LifestyleTags,
-	}, nil
+	}
+	if viewerID != "" && viewerID != profile.ID {
+		viewer, found, err := s.viewerFacts(ctx, viewerID)
+		if err != nil {
+			return PublicProfile{}, err
+		}
+		if found {
+			c := compare(viewer, profileFacts{City: profile.City, BudgetMax: profile.BudgetMax, LifestyleTags: profile.LifestyleTags})
+			public.Compatibility = &c
+		}
+	}
+	return public, nil
+}
+
+// viewerFacts legge i dati di chi guarda che servono alla compatibilità.
+// found è false se l'utente della sessione non esiste più.
+func (s *Service) viewerFacts(ctx context.Context, viewerID string) (facts profileFacts, found bool, err error) {
+	viewer, err := s.store.Profile(ctx, viewerID)
+	if db.IsNoRows(err) || db.IsInvalidInput(err) {
+		return profileFacts{}, false, nil
+	}
+	if err != nil {
+		return profileFacts{}, false, fmt.Errorf("lettura profilo di chi guarda: %w", err)
+	}
+	return profileFacts{City: viewer.City, BudgetMax: viewer.BudgetMax, LifestyleTags: viewer.LifestyleTags}, true, nil
 }
 
 // ProfileInput sono i campi modificabili del profilo.
 type ProfileInput struct {
-	UserType      string `json:"userType"`
-	City          string `json:"city"`
-	BudgetMax     int    `json:"budgetMax"`
-	Occupation    string `json:"occupation"`
-	Birthdate     string `json:"birthdate"`
-	Bio           string `json:"bio"`
-	LifestyleTags string `json:"lifestyleTags"`
-	IsPublic      bool   `json:"isPublic"`
+	UserType      string   `json:"userType"`
+	City          string   `json:"city"`
+	BudgetMax     int      `json:"budgetMax"`
+	Occupation    string   `json:"occupation"`
+	Birthdate     string   `json:"birthdate"`
+	Bio           string   `json:"bio"`
+	LifestyleTags []string `json:"lifestyleTags"`
+	IsPublic      bool     `json:"isPublic"`
 }
 
 // UpdateProfile salva il profilo e lo restituisce aggiornato.
 func (s *Service) UpdateProfile(ctx context.Context, userID string, in ProfileInput) (Profile, error) {
 	u := ProfileUpdate{
-		UserType:      in.UserType,
-		City:          validate.Text(in.City),
-		BudgetMax:     in.BudgetMax,
-		Occupation:    validate.Text(in.Occupation),
-		Birthdate:     in.Birthdate,
-		Bio:           validate.Text(in.Bio),
-		LifestyleTags: validate.Text(in.LifestyleTags),
-		IsPublic:      in.IsPublic,
+		UserType:   in.UserType,
+		City:       validate.Text(in.City),
+		BudgetMax:  in.BudgetMax,
+		Occupation: in.Occupation,
+		Birthdate:  in.Birthdate,
+		Bio:        validate.Text(in.Bio),
+		IsPublic:   in.IsPublic,
 	}
 
 	var v validate.Validator
-	checkPersonalDetails(&v, s.now(), u.UserType, u.City, u.Birthdate, u.BudgetMax, u.Occupation, u.Bio, u.LifestyleTags)
+	u.LifestyleTags = checkPersonalDetails(&v, s.now(), personalDetails{
+		UserType: u.UserType, City: u.City, Birthdate: u.Birthdate, BudgetMax: u.BudgetMax,
+		Occupation: u.Occupation, Bio: u.Bio, LifestyleTags: in.LifestyleTags,
+	})
 	if err := v.Err(); err != nil {
 		return Profile{}, err
 	}
@@ -312,71 +361,147 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, in ProfileIn
 	return s.MyProfile(ctx, userID)
 }
 
-// Roommate è un profilo nell'elenco dei coinquilini (formato JSON delle API legacy).
-// Età e compatibilità reali arrivano con il modulo M1.5.
-type Roommate struct {
-	ID       string   `json:"id"`
-	Name     string   `json:"name"`
-	Job      string   `json:"job"`
-	Quote    string   `json:"quote"`
-	City     string   `json:"city"`
-	Color1   string   `json:"color1"`
-	Color2   string   `json:"color2"`
-	Emoji    string   `json:"emoji"`
-	Tags     []string `json:"tags"`
-	UserType string   `json:"user_type"`
-	Budget   int      `json:"budget_max"`
+// RoommateSummary è un profilo nell'elenco dei coinquilini.
+type RoommateSummary struct {
+	ID            string   `json:"id"`
+	FirstName     string   `json:"firstName"`
+	Age           *int     `json:"age"`
+	City          string   `json:"city"`
+	Occupation    string   `json:"occupation"`
+	Bio           string   `json:"bio"`
+	LifestyleTags []string `json:"lifestyleTags"`
+	BudgetMax     int      `json:"budgetMax"`
+	// Compatibility è null se chi guarda non ha una sessione.
+	Compatibility *Compatibility `json:"compatibility"`
 }
 
-// Roommates restituisce i profili pubblici, con i soli dati inseriti dagli utenti.
-// Colori ed emoji dell'avatar sono decorativi.
-func (s *Service) Roommates(ctx context.Context) ([]Roommate, error) {
-	rows, err := s.store.PublicRoommates(ctx, roommatesLimit)
+// RoommatesPage è una pagina dell'elenco; NextCursor è null se non ci sono altri profili.
+type RoommatesPage struct {
+	Items      []RoommateSummary `json:"items"`
+	NextCursor *string           `json:"nextCursor"`
+}
+
+// RoommatesParams sono i parametri della richiesta, come arrivano nell'URL.
+type RoommatesParams struct {
+	City, Cursor, Limit string
+}
+
+// Roommates restituisce una pagina dei profili pubblici di chi cerca una stanza (anomalia F18),
+// escluso chi guarda.
+func (s *Service) Roommates(ctx context.Context, viewerID string, p RoommatesParams) (RoommatesPage, error) {
+	q := RoommatesQuery{ExcludeID: viewerID, City: p.City, Limit: roommatesDefaultLimit}
+
+	var v validate.Validator
+	v.Check(q.City == "" || shared.IsCity(q.City), "city", "Città non valida")
+	if p.Limit != "" {
+		limit, err := strconv.Atoi(p.Limit)
+		ok := err == nil && validate.Between(limit, 1, roommatesMaxLimit)
+		v.Check(ok, "limit", fmt.Sprintf("Il numero di profili per pagina deve essere tra 1 e %d", roommatesMaxLimit))
+		q.Limit = limit
+	}
+	if p.Cursor != "" {
+		after, ok := decodeRoommatesCursor(p.Cursor)
+		v.Check(ok, "cursor", "Pagina non valida: ricarica l'elenco")
+		q.After = &after
+	}
+	if err := v.Err(); err != nil {
+		return RoommatesPage{}, err
+	}
+
+	// Un profilo in più dice se esiste la pagina successiva
+	limit := q.Limit
+	q.Limit++
+	rows, err := s.store.Roommates(ctx, q)
 	if err != nil {
-		return nil, fmt.Errorf("elenco coinquilini: %w", err)
+		return RoommatesPage{}, fmt.Errorf("elenco coinquilini: %w", err)
 	}
 
-	colors := [][]string{{"#F5C29A", "#C4603A"}, {"#C4A882", "#7A4B2A"}, {"#D4B896", "#9A4628"}, {"#EAF3DE", "#4CAF50"}}
-	emojis := []string{"👩", "👨", "👩‍🎓", "👨‍🎨"}
+	page := RoommatesPage{Items: make([]RoommateSummary, 0, min(len(rows), limit))}
+	if len(rows) > limit {
+		rows = rows[:limit]
+		last := rows[limit-1]
+		cursor := encodeRoommatesCursor(RoommatesCursor{CreatedAt: last.CreatedAt, ID: last.ID})
+		page.NextCursor = &cursor
+	}
 
-	roommates := make([]Roommate, 0, len(rows))
-	for i, row := range rows {
-		tags := []string{}
-		if row.Tags != "" {
-			tags = strings.Split(row.Tags, ", ")
+	var viewer profileFacts
+	var withCompatibility bool
+	if viewerID != "" {
+		viewer, withCompatibility, err = s.viewerFacts(ctx, viewerID)
+		if err != nil {
+			return RoommatesPage{}, err
 		}
-		roommates = append(roommates, Roommate{
-			ID:       row.ID,
-			Name:     row.Name,
-			Job:      row.Job,
-			Quote:    row.Bio,
-			City:     row.City,
-			Color1:   colors[i%len(colors)][0],
-			Color2:   colors[i%len(colors)][1],
-			Emoji:    emojis[i%len(emojis)],
-			Tags:     tags,
-			UserType: row.UserType,
-			Budget:   row.BudgetMax,
-		})
 	}
-	return roommates, nil
+
+	for _, r := range rows {
+		item := RoommateSummary{
+			ID:            r.ID,
+			FirstName:     r.FirstName,
+			Age:           r.Age,
+			City:          r.City,
+			Occupation:    r.Occupation,
+			Bio:           r.Bio,
+			LifestyleTags: r.LifestyleTags,
+			BudgetMax:     r.BudgetMax,
+		}
+		if withCompatibility {
+			c := compare(viewer, profileFacts{City: r.City, BudgetMax: r.BudgetMax, LifestyleTags: r.LifestyleTags})
+			item.Compatibility = &c
+		}
+		page.Items = append(page.Items, item)
+	}
+	return page, nil
 }
+
+// Il cursore è la posizione dell'ultimo profilo della pagina: "microsecondi_uuid" in Base64 URL.
+func encodeRoommatesCursor(c RoommatesCursor) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(strconv.FormatInt(c.CreatedAt.UnixMicro(), 10) + "_" + c.ID))
+}
+
+func decodeRoommatesCursor(s string) (RoommatesCursor, bool) {
+	raw, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		return RoommatesCursor{}, false
+	}
+	micros, id, found := strings.Cut(string(raw), "_")
+	n, err := strconv.ParseInt(micros, 10, 64)
+	if !found || err != nil || !uuidPattern.MatchString(id) {
+		return RoommatesCursor{}, false
+	}
+	return RoommatesCursor{CreatedAt: time.UnixMicro(n).UTC(), ID: id}, true
+}
+
+var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 func checkPassword(v *validate.Validator, field, password string) {
 	v.Check(len(password) >= auth.MinPasswordLength, field, "La password deve avere almeno 6 caratteri")
 	v.Check(len(password) <= auth.MaxPasswordBytes, field, "La password è troppo lunga")
 }
 
-// checkPersonalDetails valida i campi comuni a registrazione e modifica del profilo.
-// Occupazione e città sono ancora testo libero: diventano elenchi chiusi nel modulo M1.5.
-func checkPersonalDetails(v *validate.Validator, now time.Time, userType, city, birthdate string, budget int, occupation, bio, tags string) {
-	v.Check(validate.OneOf(userType, UserTypeSeeker, UserTypeLandlord), "userType", "Tipo di utente non valido")
-	v.Check(validate.MaxLen(city, 80), "city", "La città può avere al massimo 80 caratteri")
-	v.Check(validate.PastDate(birthdate, now), "birthdate", "Data di nascita non valida")
-	v.Check(validate.Between(budget, 0, 20000), "budgetMax", "Il budget deve essere compreso tra 0 e 20.000 €")
-	v.Check(validate.MaxLen(occupation, 50), "occupation", "L'occupazione può avere al massimo 50 caratteri")
-	v.Check(validate.MaxLen(bio, 1000), "bio", "La bio può avere al massimo 1000 caratteri")
-	v.Check(validate.MaxLen(tags, 300), "lifestyleTags", "Troppi tag di stile di vita")
+// personalDetails sono i campi comuni a registrazione e modifica del profilo.
+type personalDetails struct {
+	UserType, City, Birthdate string
+	BudgetMax                 int
+	Occupation, Bio           string
+	LifestyleTags             []string
+}
+
+// checkPersonalDetails valida i campi comuni a registrazione e modifica del profilo e restituisce
+// le abitudini senza duplicati, nell'ordine dell'elenco. Città e occupazione sono facoltative,
+// ma se indicate devono essere tra quelle di shared/options.json.
+func checkPersonalDetails(v *validate.Validator, now time.Time, d personalDetails) []string {
+	v.Check(validate.OneOf(d.UserType, UserTypeSeeker, UserTypeLandlord), "userType", "Tipo di utente non valido")
+	v.Check(d.City == "" || shared.IsCity(d.City), "city", "Scegli la città dall'elenco")
+	v.Check(validate.PastDate(d.Birthdate, now), "birthdate", "Data di nascita non valida")
+	v.Check(validate.Between(d.BudgetMax, 0, 20000), "budgetMax", "Il budget deve essere compreso tra 0 e 20.000 €")
+	v.Check(d.Occupation == "" || shared.HasKey(shared.Occupations, d.Occupation), "occupation", "Occupazione non valida")
+	v.Check(validate.MaxLen(d.Bio, 1000), "bio", "La bio può avere al massimo 1000 caratteri")
+
+	tags, ok := shared.NormalizeKeys(shared.LifestyleTags, d.LifestyleTags)
+	v.Check(ok, "lifestyleTags", "Abitudine non valida")
+	v.Check(!slices.Contains(tags, tagSmoker) || !slices.Contains(tags, tagNonSmoker), "lifestyleTags",
+		"Scegli solo una tra «Fumatore» e «Non fumatore»")
+	return tags
 }
 
 // checkVault valida la chiave pubblica e la chiave privata cifrata: tutte presenti o tutte assenti.
