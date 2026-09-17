@@ -69,7 +69,7 @@ func (s *Store) SetActive(ctx context.Context, id int, active bool) error {
 // Owner restituisce l'ID del proprietario dell'annuncio.
 func (s *Store) Owner(ctx context.Context, id int) (string, error) {
 	var ownerID string
-	err := s.db.QueryRow(ctx, `SELECT user_id::text FROM roomdate_app.listings WHERE id = $1`, id).Scan(&ownerID)
+	err := s.db.QueryRow(ctx, `SELECT COALESCE(user_id::text, '') FROM roomdate_app.listings WHERE id = $1`, id).Scan(&ownerID)
 	return ownerID, err
 }
 
@@ -88,8 +88,9 @@ type Row struct {
 	CoverKey *string
 }
 
-const rowColumns = `l.id, l.user_id::text, COALESCE(u.first_name, ''),
-    l.title, l.city, COALESCE(l.zone, ''), l.room_type, l.price, COALESCE(l.description, ''),
+// Nel database di produzione user_id e room_type possono essere NULL.
+const rowColumns = `l.id, COALESCE(l.user_id::text, ''), COALESCE(u.first_name, ''),
+    l.title, l.city, COALESCE(l.zone, ''), COALESCE(l.room_type, ''), l.price, COALESCE(l.description, ''),
     l.amenities, l.bills_included, l.available_from, l.is_active,
     (SELECT i.storage_key FROM roomdate_app.listing_images i WHERE i.listing_id = l.id ORDER BY i.position, i.id LIMIT 1)`
 

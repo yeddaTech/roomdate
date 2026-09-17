@@ -27,7 +27,7 @@ func NewStore(db *pgxpool.Pool) *Store {
 
 // ListingForChat restituisce il proprietario dell'annuncio e se l'annuncio è attivo.
 func (s *Store) ListingForChat(ctx context.Context, listingID int) (ownerID string, active bool, err error) {
-	err = s.db.QueryRow(ctx, `SELECT user_id::text, is_active FROM roomdate_app.listings WHERE id = $1`, listingID).Scan(&ownerID, &active)
+	err = s.db.QueryRow(ctx, `SELECT COALESCE(user_id::text, ''), is_active FROM roomdate_app.listings WHERE id = $1`, listingID).Scan(&ownerID, &active)
 	return ownerID, active, err
 }
 
