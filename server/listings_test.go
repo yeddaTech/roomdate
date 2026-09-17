@@ -98,6 +98,8 @@ func TestCreateListing(t *testing.T) {
 		value any
 	}{
 		{"title", "  "},
+		{"title", strings.Repeat("a", 101)},
+		{"city", strings.Repeat("c", 51)},
 		{"roomType", "suite"},
 		{"price", 0},
 		{"price", 20001},
@@ -442,6 +444,51 @@ func TestListingImagesWithoutStorage(t *testing.T) {
 	expect(t, rec, http.StatusServiceUnavailable, "uploads_unavailable")
 	// Senza storage l'annuncio si può comunque eliminare
 	expect(t, app.do(http.MethodDelete, "/api/v1/listings/"+itoa(id), nil, withSession(owner.Cookie)), http.StatusNoContent, "")
+}
+
+// Il testo al limite delle colonne VARCHAR del database si salva senza errori.
+func TestListingTextAtColumnLimits(t *testing.T) {
+	app := newApp(t)
+	owner := app.registerUser("Marco", "affitta", false)
+	title := strings.Repeat("è", 100)
+	city := strings.Repeat("à", 50)
+	id := app.createListing(owner.Cookie, map[string]any{"title": title, "city": city, "zone": strings.Repeat("z", 80)})
+	detail, _ := app.listing(id, "")
+	if detail.Title != title || detail.City != city {
+		t.Fatalf("testo salvato = %q, %q", detail.Title, detail.City)
+	}
+}
+
+// In produzione user_id, room_type, first_name e last_name possono essere NULL:
+// annunci e profili con questi campi vuoti non devono rompere gli elenchi.
+func TestNullableProductionColumns(t *testing.T) {
+	app := newApp(t)
+	owner := app.registerUser("Marco", "affitta", false)
+	seeker := app.registerUser("Giulia", "cerca", false)
+	ownerless := app.createListing(owner.Cookie, map[string]any{"title": "Senza proprietario"})
+	app.createListing(owner.Cookie, map[string]any{"title": "Senza tipo"})
+	ctx := context.Background()
+	for _, query := range []string{
+		`UPDATE roomdate_app.listings SET user_id = NULL WHERE title = 'Senza proprietario'`,
+		`UPDATE roomdate_app.listings SET room_type = NULL WHERE title = 'Senza tipo'`,
+		`UPDATE roomdate_app.users SET first_name = NULL, last_name = NULL WHERE email = 'marco@test.it'`,
+	} {
+		if _, err := testPool.Exec(ctx, query); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if ids := app.publicListingIDs(); len(ids) != 2 {
+		t.Fatalf("elenco annunci = %v", ids)
+	}
+	if detail, code := app.listing(ownerless, seeker.Cookie); detail == nil || detail.IsOwner {
+		t.Fatalf("dettaglio senza proprietario: %d %+v", code, detail)
+	}
+	expect(t, app.do(http.MethodPost, "/api/start_chat", map[string]int{"listingId": ownerless}, withSession(seeker.Cookie)), http.StatusNotFound, "non più disponibile")
+	expect(t, app.do(http.MethodGet, "/api/v1/me/listings", nil, withSession(owner.Cookie)), http.StatusOK, "Senza tipo")
+	expect(t, app.do(http.MethodPost, "/api/v1/auth/login", map[string]string{"email": owner.Email, "password": owner.Password}), http.StatusOK, `"firstName":""`)
+	expect(t, app.do(http.MethodGet, "/api/v1/me", nil, withSession(owner.Cookie)), http.StatusOK, `"lastName":""`)
+	expect(t, app.do(http.MethodGet, "/api/get_roommates", nil), http.StatusOK, `"name":""`)
 }
 
 func TestListingConstraintsInDatabase(t *testing.T) {

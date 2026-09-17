@@ -107,13 +107,13 @@ export default function ListingForm({ listing, submitLabel, onSubmit }: Props) {
       )}
 
       <div>
-        <input name="title" type="text" placeholder="Titolo (Es: Camera Singola Navigli)" value={form.title} onChange={set('title')} maxLength={120} className={inputClass} />
+        <input name="title" type="text" placeholder="Titolo (Es: Camera Singola Navigli)" value={form.title} onChange={set('title')} maxLength={100} className={inputClass} />
         <FieldError message={errors.title} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <input name="city" type="text" placeholder="Città" value={form.city} onChange={set('city')} maxLength={80} className={inputClass} />
+          <input name="city" type="text" placeholder="Città" value={form.city} onChange={set('city')} maxLength={50} className={inputClass} />
           <FieldError message={errors.city} />
         </div>
         <div>
