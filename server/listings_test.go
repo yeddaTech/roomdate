@@ -70,14 +70,25 @@ func (a *testApp) listing(id int, cookie string) (*listingDetail, int) {
 	return &detail, rec.Code
 }
 
+type listingsPage struct {
+	Items      []listingDetail
+	NextCursor *string
+}
+
+// listings legge una pagina dell'elenco pubblico ("?city=..." o "" per nessun filtro).
+func (a *testApp) listings(query string) listingsPage {
+	a.t.Helper()
+	rec := a.do(http.MethodGet, "/api/v1/listings"+query, nil)
+	expect(a.t, rec, http.StatusOK, "")
+	var page listingsPage
+	decode(a.t, rec, &page)
+	return page
+}
+
 func (a *testApp) publicListingIDs() []int {
 	a.t.Helper()
-	rec := a.do(http.MethodGet, "/api/v1/listings", nil)
-	expect(a.t, rec, http.StatusOK, "")
-	var list []listingDetail
-	decode(a.t, rec, &list)
 	ids := []int{}
-	for _, l := range list {
+	for _, l := range a.listings("").Items {
 		ids = append(ids, l.ID)
 	}
 	return ids
@@ -144,14 +155,18 @@ func TestReadListings(t *testing.T) {
 
 	rec := app.do(http.MethodGet, "/api/v1/listings", nil)
 	expect(t, rec, http.StatusOK, `"coverUrl":null`)
-	var list []map[string]any
-	decode(t, rec, &list)
-	if len(list) != 1 || list[0]["title"] != "Singola in zona Isola" || list[0]["roomType"] != "singola" || list[0]["billsIncluded"] != true {
+	var page struct {
+		Items      []map[string]any
+		NextCursor *string
+	}
+	decode(t, rec, &page)
+	if len(page.Items) != 1 || page.NextCursor != nil || page.Items[0]["title"] != "Singola in zona Isola" ||
+		page.Items[0]["roomType"] != "singola" || page.Items[0]["billsIncluded"] != true {
 		t.Fatalf("elenco = %s", rec.Body.String())
 	}
 	// Nessun dato inventato
 	for _, fake := range []string{"avail", "color", "emoji", "tags"} {
-		if _, found := list[0][fake]; found {
+		if _, found := page.Items[0][fake]; found {
 			t.Errorf("l'elenco contiene %q", fake)
 		}
 	}
@@ -174,7 +189,7 @@ func TestEmptyListsAreArrays(t *testing.T) {
 	app := newApp(t)
 	seeker := app.registerUser("Giulia", "cerca", false)
 
-	expect(t, app.do(http.MethodGet, "/api/v1/listings", nil), http.StatusOK, "[]")
+	expect(t, app.do(http.MethodGet, "/api/v1/listings", nil), http.StatusOK, `{"items":[],"nextCursor":null}`)
 	expect(t, app.do(http.MethodGet, "/api/v1/me/listings", nil, withSession(seeker.Cookie)), http.StatusOK, "[]")
 	expect(t, app.do(http.MethodGet, "/api/get_chats", nil, withSession(seeker.Cookie)), http.StatusOK, "[]")
 }

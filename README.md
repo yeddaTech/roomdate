@@ -49,8 +49,10 @@ User text is stored as typed (only surrounding spaces and invisible control char
 Accounts, profiles and listings use the `/api/v1/` endpoints: camelCase JSON, errors as `{"error": {"code", "message", "fields"}}`.
 
 * Accounts and profiles: `auth/session`, `auth/login`, `auth/logout`, `auth/register`, `auth/password`, `me`, `users/{id}`. Emails are stored in lowercase and matched ignoring case.
-* Roommates: `roommates?city=&cursor=&limit=` lists the public profiles of people looking for a room, newest first, without the viewer's own profile. Pages hold 24 profiles by default (at most 50); pass the returned `nextCursor` to get the next one.
-* Listings: `listings` (list, create), `listings/{id}` (read, update, delete), `listings/{id}/active`, `me/listings`, and the photo endpoints `listings/{id}/images/uploads`, `listings/{id}/images`, `listings/{id}/images/{imageId}`.
+* Roommates: `roommates?city=&minBudget=&cursor=&limit=` lists the public profiles of people looking for a room, newest first, without the viewer's own profile.
+* Listings: `listings` (list, create), `listings/{id}` (read, update, delete), `listings/{id}/active`, `me/listings`, and the photo endpoints `listings/{id}/images/uploads`, `listings/{id}/images`, `listings/{id}/images/{imageId}`. The public list takes `city`, `maxPrice`, `roomType`, `billsIncluded` and `sort` (`recenti`, `prezzo`, `prezzo-desc`).
+
+Both lists answer `{"items": [...], "nextCursor": "…"}` and are paginated by cursor: pages hold 24 rows by default (at most 50, with `limit`), and `nextCursor` is null on the last one. A cursor belongs to one sort order, so changing `sort` starts again from the first page. Filtering, sorting and paging happen in the database (`internal/page` builds the cursors, migration `00005` adds the matching indexes); an unknown value in any parameter is answered with 400 and the field name, never ignored silently.
 
 Public profiles show the age, never the birth date. For a signed-in viewer, profiles also carry `compatibility`: what the two profiles have in common (same city, budgets within 100 €, shared lifestyle tags) and whether one smokes and the other does not. There is deliberately no percentage score, so every item shown to users has a stated reason.
 
@@ -59,6 +61,7 @@ Chat still uses the legacy endpoints (`/api/start_chat`, `/api/get_chats`, …) 
 ### Frontend data layer
 
 * `src/api/` (TypeScript) — `client.ts` makes every API call (the only other `fetch` is the photo upload to the storage in `listings.ts`); one file per area converts API responses into the types in `types.ts`; `hooks.ts` exposes TanStack Query hooks, which pages use instead of calling the API directly.
+* Search filters live in the URL (`/ricerca?intent=&citta=&budget=&tipo=&spese=&ordina=`), the only source the queries read: a search is shareable and the back button steps through searches. Typing in the budget field replaces the current history entry instead of adding one, and the request waits until typing stops. A failed request is shown as an error with a "Riprova" button, never as "no results".
 * `src/auth/` — `AuthProvider` holds the session verified by the server (no user copy in `localStorage`), `ProtectedRoute` guards private pages, `keyStorage.ts` manages the E2EE keys kept in the browser. A request that finds the session expired sends the user back to the login page; after a logout or account deletion, the page the user left sends them to the home page.
 * `npm run typecheck` checks the TypeScript files; `npm run build` runs it before building.
 

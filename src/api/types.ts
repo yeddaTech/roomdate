@@ -116,6 +116,24 @@ export interface ListingSummary {
   coverUrl: string | null;
 }
 
+/** Ordinamenti dell'elenco degli annunci, come li accetta il server. */
+export type ListingSort = 'recenti' | 'prezzo' | 'prezzo-desc';
+
+/** Filtri dell'elenco degli annunci; i campi vuoti non filtrano nulla. */
+export interface ListingFilters {
+  city?: string;
+  maxPrice?: string;
+  roomType?: RoomType | '';
+  billsIncluded?: 'true' | 'false' | '';
+  sort?: ListingSort;
+}
+
+export interface ListingsPage {
+  items: ListingSummary[];
+  /** Da passare alla richiesta successiva; null se non ci sono altri annunci. */
+  nextCursor: string | null;
+}
+
 export interface ListingImage {
   id: number;
   url: string;

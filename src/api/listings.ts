@@ -1,6 +1,6 @@
 import { ApiError, request } from './client';
 import { prepareImage } from './photos';
-import type { ListingDetail, ListingImage, ListingInput, ListingSummary, PendingUpload } from './types';
+import type { ListingDetail, ListingFilters, ListingImage, ListingInput, ListingsPage, ListingSummary, PendingUpload } from './types';
 
 export const MAX_LISTING_IMAGES = 8;
 
@@ -20,8 +20,17 @@ export function formatBills(billsIncluded: boolean | null): string | null {
   return billsIncluded ? 'Spese incluse' : 'Spese escluse';
 }
 
-export function listLatestListings(): Promise<ListingSummary[]> {
-  return request<ListingSummary[]>('/api/v1/listings');
+/**
+ * Una pagina dell'elenco pubblico: il server applica filtri e ordinamento (anomalia F17).
+ * I filtri vuoti non vengono inviati.
+ */
+export function listListings(filters: ListingFilters = {}, { cursor = '', limit = '' } = {}): Promise<ListingsPage> {
+  const params = new URLSearchParams();
+  for (const [name, value] of Object.entries({ ...filters, cursor, limit })) {
+    if (value) params.set(name, String(value));
+  }
+  const query = params.toString();
+  return request<ListingsPage>(`/api/v1/listings${query ? `?${query}` : ''}`);
 }
 
 export function listMyListings(): Promise<ListingSummary[]> {
