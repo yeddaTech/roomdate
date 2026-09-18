@@ -165,6 +165,9 @@ func (s *Store) RecentFailedLogins(ctx context.Context, emailHash, ipHash string
 	return f, err
 }
 
+// EventRetention è per quanto si conservano gli eventi del registro di sicurezza (vedi informativa privacy).
+const EventRetention = 90 * 24 * time.Hour
+
 // DeleteOldEvents elimina gli eventi più vecchi del periodo di conservazione.
 func (s *Store) DeleteOldEvents(ctx context.Context, keepFor time.Duration) error {
 	_, err := s.db.Exec(ctx, `DELETE FROM roomdate_app.security_events WHERE created_at < NOW() - $1::interval`, keepFor.String())

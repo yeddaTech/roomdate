@@ -11,6 +11,7 @@ package main
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hkdf"
 	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/rsa"
@@ -26,6 +27,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"golang.org/x/crypto/bcrypt"
 
+	"roomdate-backend/internal/auth"
 	"roomdate-backend/internal/devenv"
 )
 
@@ -35,8 +37,13 @@ const (
 	seedEmailPattern = "%" + seedDomain
 
 	// Stessi parametri di src/utils/crypto.js
-	rsaBits          = 2048
-	pbkdf2Iterations = 100000
+	rsaBits = 2048
+	// Metodo nuovo (modulo M3.4): PBKDF2-SHA256 e due chiavi ricavate con HKDF
+	kdfIterations = 600000
+	// Metodo precedente: la chiave privata era cifrata direttamente con la password
+	legacyIterations = 100000
+	// Utente lasciato con il metodo precedente, per provare il passaggio automatico al primo accesso
+	legacyUser = "luca"
 )
 
 type seedUser struct {
@@ -130,6 +137,10 @@ type userKeys struct {
 	id                                     string
 	publicKey                              *rsa.PublicKey
 	publicB64, vault, cryptoSalt, cryptoIv string
+	// Hash salvato dal server e parametri di derivazione (kdfVersion 1 = metodo precedente)
+	passwordHash              string
+	kdfVersion, kdfIterations int
+	kdfSalt                   string
 }
 
 func main() {
@@ -194,6 +205,9 @@ func main() {
 		if !u.public {
 			visibility = " (profilo privato)"
 		}
+		if u.key == legacyUser {
+			visibility += " (metodo di accesso precedente: si aggiorna al primo accesso)"
+		}
 		log.Printf("  %s%s — %s%s", u.key, seedDomain, u.userType, visibility)
 	}
 }
@@ -220,25 +234,23 @@ func deleteSeedData(tx *sql.Tx) error {
 }
 
 func insertSeedData(tx *sql.Tx) error {
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(seedPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
-
 	keys := map[string]*userKeys{}
 	for _, u := range users {
-		k, err := newUserKeys(seedPassword)
+		k, err := newUserKeys(seedPassword, u.key == legacyUser)
 		if err != nil {
 			return fmt.Errorf("chiavi per %s: %w", u.key, err)
 		}
 		err = tx.QueryRow(`
             INSERT INTO roomdate_app.users
                 (first_name, last_name, email, password_hash, citta, user_type, birthdate, budget_max,
-                 occupation, bio, lifestyle_tags, is_public, public_key, encrypted_private_key, crypto_salt, crypto_iv)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                 occupation, bio, lifestyle_tags, is_public, public_key, encrypted_private_key, crypto_salt, crypto_iv,
+                 kdf_version, kdf_salt, kdf_iterations)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+                    $17, NULLIF($18, ''), NULLIF($19, 0))
             RETURNING id::text`,
-			u.nome, u.cognome, u.key+seedDomain, string(passwordHash), u.citta, u.userType, u.nascita, u.budget,
+			u.nome, u.cognome, u.key+seedDomain, k.passwordHash, u.citta, u.userType, u.nascita, u.budget,
 			u.occupation, u.bio, u.tags, u.public, k.publicB64, k.vault, k.cryptoSalt, k.cryptoIv,
+			k.kdfVersion, k.kdfSalt, k.kdfIterations,
 		).Scan(&k.id)
 		if err != nil {
 			return fmt.Errorf("utente %s: %w", u.key, err)
@@ -336,9 +348,14 @@ func insertSeedData(tx *sql.Tx) error {
 	return nil
 }
 
-// newUserKeys replica generateKeyPair + wrapPrivateKey di src/utils/crypto.js:
-// chiave privata PKCS#8 in Base64, cifrata con AES-256-GCM e chiave derivata con PBKDF2-SHA256.
-func newUserKeys(password string) (*userKeys, error) {
+// newUserKeys replica la registrazione del browser (src/auth/accountKeys.ts e src/utils/crypto.js):
+// coppia di chiavi RSA e chiave privata PKCS#8 in Base64, cifrata con AES-256-GCM.
+//
+// Metodo nuovo: dalla password si ricava con PBKDF2-SHA256 una chiave madre, e da questa con HKDF
+// una chiave d'accesso (inviata al server, che ne salva l'hash Argon2id) e una chiave che cifra la
+// chiave privata. Metodo precedente (legacy): la chiave privata è cifrata con PBKDF2 sulla password
+// e il server salva l'hash bcrypt della password.
+func newUserKeys(password string, legacy bool) (*userKeys, error) {
 	priv, err := rsa.GenerateKey(rand.Reader, rsaBits)
 	if err != nil {
 		return nil, err
@@ -357,9 +374,36 @@ func newUserKeys(password string) (*userKeys, error) {
 	rand.Read(salt)
 	rand.Read(iv)
 
-	aesKey, err := pbkdf2.Key(sha256.New, password, salt, pbkdf2Iterations, 32)
-	if err != nil {
-		return nil, err
+	b64 := base64.StdEncoding.EncodeToString
+	k := &userKeys{kdfVersion: 2, kdfIterations: kdfIterations, kdfSalt: b64(salt)}
+	var aesKey []byte
+	if legacy {
+		aesKey, err = pbkdf2.Key(sha256.New, password, salt, legacyIterations, 32)
+		if err != nil {
+			return nil, err
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return nil, err
+		}
+		k.passwordHash, k.kdfVersion, k.kdfIterations, k.kdfSalt = string(hash), 1, 0, ""
+	} else {
+		master, err := pbkdf2.Key(sha256.New, password, salt, kdfIterations, 32)
+		if err != nil {
+			return nil, err
+		}
+		// HKDF senza sale, come nel browser: stessa chiave madre, etichette diverse
+		authKey, err := hkdf.Key(sha256.New, master, nil, "roomdate-auth", 32)
+		if err != nil {
+			return nil, err
+		}
+		aesKey, err = hkdf.Key(sha256.New, master, nil, "roomdate-wrap", 32)
+		if err != nil {
+			return nil, err
+		}
+		if k.passwordHash, err = auth.HashPassword(b64(authKey)); err != nil {
+			return nil, err
+		}
 	}
 	block, err := aes.NewCipher(aesKey)
 	if err != nil {
@@ -372,14 +416,12 @@ func newUserKeys(password string) (*userKeys, error) {
 	// Come WebCrypto: testo cifrato seguito dal tag di autenticazione
 	sealed := gcm.Seal(nil, iv, []byte(base64.StdEncoding.EncodeToString(pkcs8)), nil)
 
-	b64 := base64.StdEncoding.EncodeToString
-	return &userKeys{
-		publicKey:  &priv.PublicKey,
-		publicB64:  b64(spki),
-		vault:      b64(sealed),
-		cryptoSalt: b64(salt),
-		cryptoIv:   b64(iv),
-	}, nil
+	k.publicKey = &priv.PublicKey
+	k.publicB64 = b64(spki)
+	k.vault = b64(sealed)
+	k.cryptoSalt = b64(salt)
+	k.cryptoIv = b64(iv)
+	return k, nil
 }
 
 // encryptBody cifra il testo con AES-256-GCM, come encryptForRecipients di src/utils/crypto.js:

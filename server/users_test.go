@@ -88,10 +88,13 @@ func TestRegisterValidation(t *testing.T) {
 		{"nome vuoto", "firstName", "   ", "Il nome è obbligatorio"},
 		{"nome solo caratteri invisibili", "firstName", "\x00\x07 ", "Il nome è obbligatorio"},
 		{"email non valida", "email", "bruno", "Inserisci un indirizzo email valido"},
-		{"password corta", "password", "corta1234", "almeno 10 caratteri"},
-		{"password comune", "password", "password123", "tra le più usate"},
-		{"password con il nome", "password", "bruno-e-la-sua-password", "il tuo nome o la tua email"},
-		{"password troppo lunga", "password", strings.Repeat("x", 200), "troppo lunga"},
+		{"chiave di accesso non valida", "password", "non-base64!", "Chiave di accesso non valida"},
+		{"chiave di accesso vuota", "password", "", "Chiave di accesso non valida"},
+		{"chiave di accesso troppo lunga", "password", b64(strings.Repeat("x", 200)), "Chiave di accesso non valida"},
+		{"parametri di sicurezza assenti", "kdf", nil, "Aggiorna la pagina"},
+		{"metodo di derivazione vecchio", "kdf", map[string]any{"version": 1}, "Aggiorna la pagina"},
+		{"sale troppo corto", "kdf", map[string]any{"version": 2, "salt": b64("x"), "iterations": 600000}, "Parametri di sicurezza"},
+		{"ripetizioni insufficienti", "kdf", map[string]any{"version": 2, "salt": b64("sale-di-prova-1234"), "iterations": 1000}, "Parametri di sicurezza"},
 		{"tipo utente sconosciuto", "userType", "admin", "Tipo di utente non valido"},
 		{"data di nascita vuota", "birthdate", "", "Data di nascita non valida"},
 		{"data di nascita futura", "birthdate", "2999-01-01", "Data di nascita non valida"},
@@ -141,7 +144,7 @@ func TestEmailIsCaseInsensitive(t *testing.T) {
 	cookie := app.login("ANNA.ROSSI@test.it", testPassword)
 	expect(t, app.do(http.MethodGet, "/api/v1/me", nil, withSession(cookie)), http.StatusOK, `"email":"anna.rossi@test.it"`)
 
-	rec := app.do(http.MethodPost, "/api/v1/auth/register", registration("Anna", "anna.rossi@test.IT", "altra-password", "cerca", false))
+	rec := app.do(http.MethodPost, "/api/v1/auth/register", registration("Anna", "anna.rossi@test.IT", b64("altra-chiave"), "cerca", false))
 	expect(t, rec, http.StatusConflict, "registration_failed")
 
 	// Un indirizzo salvato con le maiuscole da un'altra strada (es. a mano nel database) funziona lo stesso
@@ -207,7 +210,7 @@ func TestLogoutClearsCookie(t *testing.T) {
 	}
 }
 
-const newTestPassword = "collina-di-lavanda-7"
+var newTestPassword = b64("nuova-chiave-di-accesso")
 
 func TestChangePassword(t *testing.T) {
 	app := newApp(t)
@@ -216,7 +219,7 @@ func TestChangePassword(t *testing.T) {
 
 	// changePassword costruisce la richiesta; withKeys aggiunge la chiave privata cifrata di nuovo
 	changePassword := func(current, next string, withKeys bool) map[string]any {
-		body := map[string]any{"currentPassword": current, "newPassword": next}
+		body := map[string]any{"currentPassword": current, "newPassword": next, "kdf": testKDF()}
 		if withKeys {
 			body["keys"] = map[string]string{"encryptedPrivateKey": b64("VAULT-NEW"), "cryptoSalt": b64("SALT-NEW"), "cryptoIv": b64("IV-NEW")}
 		}
@@ -230,7 +233,7 @@ func TestChangePassword(t *testing.T) {
 	const path = "/api/v1/auth/password"
 
 	expect(t, app.do(http.MethodPost, path, changePassword(anna.Password, newTestPassword, true)), http.StatusUnauthorized, "session_invalid")
-	expect(t, app.do(http.MethodPost, path, changePassword(anna.Password, "corta123", true), withSession(anna.Cookie)), http.StatusBadRequest, "almeno 10")
+	expect(t, app.do(http.MethodPost, path, changePassword(anna.Password, "non-base64!", true), withSession(anna.Cookie)), http.StatusBadRequest, "Chiave di accesso non valida")
 	expect(t, app.do(http.MethodPost, path, changePassword(anna.Password, newTestPassword, false), withSession(anna.Cookie)), http.StatusBadRequest, "Chiavi di cifratura mancanti")
 	// Password attuale errata: codice invalid_credentials, che il frontend non scambia per una sessione scaduta
 	expect(t, app.do(http.MethodPost, path, changePassword("sbagliata", newTestPassword, true), withSession(anna.Cookie)), http.StatusUnauthorized, `"code":"invalid_credentials"`)
@@ -246,7 +249,7 @@ func TestChangePassword(t *testing.T) {
 	expect(t, app.do(http.MethodPost, "/api/v1/auth/login", map[string]string{"email": anna.Email, "password": newTestPassword}), http.StatusOK, b64("VAULT-NEW"))
 
 	// Utente senza chiavi: nessuna chiave richiesta e nessuna chiave aggiunta
-	expect(t, app.do(http.MethodPost, path, changePassword(bruno.Password, "nebbia-sul-lago-9", true), withSession(bruno.Cookie)), http.StatusNoContent, "")
+	expect(t, app.do(http.MethodPost, path, changePassword(bruno.Password, b64("nebbia-sul-lago"), true), withSession(bruno.Cookie)), http.StatusNoContent, "")
 	if vaultOf(bruno.ID) != "" {
 		t.Fatal("non va aggiunta una chiave a un utente che non l'aveva")
 	}
