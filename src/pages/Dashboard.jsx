@@ -39,7 +39,7 @@ export default function Dashboard() {
     // Una città salvata prima degli elenchi condivisi, e non riconosciuta, va scelta di nuovo
     if (profile) setForm({ ...profile, city: isCity(profile.city) ? profile.city : '' });
   }, [profileQuery.data]);
-
+  // 🔴 FIX: Se l'utente cerca stanza, mostriamo 2 colonne col budget. Se affitta, 1 colonna sola senza budget
   // Solo chi affitta pubblica annunci (conta il ruolo salvato, non quello in modifica).
   // Chi ne ha già pubblicati può sempre gestirli, anche dopo aver cambiato ruolo.
   const isLandlord = profileQuery.data?.userType === 'affitta';
