@@ -11,6 +11,17 @@ import (
 //go:embed options.json
 var optionsJSON []byte
 
+// Le password più usate, rifiutate in registrazione e al cambio password. Le controlla il browser,
+// che è l'unico a vedere la password: il server riceve solo una chiave derivata (modulo M3.4).
+//
+//go:embed common_passwords.txt
+var commonPasswordsText string
+
+// CommonPasswords restituisce l'elenco delle password da rifiutare, una per riga.
+func CommonPasswords() string {
+	return commonPasswordsText
+}
+
 // Option è un valore di un elenco chiuso: la chiave si salva nel database, l'etichetta la mostra il frontend.
 type Option struct {
 	Key   string `json:"key"`

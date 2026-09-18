@@ -70,6 +70,8 @@ func New(d Deps) (http.Handler, error) {
 	mux.Handle("/api/v1/auth/logout", httpx.Methods(methods{http.MethodPost: usersHandler.Logout}))
 	mux.Handle("/api/v1/auth/register", httpx.Methods(methods{http.MethodPost: usersHandler.Register}))
 	mux.Handle("/api/v1/auth/password", httpx.Methods(methods{http.MethodPost: usersHandler.ChangePassword}))
+	mux.Handle("/api/v1/auth/prelogin", httpx.Methods(methods{http.MethodPost: usersHandler.Prelogin}))
+	mux.Handle("/api/v1/auth/kdf", httpx.Methods(methods{http.MethodPost: usersHandler.UpgradeKDF}))
 	mux.Handle("/api/v1/me", httpx.Methods(methods{
 		http.MethodGet: usersHandler.MyProfile, http.MethodPut: usersHandler.UpdateMyProfile, http.MethodDelete: usersHandler.DeleteMe,
 	}))

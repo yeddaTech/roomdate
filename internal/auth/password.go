@@ -3,7 +3,6 @@ package auth
 import (
 	"crypto/rand"
 	"crypto/subtle"
-	_ "embed"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -13,6 +12,8 @@ import (
 
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/bcrypt"
+
+	"roomdate-backend/shared"
 )
 
 // Parametri di Argon2id consigliati da OWASP per un server con poca memoria a disposizione
@@ -25,12 +26,9 @@ const (
 	argonSaltLen = 16
 )
 
-//go:embed common_passwords.txt
-var commonPasswordList string
-
 var commonPasswords = sync.OnceValue(func() map[string]bool {
 	set := map[string]bool{}
-	for _, line := range strings.Split(commonPasswordList, "\n") {
+	for _, line := range strings.Split(shared.CommonPasswords(), "\n") {
 		if password := strings.TrimSpace(line); password != "" {
 			set[password] = true
 		}
@@ -181,4 +179,23 @@ func delayAfter(failures, threshold int) time.Duration {
 		delay *= 2
 	}
 	return min(delay, maxDelay)
+}
+
+// Versioni del calcolo che trasforma la password in chiavi (modulo M3.4).
+const (
+	// KDFLegacy: la password arriva al server, che la usa per l'accesso. Il server potrebbe
+	// quindi aprire anche la chiave privata delle chat. Resta solo sugli account non ancora aggiornati.
+	KDFLegacy = 1
+	// KDFDerived: il browser ricava due chiavi diverse dalla password. Al server arriva solo
+	// quella d'accesso; l'altra, che apre la chiave privata, non esce mai dal browser.
+	KDFDerived = 2
+	// MinKDFIterations è il minimo di ripetizioni accettate per PBKDF2-SHA256 (OWASP: 600.000).
+	MinKDFIterations = 600000
+)
+
+// KDFParams sono i parametri pubblici che il browser deve conoscere prima dell'accesso.
+type KDFParams struct {
+	Version    int    `json:"version"`
+	Salt       string `json:"salt"`
+	Iterations int    `json:"iterations"`
 }

@@ -42,10 +42,11 @@ export default function Privacy() {
             <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-3">2. Dati Raccolti e Luogo del Trattamento</h2>
             <p className="mb-3">Raccogliamo solo i dati strettamente necessari all'utilizzo della piattaforma:</p>
             <ul className="list-disc pl-5 flex flex-col gap-2 mb-4 text-neutral-600">
-              <li>Dati di registrazione (nome, cognome, email, data di nascita; la password è conservata solo come hash).</li>
+              <li>Dati di registrazione (nome, cognome, email, data di nascita). La password non viene inviata ai nostri server: il browser ne ricava una chiave d&apos;accesso, di cui conserviamo solo l&apos;hash.</li>
               <li>Dati del profilo (città, occupazione, budget, presentazione, abitudini di vita). Se il profilo è pubblico sono visibili agli altri utenti insieme al nome; cognome, email e data di nascita restano privati (agli altri utenti mostriamo solo gli anni compiuti).</li>
               <li>Informazioni sugli annunci inseriti (titolo, città, zona, tipo di stanza, prezzo, descrizione).</li>
-              <li>I messaggi della chat, conservati sul server in forma cifrata end-to-end, e le chiavi di cifratura dell'utente (la chiave privata è a sua volta cifrata con la password).</li>
+              <li>I messaggi della chat, conservati sul server in forma cifrata end-to-end, e le chiavi di cifratura dell&apos;utente. La chiave privata è a sua volta cifrata con una chiave che il browser ricava dalla password e che non riceviamo mai: non possiamo leggere i messaggi.</li>
+              <li>Un registro di sicurezza con accessi, tentativi falliti, cambi di password ed eliminazioni di account, conservato per 90 giorni. Email e indirizzo IP vi compaiono solo come impronte non reversibili, che servono a rallentare chi tenta di indovinare le password.</li>
             </ul>
             <p>
               I dati raccolti vengono elaborati tramite l'infrastruttura cloud di Vercel e conservati in un database gestito da Neon.
@@ -55,7 +56,7 @@ export default function Privacy() {
           <section>
             <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-3">3. Cookie e Strumenti di Tracciamento</h2>
             <p className="mb-3">
-              RoomDate utilizza solo strumenti tecnici necessari al funzionamento della piattaforma: un cookie di sessione (<code>roomdate_session</code>, valido 24 ore) per mantenere l'accesso e la memoria locale del browser (<code>localStorage</code> e <code>sessionStorage</code>) per conservare le chiavi di cifratura della chat. Per questi strumenti non è richiesto il consenso.
+              RoomDate utilizza solo strumenti tecnici necessari al funzionamento della piattaforma: un cookie di sessione (<code>__Host-roomdate_session</code>, valido fino a 30 giorni e 7 giorni dall&apos;ultimo utilizzo) per mantenere l&apos;accesso, e la memoria locale del browser (<code>localStorage</code> e IndexedDB) per conservare le chiavi di cifratura della chat, cancellate all&apos;uscita. Per questi strumenti non è richiesto il consenso.
             </p>
             <p>
               RoomDate non utilizza cookie analitici, di profilazione o pubblicitari. Il sito carica i caratteri tipografici da Google Fonts e usa Pusher per la chat in tempo reale: questi servizi ricevono i dati tecnici della connessione, come l'indirizzo IP.

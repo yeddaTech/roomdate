@@ -2,6 +2,8 @@ package users
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"regexp"
 	"slices"
@@ -68,6 +70,8 @@ type RegisterInput struct {
 	// LifestyleTags sono chiavi di shared.LifestyleTags.
 	LifestyleTags []string `json:"lifestyleTags"`
 	Keys          *Vault   `json:"keys"`
+	// KDF descrive come il browser ha ricavato Password dalla password scritta dall'utente.
+	KDF *auth.KDFParams `json:"kdf"`
 }
 
 // normalizeEmail rende uguali gli indirizzi che differiscono solo per maiuscole o spazi (anomalia F2).
@@ -92,11 +96,16 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (string, error
 		u.Vault = *in.Keys
 	}
 
+	if in.KDF != nil {
+		u.KDF = *in.KDF
+	}
+
 	var v validate.Validator
 	v.Check(validate.NotBlank(u.FirstName) && validate.MaxLen(u.FirstName, 50), "firstName", "Il nome è obbligatorio (massimo 50 caratteri)")
 	v.Check(validate.NotBlank(u.LastName) && validate.MaxLen(u.LastName, 50), "lastName", "Il cognome è obbligatorio (massimo 50 caratteri)")
 	v.Check(validate.Email(u.Email), "email", "Inserisci un indirizzo email valido")
-	checkPassword(&v, "password", in.Password, u.Email, u.FirstName)
+	checkSecret(&v, "password", in.Password, u.KDF, u.Email, u.FirstName)
+	checkKDF(&v, u.KDF)
 	u.LifestyleTags = checkPersonalDetails(&v, s.now(), personalDetails{
 		UserType: u.UserType, City: u.City, Birthdate: u.Birthdate, BudgetMax: u.BudgetMax,
 		Occupation: u.Occupation, Bio: u.Bio, LifestyleTags: in.LifestyleTags,
@@ -121,6 +130,37 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (string, error
 		return "", fmt.Errorf("creazione utente: %w", err)
 	}
 	return id, nil
+}
+
+// Prelogin restituisce i parametri con cui il browser deve ricavare le chiavi dalla password.
+//
+// Per un indirizzo non registrato risponde con un sale finto ma sempre uguale, ricavato
+// dall'indirizzo stesso: dalla risposta non si capisce quali email esistono.
+func (s *Service) Prelogin(ctx context.Context, email string) (auth.KDFParams, error) {
+	account, err := s.store.AccountByEmail(ctx, normalizeEmail(email))
+	if db.IsNoRows(err) {
+		return auth.KDFParams{Version: auth.KDFDerived, Salt: s.fakeSalt(email), Iterations: auth.MinKDFIterations}, nil
+	}
+	if err != nil {
+		return auth.KDFParams{}, fmt.Errorf("lettura account: %w", err)
+	}
+	if account.KDF.Version != auth.KDFDerived || account.KDF.Salt == "" {
+		// Account non ancora aggiornato: il browser invia la password come prima e poi passa
+		// al metodo nuovo, subito dopo l'accesso.
+		return auth.KDFParams{Version: auth.KDFLegacy}, nil
+	}
+	return account.KDF, nil
+}
+
+// fakeSalt costruisce un sale credibile per un indirizzo inesistente: sempre lo stesso per lo
+// stesso indirizzo, diverso da quello di chiunque altro, e non ricavabile senza il segreto del server.
+func (s *Service) fakeSalt(email string) string {
+	hash := s.hash("prelogin:" + normalizeEmail(email))
+	raw, err := hex.DecodeString(hash)
+	if err != nil || len(raw) < 16 {
+		return base64.StdEncoding.EncodeToString([]byte(hash))[:24]
+	}
+	return base64.StdEncoding.EncodeToString(raw[:16])
 }
 
 // LoginInput sono i dati di un tentativo di accesso; IPHash identifica la provenienza
@@ -162,6 +202,11 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (Account, error) {
 		}
 	}
 	s.record(ctx, auth.Event{Kind: auth.EventLoginOK, UserID: account.ID, EmailHash: emailHash, IPHash: in.IPHash})
+	// Il registro si ripulisce a ogni accesso riuscito: l'indice sulla data rende la cancellazione
+	// immediata quando non c'è nulla da togliere
+	if err := s.security.DeleteOldEvents(ctx, auth.EventRetention); err != nil {
+		logx.From(ctx).Warn("pulizia del registro di sicurezza non riuscita", "err", err)
+	}
 	return account, nil
 }
 
@@ -210,6 +255,8 @@ type ChangePasswordInput struct {
 	CurrentPassword string `json:"currentPassword"`
 	NewPassword     string `json:"newPassword"`
 	Keys            *Vault `json:"keys"`
+	// KDF sono i nuovi parametri di derivazione: cambiando password cambia anche il sale.
+	KDF *auth.KDFParams `json:"kdf"`
 }
 
 // ChangePassword richiede la password attuale e, se l'utente ha chiavi E2EE, la chiave privata
@@ -223,8 +270,14 @@ func (s *Service) ChangePassword(ctx context.Context, userID string, in ChangePa
 		return fmt.Errorf("lettura account: %w", err)
 	}
 
+	var kdf auth.KDFParams
+	if in.KDF != nil {
+		kdf = *in.KDF
+	}
+
 	var v validate.Validator
-	checkPassword(&v, "newPassword", in.NewPassword, account.Email, account.FirstName)
+	checkSecret(&v, "newPassword", in.NewPassword, kdf, account.Email, account.FirstName)
+	checkKDF(&v, kdf)
 	if err := v.Err(); err != nil {
 		return err
 	}
@@ -254,7 +307,7 @@ func (s *Service) ChangePassword(ctx context.Context, userID string, in ChangePa
 	if err != nil {
 		return fmt.Errorf("hash della password: %w", err)
 	}
-	if err := s.store.UpdatePassword(ctx, userID, hash, newVault); err != nil {
+	if err := s.store.UpdatePassword(ctx, userID, hash, kdf, newVault); err != nil {
 		return fmt.Errorf("aggiornamento password: %w", err)
 	}
 	s.record(ctx, auth.Event{Kind: auth.EventPasswordChanged, UserID: account.ID})
@@ -282,6 +335,63 @@ func (s *Service) DeleteAccount(ctx context.Context, userID, password string) er
 	s.images(ctx, keys)
 	// L'evento resta senza utente: la riga dell'account non esiste più
 	s.record(ctx, auth.Event{Kind: auth.EventAccountDeleted})
+	return nil
+}
+
+// UpgradeKDFInput porta l'account al metodo nuovo: la chiave d'accesso ricavata dal browser,
+// i suoi parametri e la chiave privata cifrata di nuovo con la chiave che resta nel browser.
+type UpgradeKDFInput struct {
+	CurrentPassword string          `json:"currentPassword"`
+	AuthKey         string          `json:"authKey"`
+	KDF             *auth.KDFParams `json:"kdf"`
+	Keys            *Vault          `json:"keys"`
+}
+
+// UpgradeKDF aggiorna un account dal vecchio metodo (password al server) a quello nuovo.
+// Avviene subito dopo un accesso riuscito, senza che l'utente debba fare nulla.
+func (s *Service) UpgradeKDF(ctx context.Context, userID string, in UpgradeKDFInput) error {
+	account, err := s.store.AccountByID(ctx, userID)
+	if db.IsNoRows(err) || db.IsInvalidInput(err) {
+		return errSessionInvalid
+	}
+	if err != nil {
+		return fmt.Errorf("lettura account: %w", err)
+	}
+	if account.KDF.Version == auth.KDFDerived {
+		return apperr.Conflict("kdf_already_upgraded", "Account già aggiornato")
+	}
+
+	var kdf auth.KDFParams
+	if in.KDF != nil {
+		kdf = *in.KDF
+	}
+	var v validate.Validator
+	v.Check(validate.Base64(in.AuthKey, 128) && in.AuthKey != "", "authKey", "Chiave di accesso non valida")
+	checkKDF(&v, kdf)
+	if err := v.Err(); err != nil {
+		return err
+	}
+
+	// Serve la password attuale: senza, una sessione rubata potrebbe cambiare le chiavi
+	if ok, _ := auth.CheckPassword(account.PasswordHash, in.CurrentPassword); !ok {
+		return apperr.Unauthorized("invalid_credentials", "La password non è corretta")
+	}
+
+	var newVault Vault
+	if in.Keys != nil {
+		newVault = *in.Keys
+	}
+	if account.Vault.EncryptedPrivateKey != "" && newVault.EncryptedPrivateKey == "" {
+		return apperr.BadRequest("vault_required", "Chiavi di cifratura mancanti: esci, accedi di nuovo e riprova")
+	}
+
+	hash, err := auth.HashPassword(in.AuthKey)
+	if err != nil {
+		return fmt.Errorf("hash della chiave di accesso: %w", err)
+	}
+	if err := s.store.UpdatePassword(ctx, userID, hash, kdf, newVault); err != nil {
+		return fmt.Errorf("aggiornamento chiavi: %w", err)
+	}
 	return nil
 }
 
@@ -535,11 +645,29 @@ func decodeRoommatesCursor(cursor string) (RoommatesCursor, bool) {
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
-// checkPassword applica le regole sulle password (lunghezza, password prevedibili, dati personali).
-func checkPassword(v *validate.Validator, field, password, email, firstName string) {
-	if problem := auth.PasswordProblem(password, email, firstName); problem != "" {
+// checkSecret controlla ciò che arriva al posto della password.
+//
+// Con il metodo nuovo il server riceve una chiave derivata, non la password: le regole su
+// lunghezza e password prevedibili le applica il browser, l'unico che la vede (src/auth/passwordPolicy.ts).
+// Qui resta la verifica della forma. Per gli account non ancora aggiornati vale ancora il controllo completo.
+func checkSecret(v *validate.Validator, field, secret string, kdf auth.KDFParams, email, firstName string) {
+	if kdf.Version == auth.KDFDerived {
+		v.Check(secret != "" && validate.Base64(secret, 128), field, "Chiave di accesso non valida")
+		return
+	}
+	if problem := auth.PasswordProblem(secret, email, firstName); problem != "" {
 		v.Check(false, field, problem)
 	}
+}
+
+// checkKDF controlla i parametri di derivazione dichiarati dal browser.
+func checkKDF(v *validate.Validator, kdf auth.KDFParams) {
+	v.Check(kdf.Version == auth.KDFDerived, "kdf", "Aggiorna la pagina: il metodo di accesso è cambiato")
+	if kdf.Version != auth.KDFDerived {
+		return
+	}
+	v.Check(validate.Base64(kdf.Salt, 128) && len(kdf.Salt) >= 16, "kdf", "Parametri di sicurezza non validi")
+	v.Check(kdf.Iterations >= auth.MinKDFIterations && kdf.Iterations <= 10_000_000, "kdf", "Parametri di sicurezza non validi")
 }
 
 // personalDetails sono i campi comuni a registrazione e modifica del profilo.

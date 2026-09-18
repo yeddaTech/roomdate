@@ -324,8 +324,14 @@ type user struct {
 	ID, Email, Password, Cookie string
 }
 
-// testPassword rispetta le regole del modulo M3.2: lunga, non comune e senza dati personali.
-const testPassword = "tramonto-arancione-42"
+// Dal modulo M3.4 il server non riceve la password ma una chiave ricavata dal browser:
+// nei test è un valore Base64 qualsiasi, perché il server la tratta come un'informazione opaca.
+var testPassword = b64("chiave-di-accesso-di-prova")
+
+// testKDF sono i parametri di derivazione dichiarati dal browser.
+func testKDF() map[string]any {
+	return map[string]any{"version": 2, "salt": b64("sale-di-prova-1234"), "iterations": 600000}
+}
 
 // registerUser registra un utente (con chiavi E2EE fittizie se withVault) ed esegue il login.
 func (a *testApp) registerUser(name, userType string, withVault bool) user {
@@ -348,6 +354,7 @@ func registration(name, email, password, userType string, withVault bool) map[st
 		"firstName": name, "lastName": "Rossi", "email": email, "password": password,
 		"city": "Milano", "userType": userType, "birthdate": "1999-01-01", "budgetMax": 500,
 		"occupation": "studente", "bio": "ciao", "lifestyleTags": []string{"socievole"},
+		"kdf": testKDF(),
 	}
 	if withVault {
 		body["keys"] = map[string]string{

@@ -165,7 +165,7 @@ func TestPasswordChangeRevokesOtherSessions(t *testing.T) {
 	other := app.login(u.Email, u.Password)
 
 	rec := app.do(http.MethodPost, "/api/v1/auth/password",
-		map[string]any{"currentPassword": u.Password, "newPassword": "sentiero-di-pietra-8"}, withSession(u.Cookie))
+		map[string]any{"currentPassword": u.Password, "newPassword": b64("chiave-nuova-1"), "kdf": testKDF()}, withSession(u.Cookie))
 	expect(t, rec, http.StatusNoContent, "")
 
 	if app.session(other).User != nil {
@@ -222,7 +222,7 @@ func TestSecurityEvents(t *testing.T) {
 	u := app.registerUser("Ilaria", "cerca", false)
 	app.do(http.MethodPost, "/api/v1/auth/login", map[string]string{"email": u.Email, "password": "sbagliata"})
 	expect(t, app.do(http.MethodPost, "/api/v1/auth/password",
-		map[string]any{"currentPassword": u.Password, "newPassword": "finestra-sul-cortile-3"}, withSession(u.Cookie)), http.StatusNoContent, "")
+		map[string]any{"currentPassword": u.Password, "newPassword": b64("chiave-nuova-2"), "kdf": testKDF()}, withSession(u.Cookie)), http.StatusNoContent, "")
 
 	rows, err := testPool.Query(context.Background(),
 		`SELECT kind, COALESCE(email_hash, ''), COALESCE(ip_hash, '') FROM roomdate_app.security_events ORDER BY id`)
@@ -244,5 +244,28 @@ func TestSecurityEvents(t *testing.T) {
 	}
 	if !slices.Equal(kinds, []string{"login_ok", "login_failed", "password_changed"}) {
 		t.Fatalf("eventi registrati = %v", kinds)
+	}
+}
+
+// Gli eventi più vecchi di 90 giorni vengono cancellati, come dichiara l'informativa privacy.
+func TestOldSecurityEventsAreDeleted(t *testing.T) {
+	app := newApp(t)
+	u := app.registerUser("Lara", "cerca", false)
+	ctx := context.Background()
+	if _, err := testPool.Exec(ctx, `
+        INSERT INTO roomdate_app.security_events (kind, user_id, created_at) VALUES
+            ('login_ok', $1, NOW() - interval '91 days'),
+            ('login_ok', $1, NOW() - interval '89 days')`, u.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	app.login(u.Email, u.Password)
+
+	var old, recent int
+	testPool.QueryRow(ctx, `SELECT count(*) FILTER (WHERE created_at < NOW() - interval '90 days'),
+                                   count(*) FILTER (WHERE created_at > NOW() - interval '90 days')
+                            FROM roomdate_app.security_events`).Scan(&old, &recent)
+	if old != 0 || recent < 2 {
+		t.Fatalf("eventi vecchi rimasti: %d, recenti: %d", old, recent)
 	}
 }

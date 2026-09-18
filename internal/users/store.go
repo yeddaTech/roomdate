@@ -7,6 +7,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"roomdate-backend/internal/auth"
 )
 
 // Store esegue le query sulla tabella roomdate_app.users.
@@ -23,6 +25,7 @@ type Account struct {
 	ID, FirstName, LastName, Email, UserType string
 	PasswordHash                             string
 	Vault                                    Vault
+	KDF                                      auth.KDFParams
 	FailedLogins                             int
 	LockedUntil                              *time.Time
 }
@@ -37,12 +40,14 @@ type Vault struct {
 
 const accountColumns = `id::text, COALESCE(first_name, ''), COALESCE(last_name, ''), email, COALESCE(user_type, ''), password_hash,
     COALESCE(public_key, ''), COALESCE(encrypted_private_key, ''), COALESCE(crypto_salt, ''), COALESCE(crypto_iv, ''),
+    COALESCE(kdf_version, 1), COALESCE(kdf_salt, ''), COALESCE(kdf_iterations, 0),
     COALESCE(failed_login_attempts, 0), locked_until`
 
 func scanAccount(row interface{ Scan(...any) error }) (Account, error) {
 	var a Account
 	err := row.Scan(&a.ID, &a.FirstName, &a.LastName, &a.Email, &a.UserType, &a.PasswordHash,
 		&a.Vault.PublicKey, &a.Vault.EncryptedPrivateKey, &a.Vault.CryptoSalt, &a.Vault.CryptoIV,
+		&a.KDF.Version, &a.KDF.Salt, &a.KDF.Iterations,
 		&a.FailedLogins, &a.LockedUntil)
 	return a, err
 }
@@ -79,6 +84,7 @@ type NewUser struct {
 	Occupation, Bio                          string
 	LifestyleTags                            []string
 	Vault                                    Vault
+	KDF                                      auth.KDFParams
 }
 
 // Create inserisce l'utente. Città e occupazione vuote diventano NULL.
@@ -87,12 +93,15 @@ func (s *Store) Create(ctx context.Context, u NewUser) (string, error) {
 	err := s.db.QueryRow(ctx, `
         INSERT INTO roomdate_app.users
             (first_name, last_name, email, password_hash, citta, user_type, birthdate, budget_max,
-             occupation, bio, lifestyle_tags, public_key, encrypted_private_key, crypto_salt, crypto_iv)
-        VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, $7, $8, NULLIF($9, ''), $10, $11, $12, $13, $14, $15)
+             occupation, bio, lifestyle_tags, public_key, encrypted_private_key, crypto_salt, crypto_iv,
+             kdf_version, kdf_salt, kdf_iterations)
+        VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, $7, $8, NULLIF($9, ''), $10, $11, $12, $13, $14, $15,
+                $16, NULLIF($17, ''), NULLIF($18, 0))
         RETURNING id::text`,
 		u.FirstName, u.LastName, u.Email, u.PasswordHash, u.City, u.UserType, u.Birthdate, u.BudgetMax,
 		u.Occupation, u.Bio, u.LifestyleTags,
 		u.Vault.PublicKey, u.Vault.EncryptedPrivateKey, u.Vault.CryptoSalt, u.Vault.CryptoIV,
+		u.KDF.Version, u.KDF.Salt, u.KDF.Iterations,
 	).Scan(&id)
 	return id, err
 }
@@ -104,19 +113,22 @@ func (s *Store) UpdatePasswordHash(ctx context.Context, id, passwordHash string)
 	return err
 }
 
-// UpdatePassword cambia password e chiave privata cifrata in un'unica istruzione.
+// UpdatePassword cambia password, parametri di derivazione e chiave privata cifrata in un'unica
+// istruzione: se qualcosa fallisce, l'account non resta con la password nuova e la chiave vecchia.
 // La chiave viene sostituita solo se l'utente ne aveva già una.
-func (s *Store) UpdatePassword(ctx context.Context, id, passwordHash string, vault Vault) error {
+func (s *Store) UpdatePassword(ctx context.Context, id, passwordHash string, kdf auth.KDFParams, vault Vault) error {
 	_, err := s.db.Exec(ctx, `
         UPDATE roomdate_app.users
         SET password_hash = $2,
+            kdf_version = $6, kdf_salt = NULLIF($7, ''), kdf_iterations = NULLIF($8, 0),
             encrypted_private_key = CASE WHEN COALESCE(encrypted_private_key, '') <> '' THEN $3 ELSE encrypted_private_key END,
             crypto_salt = CASE WHEN COALESCE(encrypted_private_key, '') <> '' THEN $4 ELSE crypto_salt END,
             crypto_iv = CASE WHEN COALESCE(encrypted_private_key, '') <> '' THEN $5 ELSE crypto_iv END,
             failed_login_attempts = 0,
             locked_until = NULL
         WHERE id = $1`,
-		id, passwordHash, vault.EncryptedPrivateKey, vault.CryptoSalt, vault.CryptoIV)
+		id, passwordHash, vault.EncryptedPrivateKey, vault.CryptoSalt, vault.CryptoIV,
+		kdf.Version, kdf.Salt, kdf.Iterations)
 	return err
 }
 

@@ -1,10 +1,11 @@
 import { useQuery, useQueryClient, type Query } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
-import { getSession, login as apiLogin, logout as apiLogout } from '../api/auth';
+import { getSession, logout as apiLogout } from '../api/auth';
 import { queryKeys } from '../api/queryKeys';
+import { signIn } from './accountKeys';
 import { AuthContext, type AuthContextValue, type AuthStatus } from './AuthContext';
-import { clearLocalSession, storeKeysAtLogin } from './keyStorage';
+import { clearLocalSession } from './keyStorage';
 
 // Tutte le query tranne quella della sessione: vanno scartate quando cambia l'utente
 const notSession = (query: Query) => query.queryKey[0] !== queryKeys.session[0];
@@ -32,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // così una pagina protetta rimanda alla home e non all'accesso, qualunque sia l'ordine
   // in cui React applica la navigazione.
   const endLocalSession = useCallback((reason: 'signed_out' | 'expired') => {
-    clearLocalSession();
+    void clearLocalSession();
     queryClient.removeQueries({ predicate: notSession });
     setSignedOutFrom(reason === 'signed_out' ? pathnameRef.current : null);
     queryClient.setQueryData(queryKeys.session, null);
@@ -40,8 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const result = await apiLogin(email, password);
-      const keysUnlocked = await storeKeysAtLogin(result.keys, password);
+      // La password resta nel browser: al server va solo la chiave d'accesso ricavata da essa
+      const result = await signIn(email, password);
+      const { keysUnlocked } = result;
       queryClient.removeQueries({ predicate: notSession });
       setSignedOutFrom(null);
       queryClient.setQueryData(queryKeys.session, result.user);
