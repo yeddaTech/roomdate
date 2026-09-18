@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { generateKeyPair, wrapPrivateKey } from '../utils/crypto';
+import { prepareRegistration } from '../auth/accountKeys';
+import { passwordProblem } from '../auth/passwordPolicy';
 import { MIN_PASSWORD_LENGTH, register } from '../api/auth';
 import { ApiError } from '../api/client';
 import { CITIES, OCCUPATIONS } from '../api/options';
@@ -59,17 +60,24 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
 
+    // La password non arriva al server (ne riceve solo una chiave ricavata): le regole si controllano qui
+    const problem = passwordProblem(formData.password, formData.email, formData.nome);
+    if (problem) {
+      alert('❌ Errore: ' + problem);
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      const keys = await generateKeyPair();
-      const wrappedData = await wrapPrivateKey(keys.privateKey, formData.password);
+      const { authKey, kdf, keys } = await prepareRegistration(formData.password);
 
       await register({
         firstName: formData.nome,
         lastName: formData.cognome,
         email: formData.email,
-        password: formData.password,
+        password: authKey,
+        kdf,
         city: formData.citta,
         birthdate: formData.nascita,
         userType: userType,
@@ -78,12 +86,7 @@ export default function Register() {
         occupation: formData.occupation,
         bio: formData.bio,
         lifestyleTags: formData.lifestyleTags,
-        keys: {
-          publicKey: keys.publicKey,
-          encryptedPrivateKey: wrappedData.encryptedPrivateKey,
-          cryptoSalt: wrappedData.salt,
-          cryptoIv: wrappedData.iv
-        }
+        keys,
       });
 
       alert('🎉 Registrazione completata! Ora puoi accedere e vedere il tuo profilo già impostato.');

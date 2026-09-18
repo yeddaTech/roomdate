@@ -27,13 +27,16 @@ Password reset by email does not exist yet: it needs an email provider (decision
 
 ## Security & Cryptography Infrastructure
 
-Chat messages are encrypted and decrypted in the browser; the server stores and relays only ciphertext.
+Chat messages are encrypted and decrypted in the browser; the server stores and relays only ciphertext, and it never receives the password.
 
-*   **Not zero-knowledge (yet):** keys are generated and used client-side, but the private key is wrapped with a key derived from the account password, which the server also receives at login. A server operator could therefore derive the wrapping key. Separating the two is planned in module M3.4.
-*   **Asymmetric Encryption (RSA-OAEP):** Each user generates an RSA key pair upon registration. Public keys are exchanged to facilitate secure message transfer.
-*   **Key Wrapping (AES-GCM & PBKDF2):** Private keys are never stored in plaintext on the server. They are wrapped using AES-GCM, with a key derived from the user's master password via PBKDF2, and stored as an encrypted vault in the database.
+*   **Two keys from the password:** before signing in, the browser asks `POST /api/v1/auth/prelogin` for the account's salt and iteration count, then derives a master key with PBKDF2-SHA256 (600,000 iterations) and splits it with HKDF into two independent keys. The *access key* goes to the server, which stores only its Argon2id hash; the *wrap key* never leaves the browser and encrypts the private key. A server operator therefore cannot open the private key. For an unknown email, `prelogin` answers with a fake but stable salt, so the response does not reveal who is registered.
+*   **Accounts created before this change** (`kdf_version = 1`) sign in once as before, with the password: right after that, the browser derives the new keys, re-encrypts the private key and calls `POST /api/v1/auth/kdf`, in one operation. From the next sign-in the password stays in the browser. Until every old account has signed in again, `prelogin` answers differently for them.
+*   **Password rules in the browser:** since the server only sees the access key, length, common passwords and personal data are checked by the browser (`src/auth/passwordPolicy.ts`, same rules and list as `internal/auth`, from `shared/common_passwords.txt`).
+*   **Asymmetric Encryption (RSA-OAEP):** each user generates an RSA key pair upon registration. Public keys are exchanged to facilitate secure message transfer.
 *   **Hybrid encryption:** each message is encrypted once with AES-256-GCM, and the message key is then encrypted with RSA-OAEP for every participant (table `message_keys`). Message length no longer depends on RSA, which stops at 190 bytes. Messages written before this change carry `format = 1`, one RSA copy per participant, and stay readable.
-*   **Local Secure Session:** Private keys are temporarily held in `sessionStorage` during active use. `localStorage` persists the encrypted vault, enabling a local cryptographic lock mechanism upon session expiration without exposing plaintext keys to the disk.
+*   **Private key in the browser:** once opened, the private key is imported as a non-extractable `CryptoKey` and kept in IndexedDB: the browser can decrypt with it, but no script can read its content, and it survives a page reload. `localStorage` keeps only the encrypted vault and the public key. Signing out deletes all of them.
+*   **Changing the password** re-encrypts the private key in the browser with the key derived from the new password (and a new salt); the server replaces hash, parameters and vault in a single statement.
+*   **Not yet available:** a recovery key to regain the chats after a forgotten password (decision D3), and password reset (it needs an email provider, decision D2).
 
 ## Local Development
 

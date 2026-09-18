@@ -5,8 +5,8 @@ import { useAuth } from '../auth/AuthContext';
 import { changePassword } from '../api/auth';
 import { deleteMyAccount } from '../api/users';
 import { useRevokeOtherSessions, useRevokeSession, useSessions } from '../api/hooks';
-import { prepareKeysForPasswordChange, saveKeysAfterPasswordChange } from '../auth/keyStorage';
-import { MIN_PASSWORD_LENGTH } from '../api/auth';
+import { preparePasswordChange } from '../auth/accountKeys';
+import { passwordProblem } from '../auth/passwordPolicy';
 
 /** "oggi alle 14:05", "ieri alle 9:12" oppure "12 settembre alle 18:40". */
 function whenLabel(isoDate) {
@@ -53,26 +53,31 @@ export default function Impostazioni() {
         setStatusMsg({ text: 'Le password non coincidono!', type: 'error' });
         return;
       }
-      if (newPassword.length < MIN_PASSWORD_LENGTH) {
-        setStatusMsg({ text: `La password deve avere almeno ${MIN_PASSWORD_LENGTH} caratteri.`, type: 'error' });
+
+      // La password non arriva al server: le regole si controllano qui
+      const problem = passwordProblem(newPassword, user.email, user.firstName);
+      if (problem) {
+        setStatusMsg({ text: problem, type: 'error' });
         return;
       }
 
       setIsLoading(true);
       try {
-        // 🔐 La chiave privata della chat è cifrata con la password: va cifrata di nuovo
-        // con quella nuova, altrimenti tutti i messaggi diventerebbero illeggibili.
-        const prepared = await prepareKeysForPasswordChange(currentPassword, newPassword);
+        // 🔐 La chiave privata della chat è cifrata con una chiave ricavata dalla password: va cifrata
+        // di nuovo con quella nuova, altrimenti tutti i messaggi diventerebbero illeggibili.
+        const prepared = await preparePasswordChange(user.email, currentPassword, newPassword);
         if (!prepared.ok) {
           setStatusMsg({ text: 'Password attuale errata, oppure le chiavi di cifratura salvate su questo dispositivo non sono aggiornate. Se la password è corretta, esci, accedi di nuovo e riprova.', type: 'error' });
           return;
         }
 
-        await changePassword({ currentPassword, newPassword, keys: prepared.keys });
-
-        if (prepared.keys) {
-          saveKeysAfterPasswordChange(prepared.keys);
-        }
+        await changePassword({
+          currentPassword: prepared.currentPassword,
+          newPassword: prepared.newPassword,
+          kdf: prepared.kdf,
+          keys: prepared.keys,
+        });
+        prepared.commit();
         setStatusMsg({ text: 'Password aggiornata con successo!', type: 'success' });
         setCurrentPassword('');
         setNewPassword('');

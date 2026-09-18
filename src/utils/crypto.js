@@ -24,6 +24,76 @@ export async function generateKeyPair() {
   };
 }
 
+// --- CHIAVI DELL'ACCOUNT (modulo M3.4) ---
+//
+// Dalla password il browser ricava due chiavi diverse:
+// - authKey va al server e serve solo all'accesso (il server la ri-cifra con Argon2id);
+// - wrapKey non esce mai dal browser e cifra la chiave privata delle chat.
+// Così chi gestisce il server non può aprire la chiave privata, perché non riceve mai la password.
+
+/** Ripetizioni di PBKDF2-SHA256 per le nuove password (raccomandazione OWASP). */
+export const KDF_ITERATIONS = 600000;
+
+/** Sale casuale per un nuovo calcolo delle chiavi (16 byte in Base64). */
+export function newKdfSalt() {
+  return toBase64(window.crypto.getRandomValues(new Uint8Array(16)));
+}
+
+/**
+ * Ricava le due chiavi dell'account dalla password.
+ * PBKDF2-SHA256 produce una chiave madre; HKDF ne ricava due indipendenti con etichette diverse,
+ * così conoscere una non aiuta a indovinare l'altra.
+ *
+ * @returns {Promise<{authKey: string, wrapKey: CryptoKey}>} authKey in Base64; wrapKey non estraibile.
+ */
+export async function deriveAccountKeys(password, saltBase64, iterations) {
+  const passwordKey = await window.crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(password), { name: "PBKDF2" }, false, ["deriveBits"]
+  );
+  const master = await window.crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt: base64ToArrayBuffer(saltBase64), iterations, hash: "SHA-256" },
+    passwordKey,
+    256
+  );
+  const masterKey = await window.crypto.subtle.importKey("raw", master, { name: "HKDF" }, false, ["deriveBits", "deriveKey"]);
+  const hkdf = (label) => ({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: new TextEncoder().encode(label) });
+
+  const authKey = await window.crypto.subtle.deriveBits(hkdf("roomdate-auth"), masterKey, 256);
+  const wrapKey = await window.crypto.subtle.deriveKey(
+    hkdf("roomdate-wrap"), masterKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
+  );
+  return { authKey: toBase64(authKey), wrapKey };
+}
+
+/** Cifra la chiave privata (PKCS#8 in Base64) con la wrapKey. */
+export async function wrapPrivateKeyWith(privateKeyBase64, wrapKey) {
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv }, wrapKey, new TextEncoder().encode(privateKeyBase64)
+  );
+  return { encryptedPrivateKey: toBase64(encrypted), cryptoIv: toBase64(iv) };
+}
+
+/** Decifra la chiave privata con la wrapKey e la restituisce in PKCS#8 Base64 (serve per cifrarla di nuovo). */
+export async function unwrapPrivateKeyWith(encryptedPrivateKey, ivBase64, wrapKey) {
+  const decrypted = await window.crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: new Uint8Array(base64ToArrayBuffer(ivBase64)) }, wrapKey, base64ToArrayBuffer(encryptedPrivateKey)
+  );
+  return new TextDecoder().decode(decrypted);
+}
+
+/**
+ * Importa la chiave privata come CryptoKey non estraibile: il browser la usa per decifrare,
+ * ma nessuno script può più leggerne il contenuto (vulnerabilità S15).
+ */
+export async function importPrivateKey(privateKeyBase64) {
+  return window.crypto.subtle.importKey(
+    "pkcs8", base64ToArrayBuffer(privateKeyBase64), { name: "RSA-OAEP", hash: "SHA-256" }, false, ["decrypt"]
+  );
+}
+
+// --- VERSIONE PRECEDENTE (account non ancora aggiornati) ---
+
 // 2. Deriva una chiave AES sicura dalla password dell'utente
 async function deriveKeyFromPassword(password, salt) {
   const enc = new TextEncoder();
@@ -40,28 +110,8 @@ async function deriveKeyFromPassword(password, salt) {
   );
 }
 
-// 3. "Incarta" la Chiave Privata appena generata
-export async function wrapPrivateKey(privateKeyString, password) {
-  const salt = window.crypto.getRandomValues(new Uint8Array(16));
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
-
-  const aesKey = await deriveKeyFromPassword(password, salt);
-  
-  const enc = new TextEncoder();
-  const encryptedPrivateKeyBuffer = await window.crypto.subtle.encrypt(
-    { name: "AES-GCM", iv: iv },
-    aesKey,
-    enc.encode(privateKeyString)
-  );
-
-  return {
-    encryptedPrivateKey: btoa(String.fromCharCode(...new Uint8Array(encryptedPrivateKeyBuffer))),
-    salt: btoa(String.fromCharCode(...salt)),
-    iv: btoa(String.fromCharCode(...iv))
-  };
-}
-
-// 4. "Spacchetta" la Chiave Privata al momento del Login
+// 3. Apre una chiave privata cifrata con la versione precedente (PBKDF2 a 100.000 ripetizioni sulla
+// password): serve solo a portare gli account vecchi al metodo nuovo.
 export async function unwrapPrivateKey(encryptedPrivateKeyBase64, password, saltBase64, ivBase64) {
   try {
     const salt = new Uint8Array(atob(saltBase64).split('').map(c => c.charCodeAt(0)));
@@ -82,29 +132,6 @@ export async function unwrapPrivateKey(encryptedPrivateKeyBase64, password, salt
     console.error("Errore decrittografia (Password errata o dati corrotti):", error);
     throw new Error("Impossibile decifrare la chiave privata");
   }
-}
-
-// 5. Cifra di nuovo la Chiave Privata con una nuova password (cambio password).
-// Restituisce null se la password attuale non apre la chiave salvata,
-// o se la chiave non corrisponde alla chiave pubblica dell'utente (dati locali di un altro account).
-export async function rewrapPrivateKey(cryptoData, currentPassword, newPassword, publicKeyBase64) {
-  if (!cryptoData || !publicKeyBase64) return null;
-
-  let privateKey;
-  try {
-    privateKey = await unwrapPrivateKey(
-      cryptoData.encryptedPrivateKey,
-      currentPassword,
-      cryptoData.cryptoSalt,
-      cryptoData.cryptoIv
-    );
-    const probe = await encryptMessage('roomdate-key-check', publicKeyBase64);
-    if (await decryptMessage(probe, privateKey) !== 'roomdate-key-check') return null;
-  } catch {
-    return null;
-  }
-
-  return wrapPrivateKey(privateKey, newPassword);
 }
 
 // --- FUNZIONI DI SUPPORTO ---
@@ -137,11 +164,8 @@ async function encryptBytes(data, publicKeyBase64) {
   return toBase64(await window.crypto.subtle.encrypt({ name: "RSA-OAEP" }, publicKey, data));
 }
 
-// Decifra dati binari con la propria chiave privata RSA.
-async function decryptBytes(encryptedBase64, privateKeyBase64) {
-  const privateKey = await window.crypto.subtle.importKey(
-    "pkcs8", base64ToArrayBuffer(privateKeyBase64), { name: "RSA-OAEP", hash: "SHA-256" }, false, ["decrypt"]
-  );
+// Decifra dati binari con la propria chiave privata RSA (una CryptoKey non estraibile).
+async function decryptBytes(encryptedBase64, privateKey) {
   return window.crypto.subtle.decrypt({ name: "RSA-OAEP" }, privateKey, base64ToArrayBuffer(encryptedBase64));
 }
 
@@ -187,10 +211,10 @@ export async function encryptForRecipients(text, recipients) {
  * Decifra un messaggio in cifratura ibrida: prima la chiave del messaggio con RSA, poi il testo.
  *
  * @param {{body: string, iv: string, key: string}} message - Testo cifrato, IV e chiave per chi legge.
- * @param {string} privateKeyBase64 - La chiave privata dell'utente.
+ * @param {CryptoKey} privateKey - La chiave privata dell'utente.
  */
-export async function decryptFromRecipients({ body, iv, key }, privateKeyBase64) {
-  const rawKey = await decryptBytes(key, privateKeyBase64);
+export async function decryptFromRecipients({ body, iv, key }, privateKey) {
+  const rawKey = await decryptBytes(key, privateKey);
   const messageKey = await window.crypto.subtle.importKey("raw", rawKey, { name: "AES-GCM" }, false, ["decrypt"]);
   const decrypted = await window.crypto.subtle.decrypt(
     { name: "AES-GCM", iv: new Uint8Array(base64ToArrayBuffer(iv)) },
@@ -201,11 +225,11 @@ export async function decryptFromRecipients({ body, iv, key }, privateKeyBase64)
 }
 
 /**
- * Decifra un messaggio cifrato usando la tua chiave PRIVATA in Base64.
+ * Decifra un messaggio vecchio (formato 1, cifrato direttamente con RSA).
  * @param {string} encryptedBase64 - Il messaggio cifrato in Base64.
- * @param {string} privateKeyBase64 - La chiave privata decriptata in Base64.
+ * @param {CryptoKey} privateKey - La chiave privata dell'utente.
  * @returns {Promise<string>} - Il messaggio decifrato in chiaro.
  */
-export async function decryptMessage(encryptedBase64, privateKeyBase64) {
-  return new TextDecoder().decode(await decryptBytes(encryptedBase64, privateKeyBase64));
+export async function decryptMessage(encryptedBase64, privateKey) {
+  return new TextDecoder().decode(await decryptBytes(encryptedBase64, privateKey));
 }

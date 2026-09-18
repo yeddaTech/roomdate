@@ -49,7 +49,18 @@ export default function ChatPage() {
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileView, setMobileView] = useState('list');
-  const [privateKey, setPrivateKey] = useState(() => getPrivateKey());
+  // La chiave privata è una CryptoKey conservata in IndexedDB: si legge in modo asincrono
+  const [privateKey, setPrivateKey] = useState(null);
+  const [keyChecked, setKeyChecked] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    getPrivateKey().then((key) => {
+      if (cancelled) return;
+      setPrivateKey(key);
+      setKeyChecked(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
   const [unlockPassword, setUnlockPassword] = useState('');
   const [unlockError, setUnlockError] = useState('');
   const [isUnlocking, setIsUnlocking] = useState(false);
@@ -92,7 +103,8 @@ export default function ChatPage() {
   );
   const previewTexts = useDecryptedTexts(lastMessages, privateKey);
   const messageTexts = useDecryptedTexts(messages, privateKey);
-  const isLocked = !privateKey;
+  // Finché la chiave non è stata cercata la chat non si mostra bloccata (niente lampo del lucchetto)
+  const isLocked = keyChecked && !privateKey;
 
   const sendMessage = useSendMessage();
   const { mutate: markConversationRead } = useMarkConversationRead();
@@ -164,7 +176,7 @@ export default function ChatPage() {
     setIsUnlocking(true);
     try {
       if (await unlockPrivateKey(unlockPassword)) {
-        setPrivateKey(getPrivateKey());
+        setPrivateKey(await getPrivateKey());
         setUnlockPassword('');
       } else {
         setUnlockError('Password errata. Riprova.');

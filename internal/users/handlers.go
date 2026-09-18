@@ -69,8 +69,46 @@ func (h *Handler) Session(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]any{"user": sessionUserFrom(account)})
 }
 
+// Prelogin gestisce POST /api/v1/auth/prelogin: i parametri con cui il browser ricava
+// le chiavi dalla password, prima di inviare qualsiasi cosa.
+func (h *Handler) Prelogin(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	params, err := h.svc.Prelogin(r.Context(), req.Email)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, params)
+}
+
+// UpgradeKDF gestisce POST /api/v1/auth/kdf: porta l'account al metodo nuovo dopo l'accesso.
+func (h *Handler) UpgradeKDF(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.requireSession(w, r)
+	if !ok {
+		return
+	}
+	var in UpgradeKDFInput
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	if err := h.svc.UpgradeKDF(r.Context(), session.UserID, in); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 type loginRequest struct {
-	Email    string `json:"email"`
+	Email string `json:"email"`
+	// Password è la chiave d'accesso ricavata dal browser (o la password vera, per gli account
+	// non ancora aggiornati al metodo nuovo).
 	Password string `json:"password"`
 }
 

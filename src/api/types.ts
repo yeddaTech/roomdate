@@ -23,6 +23,16 @@ export interface CryptoKeys {
 /** Chiave privata cifrata di nuovo con una nuova password (senza chiave pubblica). */
 export type WrappedPrivateKey = Omit<CryptoKeys, 'publicKey'>;
 
+/**
+ * Come ricavare le chiavi dalla password. version 1: la password va al server (account vecchi);
+ * version 2: il browser ricava una chiave d'accesso e una chiave che non esce mai (modulo M3.4).
+ */
+export interface KdfParams {
+  version: 1 | 2;
+  salt: string;
+  iterations: number;
+}
+
 /** Dispositivo con l'accesso aperto. */
 export interface UserSession {
   id: string;
@@ -68,6 +78,7 @@ export interface RegisterInput {
   bio: string;
   lifestyleTags: string[];
   keys: CryptoKeys;
+  kdf: KdfParams;
 }
 
 /**
