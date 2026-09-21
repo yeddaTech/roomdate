@@ -11,11 +11,18 @@
 // Per la produzione indicare anche l'host atteso: se DATABASE_URL punta altrove non parte nulla.
 //
 //	go run ./cmd/migrate -host ep-floral-violet-aldznrms up
+//
+// Le migrazioni si eseguono con il ruolo proprietario dello schema (neondb_owner), non con quello
+// dell'applicazione, che può solo leggere e scrivere i dati. grant-app crea quel ruolo (se manca)
+// e gli assegna i permessi; alla creazione stampa la stringa di connessione da mettere su Vercel:
+//
+//	go run ./cmd/migrate -host ep-floral-violet-aldznrms grant-app roomdate_app
 package main
 
 import (
 	"bufio"
 	"context"
+	"database/sql"
 	"flag"
 	"fmt"
 	"log"
@@ -26,7 +33,7 @@ import (
 	"roomdate-backend/internal/devenv"
 )
 
-var writeCommands = map[string]bool{"up": true, "up-by-one": true, "down": true}
+var writeCommands = map[string]bool{"up": true, "up-by-one": true, "down": true, "grant-app": true}
 var readCommands = map[string]bool{"status": true, "version": true, "validate": true}
 
 func main() {
@@ -36,6 +43,7 @@ func main() {
 	expectedHost := flag.String("host", "", "host atteso del database, anche solo l'inizio (es. ep-floral-violet-aldznrms)")
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Uso: go run ./cmd/migrate [-yes] [-env file] [-host host] status|version|validate|up|up-by-one|down")
+		fmt.Fprintln(os.Stderr, "     go run ./cmd/migrate [-yes] [-env file] [-host host] grant-app RUOLO")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -48,6 +56,9 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
+	if command == "grant-app" && flag.Arg(1) == "" {
+		log.Fatal("Indica il ruolo dell'applicazione, es.: go run ./cmd/migrate grant-app roomdate_app")
+	}
 
 	if _, err := devenv.Load(*envFile); err != nil {
 		log.Fatalf("Errore nel file %s: %v", *envFile, err)
@@ -57,6 +68,7 @@ func main() {
 		log.Fatal("DATABASE_URL non impostata: copia .env.example in .env.local e compilala")
 	}
 
+	ownerDSN := dsn
 	dsn, direct := devenv.DirectNeonDSN(dsn)
 	host, dbname := devenv.DescribeDSN(dsn)
 	log.Printf("Database: %s / %s", host, dbname)
@@ -81,9 +93,41 @@ func main() {
 		log.Fatalf("Database non raggiungibile: %v", err)
 	}
 
+	if command == "grant-app" {
+		grantApp(conn, ownerDSN, flag.Arg(1))
+		return
+	}
+
 	if err := db.Migrate(context.Background(), conn, command); err != nil {
 		log.Fatalf("Migrazione fallita: %v", err)
 	}
+}
+
+// grantApp prepara il ruolo usato dall'app, con i soli permessi sui dati (modulo M3.6). La connessione
+// deve essere quella del ruolo proprietario, che fa le migrazioni.
+func grantApp(conn *sql.DB, ownerDSN, role string) {
+	password, err := db.SetupAppRole(context.Background(), conn, role)
+	if err != nil {
+		log.Fatalf("Ruolo non preparato, nessuna modifica: %v", err)
+	}
+	if password == "" {
+		log.Printf("Permessi di %q aggiornati: lettura e scrittura dei dati, nessuna modifica dello schema.", role)
+		return
+	}
+	log.Printf("Ruolo %q creato: può leggere e scrivere i dati, non modificare lo schema.", role)
+	fmt.Println()
+	if appDSN, ok := devenv.AppNeonDSN(ownerDSN, role, password); ok {
+		fmt.Println("Stringa di connessione dell'app, da copiare in Vercel → Settings → Environment Variables →")
+		fmt.Println("DATABASE_URL (Production). Contiene la password, che non è salvata da nessuna parte e non verrà")
+		fmt.Println("mostrata di nuovo: non incollarla in chat, email o documenti.")
+		fmt.Println()
+		fmt.Println(appDSN)
+	} else {
+		fmt.Println("Password del ruolo (non verrà mostrata di nuovo, non condividerla):")
+		fmt.Println()
+		fmt.Println(password)
+	}
+	fmt.Println()
 }
 
 func confirm(question string) bool {

@@ -87,3 +87,22 @@ func TestDirectNeonDSN(t *testing.T) {
 		}
 	}
 }
+
+func TestAppNeonDSN(t *testing.T) {
+	const want = "postgresql://roomdate_app:Ab-_9@ep-floral-violet-aldznrms-pooler.c-3.eu-central-1.aws.neon.tech/neondb?channel_binding=require&sslmode=require"
+	for _, owner := range []string{
+		"postgresql://neondb_owner:segreto@ep-floral-violet-aldznrms.c-3.eu-central-1.aws.neon.tech/neondb?channel_binding=require&sslmode=require",
+		"postgresql://neondb_owner:segreto@ep-floral-violet-aldznrms-pooler.c-3.eu-central-1.aws.neon.tech/neondb?channel_binding=require&sslmode=require",
+	} {
+		if got, ok := AppNeonDSN(owner, "roomdate_app", "Ab-_9"); !ok || got != want {
+			t.Errorf("AppNeonDSN(%q) = %q, %v", owner, got, ok)
+		}
+	}
+	// Fuori da Neon il pooler non c'è: cambiano solo ruolo e password
+	if got, _ := AppNeonDSN("postgres://owner:x@db.example.com:5432/app", "app", "y"); got != "postgres://app:y@db.example.com:5432/app" {
+		t.Errorf("AppNeonDSN fuori da Neon = %q", got)
+	}
+	if _, ok := AppNeonDSN("host=ep-x.neon.tech dbname=neondb", "app", "y"); ok {
+		t.Error("una stringa chiave=valore non si converte")
+	}
+}

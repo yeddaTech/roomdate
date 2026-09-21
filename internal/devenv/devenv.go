@@ -85,6 +85,25 @@ func DirectNeonDSN(dsn string) (direct string, changed bool) {
 	return u.String(), true
 }
 
+// AppNeonDSN ricava dalla stringa di connessione del proprietario quella dell'applicazione: stesso
+// database e stesse opzioni, ma con il ruolo e la password indicati e, su Neon, attraverso il pooler
+// (le funzioni Vercel aprono molte connessioni brevi). ok è false se la stringa non è un URL.
+func AppNeonDSN(ownerDSN, role, password string) (dsn string, ok bool) {
+	if !strings.HasPrefix(ownerDSN, "postgres://") && !strings.HasPrefix(ownerDSN, "postgresql://") {
+		return "", false
+	}
+	u, err := url.Parse(ownerDSN)
+	if err != nil {
+		return "", false
+	}
+	u.User = url.UserPassword(role, password)
+	endpoint, rest, found := strings.Cut(u.Host, ".")
+	if found && strings.HasSuffix(u.Hostname(), ".neon.tech") && !strings.HasSuffix(endpoint, "-pooler") {
+		u.Host = endpoint + "-pooler." + rest
+	}
+	return u.String(), true
+}
+
 // IsLocalHost indica se l'host è la macchina locale (loopback o socket Unix).
 func IsLocalHost(host string) bool {
 	h := host
