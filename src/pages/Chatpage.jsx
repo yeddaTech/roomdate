@@ -1,20 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import Pusher from 'pusher-js';
 import { Helmet } from 'react-helmet-async';
 import { useQueryClient } from '@tanstack/react-query';
 import { encryptForRecipients } from '../utils/crypto';
 import { useAuth } from '../auth/AuthContext';
 import { getPrivateKey, getPublicKey, hasStoredVault, unlockPrivateKey } from '../auth/keyStorage';
 import { useConversations, useMarkConversationRead, useMessages, useSendMessage } from '../api/hooks';
-import { notifyTyping } from '../api/chat';
+import { conversationChannel, createRealtimeClient, realtimeEnabled, TYPING_EVENT, userChannel } from '../api/realtime';
 import { queryKeys } from '../api/queryKeys';
 import { isSessionExpired } from '../api/client';
 import { useDecryptedTexts } from './chat/useChatMessages';
 import { dayLabel, shortDateLabel, timeLabel } from './chat/time';
 
-// Pusher può mancare in sviluppo locale: in quel caso le chat si aggiornano periodicamente
-const PUSHER_KEY = import.meta.env.VITE_PUSHER_KEY;
 const FALLBACK_REFRESH_MS = 5000;
 const TYPING_NOTICE_MS = 1500;
 
@@ -71,6 +68,8 @@ export default function ChatPage() {
   const textareaRef = useRef(null);
   const lastTypedRef = useRef(0);
   const typingTimeoutRef = useRef(null);
+  const typingChannelRef = useRef(null);
+  const [realtime, setRealtime] = useState(null);
   const activeIdRef = useRef(null);
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
 
@@ -115,32 +114,52 @@ export default function ChatPage() {
     if (activeId && unreadHere > 0) markConversationRead(activeId);
   }, [activeId, unreadHere, markConversationRead]);
 
-  // Eventi in tempo reale del solo utente: arriva l'avviso, non l'intera lista (anomalia F12)
+  // Eventi in tempo reale del solo utente, sul suo canale privato: arriva l'avviso, non l'intera
+  // lista (anomalia F12), e nessun altro può ascoltarlo
+  const userId = user?.id;
   useEffect(() => {
-    if (!user || !PUSHER_KEY) return undefined;
-    const pusher = new Pusher(PUSHER_KEY, { cluster: import.meta.env.VITE_PUSHER_CLUSTER });
-    const channel = pusher.subscribe(`user-${user.id}`);
-
+    if (!userId || !realtimeEnabled) return undefined;
+    const client = createRealtimeClient();
+    const channel = client.subscribe(userChannel(userId));
     channel.bind('nuovo-messaggio', ({ conversationId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
       queryClient.invalidateQueries({ queryKey: queryKeys.messages(Number(conversationId)) });
     });
-    channel.bind('sta-scrivendo', ({ conversationId }) => {
-      setTypingIn(Number(conversationId));
+    setRealtime(client);
+
+    return () => {
+      setRealtime(null);
+      channel.unbind_all();
+      client.disconnect();
+    };
+  }, [userId, queryClient]);
+
+  // "Sta scrivendo" della conversazione aperta: passa tra i browser dei partecipanti sul canale
+  // privato della conversazione, senza chiamate al server
+  useEffect(() => {
+    if (!realtime || !activeId) return undefined;
+    const channel = realtime.subscribe(conversationChannel(activeId));
+    typingChannelRef.current = channel;
+    channel.bind(TYPING_EVENT, (data) => {
+      // Lo stesso utente in un'altra scheda non conta come "l'altro sta scrivendo"
+      if (data?.userId === userId) return;
+      setTypingIn(activeId);
       clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => setTypingIn(null), 3000);
     });
 
     return () => {
+      typingChannelRef.current = null;
       channel.unbind_all();
-      channel.unsubscribe();
-      pusher.disconnect();
+      realtime.unsubscribe(channel.name);
+      clearTimeout(typingTimeoutRef.current);
+      setTypingIn(null);
     };
-  }, [user, queryClient]);
+  }, [realtime, activeId, userId]);
 
   // Senza Pusher (sviluppo locale) si controlla periodicamente
   useEffect(() => {
-    if (!user || PUSHER_KEY) return undefined;
+    if (!user || realtimeEnabled) return undefined;
     const timer = setInterval(() => {
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
       if (activeIdRef.current) queryClient.invalidateQueries({ queryKey: queryKeys.messages(activeIdRef.current) });
@@ -244,9 +263,10 @@ export default function ChatPage() {
     area.style.height = Math.min(area.scrollHeight, 120) + 'px';
 
     const now = Date.now();
-    if (PUSHER_KEY && activeId && now - lastTypedRef.current > TYPING_NOTICE_MS) {
+    const channel = typingChannelRef.current;
+    if (channel?.subscribed && now - lastTypedRef.current > TYPING_NOTICE_MS) {
       lastTypedRef.current = now;
-      notifyTyping(activeId).catch(() => {});
+      channel.trigger(TYPING_EVENT, { userId });
     }
   };
 

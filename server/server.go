@@ -59,7 +59,7 @@ func New(d Deps) (http.Handler, error) {
 
 	usersHandler := users.NewHandler(users.NewService(users.NewStore(d.DB), security, sessions.Hash, deleteImages), sessions)
 	listingsHandler := listings.NewHandler(listings.NewService(listings.NewStore(d.DB), photos), sessions)
-	chatHandler := chat.NewHandler(chat.NewService(chat.NewStore(d.DB), d.Publisher), sessions)
+	chatHandler := chat.NewHandler(chat.NewService(chat.NewStore(d.DB), d.Publisher, realtime.NewAuthorizer(d.Config.Pusher)), sessions)
 
 	type methods = map[string]http.HandlerFunc
 	mux := http.NewServeMux()
@@ -104,7 +104,7 @@ func New(d Deps) (http.Handler, error) {
 		http.MethodGet: chatHandler.Messages, http.MethodPost: chatHandler.SendMessage,
 	}))
 	mux.Handle("/api/v1/conversations/{id}/read", httpx.Methods(methods{http.MethodPost: chatHandler.MarkRead}))
-	mux.Handle("/api/v1/conversations/{id}/typing", httpx.Methods(methods{http.MethodPost: chatHandler.Typing}))
+	mux.Handle("/api/v1/realtime/auth", httpx.Methods(methods{http.MethodPost: chatHandler.AuthorizeRealtime}))
 
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, apperr.NotFound("endpoint_not_found", "Endpoint non trovato"))
