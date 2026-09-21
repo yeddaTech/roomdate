@@ -40,7 +40,10 @@ import (
 	"roomdate-backend/server"
 )
 
-var testPool *pgxpool.Pool
+// testPool è la connessione con tutti i permessi, per preparare i dati dei test.
+// appPool è quella dell'applicazione: un ruolo che può solo leggere e scrivere i dati, come in
+// produzione (modulo M3.6). Se all'app servisse un permesso in più, i test lo scoprirebbero.
+var testPool, appPool *pgxpool.Pool
 
 func TestMain(m *testing.M) {
 	os.Exit(run(m))
@@ -72,7 +75,13 @@ func run(m *testing.M) int {
 		fmt.Println("creazione del database di test fallita:", err)
 		return 1
 	}
-	defer admin.Exec(ctx, "DROP DATABASE IF EXISTS "+ident+" WITH (FORCE)")
+	// Ruolo dell'applicazione, creato più avanti. Va eliminato dopo il database: finché questo
+	// esiste, i permessi del ruolo su di esso ne impediscono l'eliminazione
+	role := "roomdate_app_" + hex.EncodeToString(suffix)
+	defer func() {
+		admin.Exec(ctx, "DROP DATABASE IF EXISTS "+ident+" WITH (FORCE)")
+		admin.Exec(ctx, "DROP ROLE IF EXISTS "+pgx.Identifier{role}.Sanitize())
+	}()
 
 	cfg, err := db.Config(adminURL)
 	if err != nil {
@@ -84,9 +93,17 @@ func run(m *testing.M) int {
 	sqlDB := stdlib.OpenDB(*cfg.ConnConfig.Copy())
 	goose.SetLogger(goose.NopLogger())
 	err = db.Migrate(ctx, sqlDB, "up")
+	if err != nil {
+		sqlDB.Close()
+		fmt.Println("migrazioni fallite:", err)
+		return 1
+	}
+
+	// Ruolo dell'applicazione, creato come fa "migrate grant-app" e con i soli permessi sui dati
+	rolePassword, err := db.SetupAppRole(ctx, sqlDB, role)
 	sqlDB.Close()
 	if err != nil {
-		fmt.Println("migrazioni fallite:", err)
+		fmt.Println("ruolo dell'applicazione:", err)
 		return 1
 	}
 
@@ -96,6 +113,16 @@ func run(m *testing.M) int {
 		return 1
 	}
 	defer testPool.Close()
+
+	appCfg := cfg.Copy()
+	appCfg.ConnConfig.User = role
+	appCfg.ConnConfig.Password = rolePassword
+	appPool, err = pgxpool.NewWithConfig(ctx, appCfg)
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+	defer appPool.Close()
 
 	return m.Run()
 }
@@ -264,7 +291,7 @@ func newAppWithStorage(t *testing.T, st storage.Storage) *testApp {
 	publisher := &recordingPublisher{}
 	handler, err := server.New(server.Deps{
 		Config:    config.Config{SecretKey: "segreto-di-test", SecureCookies: true},
-		DB:        testPool,
+		DB:        appPool,
 		Publisher: publisher,
 		Logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Storage:   st,

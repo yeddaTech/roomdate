@@ -50,7 +50,7 @@ export default function Privacy() {
               <li>Un registro di sicurezza con accessi, tentativi falliti, cambi di password ed eliminazioni di account, conservato per 90 giorni. Email e indirizzo IP vi compaiono solo come impronte non reversibili, che servono a rallentare chi tenta di indovinare le password.</li>
             </ul>
             <p>
-              I dati raccolti vengono elaborati tramite l'infrastruttura cloud di Vercel e conservati in un database gestito da Neon.
+              I dati raccolti vengono elaborati tramite l&apos;infrastruttura cloud di Vercel e conservati in un database gestito da Neon. Il database e le funzioni del server si trovano in Unione Europea (Francoforte, Germania), e le foto degli annunci sono archiviate da Cloudflare in uno spazio soggetto alla giurisdizione UE. Le pagine del sito, che non contengono dati personali, sono distribuite dalla rete globale di Vercel.
             </p>
           </section>
 

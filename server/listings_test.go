@@ -491,7 +491,7 @@ func TestNullableProductionColumns(t *testing.T) {
 		`UPDATE roomdate_app.listings SET room_type = NULL WHERE title = 'Senza tipo'`,
 		`UPDATE roomdate_app.users SET first_name = NULL, last_name = NULL WHERE email = 'marco@test.it'`,
 		`UPDATE roomdate_app.users SET first_name = NULL, last_name = NULL, citta = NULL, occupation = NULL, bio = NULL,
-             birthdate = NULL, budget_max = NULL, is_public = NULL, user_type = 'cerca', created_at = NULL
+             birthdate = NULL, budget_max = NULL, user_type = 'cerca', created_at = NULL
          WHERE email = 'giulia@test.it'`,
 	} {
 		if _, err := testPool.Exec(ctx, query); err != nil {
