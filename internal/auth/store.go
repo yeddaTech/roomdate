@@ -104,6 +104,12 @@ func (s *Store) DeleteUserSession(ctx context.Context, userID, sessionID string)
 	return tag.RowsAffected() > 0, nil
 }
 
+// DeleteAllUserSessions revoca tutte le sessioni dell'utente (dopo un recupero dell'account).
+func (s *Store) DeleteAllUserSessions(ctx context.Context, userID string) error {
+	_, err := s.db.Exec(ctx, `DELETE FROM roomdate_app.sessions WHERE user_id = $1`, userID)
+	return err
+}
+
 // DeleteUserSessions revoca tutte le sessioni dell'utente tranne quella indicata.
 func (s *Store) DeleteUserSessions(ctx context.Context, userID, keepSessionID string) (int, error) {
 	tag, err := s.db.Exec(ctx, `
@@ -116,11 +122,14 @@ func (s *Store) DeleteUserSessions(ctx context.Context, userID, keepSessionID st
 
 // Tipi di evento registrati.
 const (
-	EventLoginOK         = "login_ok"
-	EventLoginFailed     = "login_failed"
-	EventPasswordChanged = "password_changed"
-	EventAccountDeleted  = "account_deleted"
-	EventSessionsRevoked = "sessions_revoked"
+	EventLoginOK           = "login_ok"
+	EventLoginFailed       = "login_failed"
+	EventPasswordChanged   = "password_changed"
+	EventAccountDeleted    = "account_deleted"
+	EventSessionsRevoked   = "sessions_revoked"
+	EventRecoveryKeySet    = "recovery_key_set"
+	EventRecoveryFailed    = "recovery_failed"
+	EventPasswordRecovered = "password_recovered"
 )
 
 // Event è una riga del registro di sicurezza. UserID è vuoto per i tentativi su email inesistenti.
@@ -148,6 +157,11 @@ type FailedLogins struct {
 }
 
 func (s *Store) RecentFailedLogins(ctx context.Context, emailHash, ipHash string, window time.Duration) (FailedLogins, error) {
+	return s.RecentFailures(ctx, EventLoginFailed, emailHash, ipHash, window)
+}
+
+// RecentFailures conta i fallimenti recenti di un tipo (accesso o chiave di recupero).
+func (s *Store) RecentFailures(ctx context.Context, kind, emailHash, ipHash string, window time.Duration) (FailedLogins, error) {
 	var f FailedLogins
 	var last *time.Time
 	err := s.db.QueryRow(ctx, `
@@ -155,10 +169,10 @@ func (s *Store) RecentFailedLogins(ctx context.Context, emailHash, ipHash string
                count(*) FILTER (WHERE ip_hash = $2 AND $2 <> ''),
                max(created_at)
         FROM roomdate_app.security_events
-        WHERE kind = 'login_failed'
+        WHERE kind = $4
           AND created_at > NOW() - $3::interval
           AND (email_hash = $1 OR (ip_hash = $2 AND $2 <> ''))`,
-		emailHash, ipHash, window.String()).Scan(&f.ByEmail, &f.ByIP, &last)
+		emailHash, ipHash, window.String(), kind).Scan(&f.ByEmail, &f.ByIP, &last)
 	if last != nil {
 		f.LastAttempt = *last
 	}

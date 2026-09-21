@@ -92,6 +92,44 @@ export async function importPrivateKey(privateKeyBase64) {
   );
 }
 
+// --- CHIAVE DI RECUPERO (decisione D3) ---
+//
+// Un codice casuale da 120 bit, da conservare fuori dal sito. Come dalla password, se ne ricavano
+// due chiavi: una dimostra al server di avere il codice, l'altra cifra una copia della chiave privata.
+// Il codice ha già 120 bit di casualità: non serve un calcolo lento come per la password.
+
+// Alfabeto di Crockford: niente I, L, O e U, che si confondono ricopiando il codice a mano.
+const RECOVERY_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+const RECOVERY_LENGTH = 24;
+
+/** Nuovo codice di recupero, in gruppi di 4 caratteri: "K7P2-M9QX-…". */
+export function newRecoveryCode() {
+  // 32 simboli dividono esattamente 256: ogni simbolo ha la stessa probabilità
+  const symbols = Array.from(window.crypto.getRandomValues(new Uint8Array(RECOVERY_LENGTH)), (b) => RECOVERY_ALPHABET[b & 31]);
+  return symbols.join('').match(/.{4}/g).join('-');
+}
+
+/**
+ * Codice di recupero nella forma canonica (maiuscolo, senza trattini), o null se non è valido.
+ * Accetta gli errori di trascrizione più comuni: O al posto di 0, I e L al posto di 1.
+ */
+export function normalizeRecoveryCode(input) {
+  const code = input.toUpperCase().replace(/[\s-]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
+  if (code.length !== RECOVERY_LENGTH || [...code].some((c) => !RECOVERY_ALPHABET.includes(c))) return null;
+  return code;
+}
+
+/** Chiavi ricavate dal codice di recupero (già normalizzato): authKey in Base64, wrapKey non estraibile. */
+export async function deriveRecoveryKeys(code, saltBase64) {
+  const codeKey = await window.crypto.subtle.importKey("raw", new TextEncoder().encode(code), { name: "HKDF" }, false, ["deriveBits", "deriveKey"]);
+  const hkdf = (label) => ({ name: "HKDF", hash: "SHA-256", salt: base64ToArrayBuffer(saltBase64), info: new TextEncoder().encode(label) });
+  const authKey = await window.crypto.subtle.deriveBits(hkdf("roomdate-recovery-auth"), codeKey, 256);
+  const wrapKey = await window.crypto.subtle.deriveKey(
+    hkdf("roomdate-recovery-wrap"), codeKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
+  );
+  return { authKey: toBase64(authKey), wrapKey };
+}
+
 // --- VERSIONE PRECEDENTE (account non ancora aggiornati) ---
 
 // 2. Deriva una chiave AES sicura dalla password dell'utente

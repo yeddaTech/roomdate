@@ -72,6 +72,8 @@ type RegisterInput struct {
 	Keys          *Vault   `json:"keys"`
 	// KDF descrive come il browser ha ricavato Password dalla password scritta dall'utente.
 	KDF *auth.KDFParams `json:"kdf"`
+	// Recovery è la chiave di recupero preparata dal browser; facoltativa.
+	Recovery *RecoveryInput `json:"recovery"`
 }
 
 // normalizeEmail rende uguali gli indirizzi che differiscono solo per maiuscole o spazi (anomalia F2).
@@ -111,6 +113,9 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (string, error
 		Occupation: u.Occupation, Bio: u.Bio, LifestyleTags: in.LifestyleTags,
 	})
 	checkVault(&v, u.Vault)
+	if in.Recovery != nil {
+		checkRecovery(&v, *in.Recovery, u.Vault.EncryptedPrivateKey != "")
+	}
 	if err := v.Err(); err != nil {
 		return "", err
 	}
@@ -120,6 +125,11 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (string, error
 		return "", fmt.Errorf("hash della password: %w", err)
 	}
 	u.PasswordHash = hash
+	if in.Recovery != nil {
+		if u.Recovery, err = hashRecovery(*in.Recovery); err != nil {
+			return "", err
+		}
+	}
 
 	id, err := s.store.Create(ctx, u)
 	if db.IsUniqueViolation(err) {
@@ -155,7 +165,12 @@ func (s *Service) Prelogin(ctx context.Context, email string) (auth.KDFParams, e
 // fakeSalt costruisce un sale credibile per un indirizzo inesistente: sempre lo stesso per lo
 // stesso indirizzo, diverso da quello di chiunque altro, e non ricavabile senza il segreto del server.
 func (s *Service) fakeSalt(email string) string {
-	hash := s.hash("prelogin:" + normalizeEmail(email))
+	return s.fakeSaltFor("prelogin", email)
+}
+
+// fakeSaltFor è fakeSalt per uno scopo diverso (accesso o recupero), così i due sali finti non coincidono.
+func (s *Service) fakeSaltFor(purpose, email string) string {
+	hash := s.hash(purpose + ":" + normalizeEmail(email))
 	raw, err := hex.DecodeString(hash)
 	if err != nil || len(raw) < 16 {
 		return base64.StdEncoding.EncodeToString([]byte(hash))[:24]
