@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { CryptoKeys, KdfParams, RegisterInput, SessionUser, WrappedPrivateKey } from './types';
+import type { CryptoKeys, KdfParams, RecoveryInput, RegisterInput, SessionUser, WrappedPrivateKey } from './types';
 
 /**
  * Lunghezza minima della password, come la applica il server (linee guida NIST 800-63B:
@@ -65,4 +65,44 @@ export interface ChangePasswordInput {
 
 export function changePassword(input: ChangePasswordInput): Promise<void> {
   return request<void>('/api/v1/auth/password', { method: 'POST', body: input });
+}
+
+// --- Chiave di recupero ---
+
+/** Crea o sostituisce la chiave di recupero; currentPassword è la chiave d'accesso attuale. */
+export function setRecoveryKey(currentPassword: string, recovery: RecoveryInput): Promise<void> {
+  return request<void>('/api/v1/me/recovery', { method: 'PUT', body: { currentPassword, recovery } });
+}
+
+/** Sale per ricavare le chiavi dal codice di recupero (finto, ma stabile, se l'account non esiste). */
+export async function recoveryStart(email: string): Promise<string> {
+  const { salt } = await request<{ salt: string }>('/api/v1/auth/recovery/start', { method: 'POST', body: { email } });
+  return salt;
+}
+
+export interface RecoveredKeys {
+  publicKey: string;
+  encryptedPrivateKey: string;
+  iv: string;
+}
+
+/** Verifica il codice; restituisce la copia della chiave privata, o null se l'account non ha chiavi. */
+export async function recoveryVerify(email: string, recoveryKey: string): Promise<RecoveredKeys | null> {
+  const { keys } = await request<{ keys: RecoveredKeys | null }>('/api/v1/auth/recovery/verify', {
+    method: 'POST', body: { email, recoveryKey },
+  });
+  return keys;
+}
+
+export interface RecoveryCompleteInput {
+  email: string;
+  recoveryKey: string;
+  newPassword: string;
+  kdf: KdfParams;
+  keys: WrappedPrivateKey | null;
+}
+
+/** Imposta la password nuova: chiude anche tutte le sessioni aperte. */
+export function recoveryComplete(input: RecoveryCompleteInput): Promise<void> {
+  return request<void>('/api/v1/auth/recovery/complete', { method: 'POST', body: input });
 }

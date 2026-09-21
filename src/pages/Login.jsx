@@ -137,6 +137,7 @@ export default function Login() {
               <div className="flex flex-col gap-2">
                 <div className="flex justify-between items-center">
                   <label className="text-sm font-bold text-neutral-900">Password</label>
+                  <Link to="/recupero" className="text-xs font-bold text-orange-500 hover:text-orange-600 transition-colors">Password dimenticata?</Link>
                 </div>
                 <div className="relative">
                   <input 

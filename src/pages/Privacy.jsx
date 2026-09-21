@@ -46,6 +46,7 @@ export default function Privacy() {
               <li>Dati del profilo (città, occupazione, budget, presentazione, abitudini di vita). Se il profilo è pubblico sono visibili agli altri utenti insieme al nome; cognome, email e data di nascita restano privati (agli altri utenti mostriamo solo gli anni compiuti).</li>
               <li>Informazioni sugli annunci inseriti (titolo, città, zona, tipo di stanza, prezzo, descrizione).</li>
               <li>I messaggi della chat, conservati sul server in forma cifrata end-to-end, e le chiavi di cifratura dell&apos;utente. La chiave privata è a sua volta cifrata con una chiave che il browser ricava dalla password e che non riceviamo mai: non possiamo leggere i messaggi.</li>
+              <li>Se crei una chiave di recupero: un&apos;impronta che ci permette di riconoscerla e una copia della chiave privata cifrata con la chiave stessa. La chiave di recupero non ci viene mai inviata.</li>
               <li>Un registro di sicurezza con accessi, tentativi falliti, cambi di password ed eliminazioni di account, conservato per 90 giorni. Email e indirizzo IP vi compaiono solo come impronte non reversibili, che servono a rallentare chi tenta di indovinare le password.</li>
             </ul>
             <p>

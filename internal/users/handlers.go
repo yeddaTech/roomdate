@@ -87,6 +87,73 @@ func (h *Handler) Prelogin(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, params)
 }
 
+// SetRecoveryKey gestisce PUT /api/v1/me/recovery: crea o sostituisce la chiave di recupero.
+func (h *Handler) SetRecoveryKey(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.requireSession(w, r)
+	if !ok {
+		return
+	}
+	var in SetRecoveryInput
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	if err := h.svc.SetRecoveryKey(r.Context(), session.UserID, in); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// RecoveryStart gestisce POST /api/v1/auth/recovery/start con {"email": "..."}.
+func (h *Handler) RecoveryStart(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	salt, err := h.svc.RecoveryStart(r.Context(), req.Email)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"salt": salt})
+}
+
+// RecoveryVerify gestisce POST /api/v1/auth/recovery/verify: se il codice è giusto restituisce
+// la copia della chiave privata cifrata con il codice.
+func (h *Handler) RecoveryVerify(w http.ResponseWriter, r *http.Request) {
+	var proof RecoveryProof
+	if err := httpx.DecodeJSON(r, &proof); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	proof.IPHash = h.sessions.IPHash(r)
+	keys, err := h.svc.RecoveryVerify(r.Context(), proof)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"keys": keys})
+}
+
+// RecoveryComplete gestisce POST /api/v1/auth/recovery/complete: imposta la password nuova.
+func (h *Handler) RecoveryComplete(w http.ResponseWriter, r *http.Request) {
+	var in RecoveryCompleteInput
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	in.IPHash = h.sessions.IPHash(r)
+	if err := h.svc.RecoveryComplete(r.Context(), in, h.sessions.RevokeAllSessions); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // UpgradeKDF gestisce POST /api/v1/auth/kdf: porta l'account al metodo nuovo dopo l'accesso.
 func (h *Handler) UpgradeKDF(w http.ResponseWriter, r *http.Request) {
 	session, ok := h.requireSession(w, r)

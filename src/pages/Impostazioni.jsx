@@ -4,8 +4,11 @@ import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../auth/AuthContext';
 import { changePassword } from '../api/auth';
 import { deleteMyAccount } from '../api/users';
-import { useRevokeOtherSessions, useRevokeSession, useSessions } from '../api/hooks';
-import { preparePasswordChange } from '../auth/accountKeys';
+import { useQueryClient } from '@tanstack/react-query';
+import { useMyProfile, useRevokeOtherSessions, useRevokeSession, useSessions } from '../api/hooks';
+import { queryKeys } from '../api/queryKeys';
+import { preparePasswordChange, setupRecoveryKey } from '../auth/accountKeys';
+import RecoveryCodePanel from '../components/RecoveryCodePanel';
 import { passwordProblem } from '../auth/passwordPolicy';
 
 /** "oggi alle 14:05", "ieri alle 9:12" oppure "12 settembre alle 18:40". */
@@ -90,6 +93,40 @@ export default function Impostazioni() {
     } else {
       setStatusMsg({ text: 'Inserisci una nuova password per cambiarla.', type: 'error' });
     }
+  };
+
+  // --- CHIAVE DI RECUPERO ---
+  // Il server non conosce il codice: si mostra una volta sola, appena creato.
+  const queryClient = useQueryClient();
+  const profileQuery = useMyProfile();
+  const hasRecoveryKey = profileQuery.data?.hasRecoveryKey ?? false;
+  const [recoveryPassword, setRecoveryPassword] = useState('');
+  const [newRecoveryCode, setNewRecoveryCode] = useState(null);
+  const [isCreatingRecovery, setIsCreatingRecovery] = useState(false);
+
+  const handleCreateRecovery = async (e) => {
+    e.preventDefault();
+    setStatusMsg({ text: '', type: '' });
+    setIsCreatingRecovery(true);
+    try {
+      const code = await setupRecoveryKey(user.email, recoveryPassword);
+      if (!code) {
+        setStatusMsg({ text: 'La password non è corretta.', type: 'error' });
+        return;
+      }
+      setRecoveryPassword('');
+      setNewRecoveryCode(code);
+    } catch (err) {
+      setStatusMsg({ text: err.message, type: 'error' });
+    } finally {
+      setIsCreatingRecovery(false);
+    }
+  };
+
+  const handleRecoveryDone = () => {
+    setNewRecoveryCode(null);
+    queryClient.invalidateQueries({ queryKey: queryKeys.myProfile });
+    setStatusMsg({ text: 'Chiave di recupero salvata. Quella precedente non vale più.', type: 'success' });
   };
 
   // --- DISPOSITIVI COLLEGATI ---
@@ -276,6 +313,45 @@ export default function Impostazioni() {
               </button>
             </div>
           </form>
+        </div>
+
+        {/* CHIAVE DI RECUPERO */}
+        <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100 mb-8" data-testid="recovery-section">
+          {newRecoveryCode ? (
+            <RecoveryCodePanel code={newRecoveryCode} doneLabel="Ho finito" onDone={handleRecoveryDone} />
+          ) : (
+            <>
+              <h3 className="text-lg font-extrabold text-neutral-900 border-b border-neutral-100 pb-4 mb-6 flex items-center gap-2">
+                🔑 Chiave di recupero
+              </h3>
+              <p className="text-neutral-600 text-sm font-medium mb-2">
+                {hasRecoveryKey
+                  ? 'Hai una chiave di recupero: se dimentichi la password, con quella e la tua email ne imposti una nuova senza perdere i messaggi.'
+                  : 'Non hai ancora una chiave di recupero. Senza, se dimentichi la password non potrai più accedere: i messaggi sono cifrati sul tuo dispositivo e nemmeno noi possiamo aprirli.'}
+              </p>
+              <p className="text-neutral-500 text-sm font-medium mb-6">
+                {hasRecoveryKey ? 'Creandone una nuova, quella precedente smette di valere.' : 'Crea la chiave e salvala in un posto sicuro.'}
+              </p>
+              <form onSubmit={handleCreateRecovery} className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="password"
+                  name="recoveryPassword"
+                  autoComplete="current-password"
+                  value={recoveryPassword}
+                  onChange={(e) => setRecoveryPassword(e.target.value)}
+                  placeholder="La tua password"
+                  className="flex-1 bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-5 py-3.5 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium placeholder:text-neutral-400"
+                />
+                <button
+                  type="submit"
+                  disabled={!recoveryPassword || isCreatingRecovery}
+                  className="bg-neutral-900 text-white hover:bg-neutral-800 px-6 py-3.5 rounded-full font-bold transition-colors cursor-pointer disabled:bg-neutral-300 disabled:cursor-not-allowed"
+                >
+                  {isCreatingRecovery ? 'Creazione...' : hasRecoveryKey ? 'Crea una nuova chiave' : 'Crea la chiave di recupero'}
+                </button>
+              </form>
+            </>
+          )}
         </div>
 
         {/* DISPOSITIVI COLLEGATI */}

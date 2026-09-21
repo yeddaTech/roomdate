@@ -85,25 +85,66 @@ type NewUser struct {
 	LifestyleTags                            []string
 	Vault                                    Vault
 	KDF                                      auth.KDFParams
+	// Recovery è vuota se l'utente si registra senza chiave di recupero.
+	Recovery Recovery
 }
 
-// Create inserisce l'utente. Città e occupazione vuote diventano NULL.
+// Create inserisce l'utente, con la chiave di recupero nella stessa istruzione.
+// Città e occupazione vuote diventano NULL.
 func (s *Store) Create(ctx context.Context, u NewUser) (string, error) {
 	var id string
 	err := s.db.QueryRow(ctx, `
         INSERT INTO roomdate_app.users
             (first_name, last_name, email, password_hash, citta, user_type, birthdate, budget_max,
              occupation, bio, lifestyle_tags, public_key, encrypted_private_key, crypto_salt, crypto_iv,
-             kdf_version, kdf_salt, kdf_iterations)
+             kdf_version, kdf_salt, kdf_iterations,
+             recovery_salt, recovery_hash, recovery_encrypted_private_key, recovery_iv, recovery_created_at)
         VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, $7, $8, NULLIF($9, ''), $10, $11, $12, $13, $14, $15,
-                $16, NULLIF($17, ''), NULLIF($18, 0))
+                $16, NULLIF($17, ''), NULLIF($18, 0),
+                NULLIF($19, ''), NULLIF($20, ''), NULLIF($21, ''), NULLIF($22, ''),
+                CASE WHEN $20 <> '' THEN NOW() END)
         RETURNING id::text`,
 		u.FirstName, u.LastName, u.Email, u.PasswordHash, u.City, u.UserType, u.Birthdate, u.BudgetMax,
 		u.Occupation, u.Bio, u.LifestyleTags,
 		u.Vault.PublicKey, u.Vault.EncryptedPrivateKey, u.Vault.CryptoSalt, u.Vault.CryptoIV,
 		u.KDF.Version, u.KDF.Salt, u.KDF.Iterations,
+		u.Recovery.Salt, u.Recovery.Hash, u.Recovery.EncryptedPrivateKey, u.Recovery.IV,
 	).Scan(&id)
 	return id, err
+}
+
+// Recovery è la chiave di recupero salvata: il sale pubblico, l'hash della chiave con cui il browser
+// dimostra di avere il codice e la copia della chiave privata cifrata con il codice.
+type Recovery struct {
+	Salt, Hash, EncryptedPrivateKey, IV string
+}
+
+// SetRecovery salva (o sostituisce) la chiave di recupero dell'utente.
+func (s *Store) SetRecovery(ctx context.Context, userID string, r Recovery) error {
+	_, err := s.db.Exec(ctx, `
+        UPDATE roomdate_app.users
+        SET recovery_salt = $2, recovery_hash = $3,
+            recovery_encrypted_private_key = NULLIF($4, ''), recovery_iv = NULLIF($5, ''),
+            recovery_created_at = NOW()
+        WHERE id = $1`, userID, r.Salt, r.Hash, r.EncryptedPrivateKey, r.IV)
+	return err
+}
+
+// RecoveryAccount è un account visto dal recupero: la chiave di recupero e la chiave pubblica.
+type RecoveryAccount struct {
+	UserID, PublicKey string
+	Recovery          Recovery
+}
+
+// RecoveryByEmail cerca l'account con la sua chiave di recupero; Recovery.Hash è vuoto se non ne ha.
+func (s *Store) RecoveryByEmail(ctx context.Context, email string) (RecoveryAccount, error) {
+	var a RecoveryAccount
+	err := s.db.QueryRow(ctx, `
+        SELECT id::text, COALESCE(public_key, ''), COALESCE(recovery_salt, ''), COALESCE(recovery_hash, ''),
+               COALESCE(recovery_encrypted_private_key, ''), COALESCE(recovery_iv, '')
+        FROM roomdate_app.users WHERE lower(email) = lower($1)`, email,
+	).Scan(&a.UserID, &a.PublicKey, &a.Recovery.Salt, &a.Recovery.Hash, &a.Recovery.EncryptedPrivateKey, &a.Recovery.IV)
+	return a, err
 }
 
 // UpdatePasswordHash sostituisce solo l'hash della password, senza toccare le chiavi di cifratura:
@@ -177,6 +218,8 @@ type Profile struct {
 	Bio           string   `json:"bio"`
 	LifestyleTags []string `json:"lifestyleTags"`
 	IsPublic      bool     `json:"isPublic"`
+	// HasRecoveryKey indica se l'utente ha una chiave di recupero per la password dimenticata.
+	HasRecoveryKey bool `json:"hasRecoveryKey"`
 	// Age è calcolata dal database; nil se manca la data di nascita. Il proprietario vede già la data.
 	Age *int `json:"-"`
 }
@@ -190,10 +233,10 @@ func (s *Store) Profile(ctx context.Context, id string) (Profile, error) {
         SELECT id::text, COALESCE(first_name, ''), COALESCE(last_name, ''), email,
                COALESCE(user_type, ''), COALESCE(citta, ''), COALESCE(birthdate::text, ''),
                COALESCE(budget_max, 0), COALESCE(occupation, ''), COALESCE(bio, ''), lifestyle_tags,
-               COALESCE(is_public, true), `+ageColumn+`
+               COALESCE(is_public, true), recovery_hash IS NOT NULL, `+ageColumn+`
         FROM roomdate_app.users WHERE id = $1`, id,
 	).Scan(&p.ID, &p.FirstName, &p.LastName, &p.Email, &p.UserType, &p.City, &p.Birthdate,
-		&p.BudgetMax, &p.Occupation, &p.Bio, &p.LifestyleTags, &p.IsPublic, &p.Age)
+		&p.BudgetMax, &p.Occupation, &p.Bio, &p.LifestyleTags, &p.IsPublic, &p.HasRecoveryKey, &p.Age)
 	return p, err
 }
 

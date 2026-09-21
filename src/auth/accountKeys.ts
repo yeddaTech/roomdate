@@ -3,14 +3,28 @@
 // La password non lascia mai il browser: da essa si ricavano una chiave d'accesso, inviata al server,
 // e una chiave che cifra la chiave privata delle chat e resta qui. Gli account creati prima passano
 // al metodo nuovo da soli, al primo accesso.
-import { login as apiLogin, prelogin, upgradeKdf, type LoginResult } from '../api/auth';
-import type { CryptoKeys, KdfParams, WrappedPrivateKey } from '../api/types';
+import {
+  login as apiLogin,
+  prelogin,
+  recoveryComplete,
+  recoveryStart,
+  recoveryVerify,
+  setRecoveryKey,
+  upgradeKdf,
+  type LoginResult,
+} from '../api/auth';
+import { ApiError } from '../api/client';
+import type { CryptoKeys, KdfParams, RecoveryInput, WrappedPrivateKey } from '../api/types';
 import {
   deriveAccountKeys,
+  deriveRecoveryKeys,
   generateKeyPair,
   KDF_ITERATIONS,
   newKdfSalt,
+  newRecoveryCode,
+  normalizeRecoveryCode,
   unwrapPrivateKey,
+  unwrapPrivateKeyWith,
   wrapPrivateKeyWith,
 } from '../utils/crypto';
 import { hasStoredVault, readPrivateKeyWithPassword, saveVault, storeKeysAtLogin } from './keyStorage';
@@ -86,13 +100,82 @@ async function upgradeAccount(
   return { keys: newKeys, keysUnlocked };
 }
 
-/** Dati di registrazione ricavati dalla password: chiave d'accesso, parametri e chiavi della chat. */
-export async function prepareRegistration(password: string): Promise<{ authKey: string; kdf: KdfParams; keys: CryptoKeys }> {
+/**
+ * Nuova chiave di recupero: il codice da mostrare all'utente e ciò che va al server
+ * (sale, chiave di verifica e copia della chiave privata cifrata con il codice).
+ */
+async function createRecovery(privateKeyBase64: string | null): Promise<{ code: string; recovery: RecoveryInput }> {
+  const code = newRecoveryCode();
+  const salt = newKdfSalt();
+  const { authKey, wrapKey } = await deriveRecoveryKeys(normalizeRecoveryCode(code), salt);
+  const copy = privateKeyBase64 ? await wrapPrivateKeyWith(privateKeyBase64, wrapKey) : null;
+  return {
+    code,
+    recovery: { salt, authKey, encryptedPrivateKey: copy?.encryptedPrivateKey ?? '', iv: copy?.cryptoIv ?? '' },
+  };
+}
+
+export interface PreparedRegistration {
+  authKey: string;
+  kdf: KdfParams;
+  keys: CryptoKeys;
+  recovery: RecoveryInput;
+  /** Codice di recupero da mostrare una sola volta, dopo la registrazione. */
+  recoveryCode: string;
+}
+
+/** Dati di registrazione ricavati dalla password: chiave d'accesso, chiavi della chat e chiave di recupero. */
+export async function prepareRegistration(password: string): Promise<PreparedRegistration> {
   const kdf = newKdf();
   const pair = await generateKeyPair();
   const { authKey, wrapKey } = await deriveAccountKeys(password, kdf.salt, kdf.iterations);
   const wrapped = await wrapWith(pair.privateKey, wrapKey, kdf);
-  return { authKey, kdf, keys: { publicKey: pair.publicKey, ...wrapped } };
+  const { code, recovery } = await createRecovery(pair.privateKey);
+  return { authKey, kdf, keys: { publicKey: pair.publicKey, ...wrapped }, recovery, recoveryCode: code };
+}
+
+/**
+ * Crea o sostituisce la chiave di recupero di un account già registrato. Serve la password,
+ * per dimostrarla al server e per aprire la chiave privata da copiare. Restituisce il codice
+ * da mostrare, o null se la password non apre la chiave salvata su questo dispositivo.
+ */
+export async function setupRecoveryKey(email: string, password: string): Promise<string | null> {
+  const current = await prelogin(email);
+  const secret = current.version === 2
+    ? (await deriveAccountKeys(password, current.salt, current.iterations)).authKey
+    : password;
+
+  const privateKeyBase64 = await readPrivateKeyWithPassword(password);
+  if (privateKeyBase64 === null && hasStoredVault()) return null;
+
+  const { code, recovery } = await createRecovery(privateKeyBase64);
+  await setRecoveryKey(secret, recovery);
+  return code;
+}
+
+/**
+ * Password dimenticata: con l'email e il codice di recupero imposta una password nuova.
+ * La chiave privata si apre con il codice e si cifra di nuovo con la nuova password,
+ * quindi i messaggi restano leggibili.
+ */
+export async function recoverAccount(email: string, code: string, newPassword: string): Promise<void> {
+  const normalized = normalizeRecoveryCode(code);
+  if (!normalized) {
+    throw new ApiError(400, 'invalid_recovery_code', 'Il codice di recupero non è valido: controlla di averlo copiato per intero.');
+  }
+
+  const salt = await recoveryStart(email);
+  const recoveryKeys = await deriveRecoveryKeys(normalized, salt);
+  const copy = await recoveryVerify(email, recoveryKeys.authKey);
+
+  const kdf = newKdf();
+  const { authKey, wrapKey } = await deriveAccountKeys(newPassword, kdf.salt, kdf.iterations);
+  let keys: WrappedPrivateKey | null = null;
+  if (copy) {
+    const privateKeyBase64 = await unwrapPrivateKeyWith(copy.encryptedPrivateKey, copy.iv, recoveryKeys.wrapKey);
+    keys = await wrapWith(privateKeyBase64, wrapKey, kdf);
+  }
+  await recoveryComplete({ email, recoveryKey: recoveryKeys.authKey, newPassword: authKey, kdf, keys });
 }
 
 export type PreparedPasswordChange =
