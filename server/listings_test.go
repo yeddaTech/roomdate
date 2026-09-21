@@ -40,6 +40,7 @@ type listingDetail struct {
 	BillsIncluded *bool
 	AvailableFrom *string
 	IsActive      bool
+	Removed       bool
 	CoverURL      *string
 	Images        []struct {
 		ID  int

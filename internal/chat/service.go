@@ -9,6 +9,7 @@ import (
 	"roomdate-backend/internal/apperr"
 	"roomdate-backend/internal/db"
 	"roomdate-backend/internal/logx"
+	"roomdate-backend/internal/moderation"
 	"roomdate-backend/internal/page"
 	"roomdate-backend/internal/realtime"
 	"roomdate-backend/internal/validate"
@@ -30,16 +31,22 @@ var (
 	errInvalidConversation = apperr.BadRequest("invalid_conversation", "Conversazione non valida")
 	errNotParticipant      = apperr.Forbidden("not_participant", "Accesso negato a questa conversazione")
 	errKeysMismatch        = apperr.BadRequest("keys_mismatch", "Chiavi del messaggio non valide: ricarica la pagina e riprova")
+	// Blocchi e sospensioni (modulo M3.3): lo stesso messaggio chiunque dei due abbia bloccato
+	errBlocked            = apperr.Forbidden("user_blocked", "Non è possibile contattare questo utente")
+	errConversationClosed = apperr.Forbidden("conversation_blocked", "Non puoi più inviare messaggi in questa conversazione")
+	errUserUnavailable    = apperr.Forbidden("user_unavailable", "Questo utente non è più disponibile")
 )
 
 type Service struct {
 	store      *Store
 	publisher  realtime.Publisher
 	authorizer realtime.Authorizer
+	// blocks dice se due utenti si sono bloccati: non possono più scriversi
+	blocks *moderation.Store
 }
 
-func NewService(store *Store, publisher realtime.Publisher, authorizer realtime.Authorizer) *Service {
-	return &Service{store: store, publisher: publisher, authorizer: authorizer}
+func NewService(store *Store, publisher realtime.Publisher, authorizer realtime.Authorizer, blocks *moderation.Store) *Service {
+	return &Service{store: store, publisher: publisher, authorizer: authorizer, blocks: blocks}
 }
 
 // StartChatInput identifica l'annuncio (chat su annuncio) o l'utente (chat diretta).
@@ -64,9 +71,9 @@ func (s *Service) startListingChat(ctx context.Context, userID string, listingID
 	if listingID < 0 {
 		return 0, apperr.BadRequest("invalid_listing_id", "ID annuncio non valido")
 	}
-	ownerID, active, err := s.store.ListingForChat(ctx, listingID)
+	ownerID, contactable, err := s.store.ListingForChat(ctx, listingID)
 	// Un annuncio senza proprietario (user_id NULL) non si può contattare
-	if db.IsNoRows(err) || (err == nil && (!active || ownerID == "")) {
+	if db.IsNoRows(err) || (err == nil && (!contactable || ownerID == "")) {
 		return 0, apperr.NotFound("listing_not_found", "Annuncio non trovato o non più disponibile")
 	}
 	if err != nil {
@@ -74,6 +81,9 @@ func (s *Service) startListingChat(ctx context.Context, userID string, listingID
 	}
 	if ownerID == userID {
 		return 0, errSelfChat
+	}
+	if err := s.requireNotBlocked(ctx, userID, ownerID, errBlocked); err != nil {
+		return 0, err
 	}
 
 	key := fmt.Sprintf("listing:%d:%s", listingID, userID)
@@ -88,16 +98,21 @@ func (s *Service) startDirectChat(ctx context.Context, userID, targetID string) 
 	if !validate.MaxLen(targetID, 64) {
 		return 0, apperr.NotFound("user_not_found", "Utente non trovato")
 	}
-	// ID nella forma salvata nel database (UUID in minuscolo anche se il client lo ha inviato in maiuscolo)
-	targetID, err := s.store.UserID(ctx, targetID)
-	if db.IsNoRows(err) {
-		return 0, apperr.NotFound("user_not_found", "Utente non trovato")
+	target, err := s.store.ChatTarget(ctx, targetID)
+	notFound := apperr.NotFound("user_not_found", "Utente non trovato")
+	if db.IsNoRows(err) || (err == nil && target.Suspended) {
+		return 0, notFound
 	}
 	if err != nil {
 		return 0, fmt.Errorf("verifica utente: %w", err)
 	}
+	// ID nella forma salvata nel database (UUID in minuscolo anche se il client lo ha inviato in maiuscolo)
+	targetID = target.ID
 	if targetID == userID {
 		return 0, errSelfChat
+	}
+	if err := s.requireNotBlocked(ctx, userID, targetID, errBlocked); err != nil {
+		return 0, err
 	}
 
 	// La chiave non dipende da chi apre la conversazione: la coppia ne ha sempre una sola
@@ -105,7 +120,19 @@ func (s *Service) startDirectChat(ctx context.Context, userID, targetID string) 
 	if second < first {
 		first, second = second, first
 	}
-	id, err := s.store.EnsureConversation(ctx, "direct:"+first+":"+second, nil, userID, targetID)
+	key := "direct:" + first + ":" + second
+	// Un profilo privato non si può contattare da zero, ma una conversazione già avviata si riapre
+	if !target.IsPublic {
+		id, err := s.store.ConversationByKey(ctx, key)
+		if db.IsNoRows(err) {
+			return 0, notFound
+		}
+		if err != nil {
+			return 0, fmt.Errorf("verifica conversazione: %w", err)
+		}
+		return id, nil
+	}
+	id, err := s.store.EnsureConversation(ctx, key, nil, userID, targetID)
 	if err != nil {
 		return 0, apperr.Wrap(err, "chat_start_failed", "Errore interno database")
 	}
@@ -143,7 +170,15 @@ type OtherParticipant struct {
 	ID        string `json:"id"`
 	FirstName string `json:"firstName"`
 	PublicKey string `json:"publicKey"`
+	// Unavailable: l'account è stato sospeso, non gli si può più scrivere.
+	Unavailable bool `json:"unavailable"`
 }
+
+// Stato di blocco di una conversazione, visto da chi la legge.
+const (
+	BlockedByMe    = "by_me"
+	BlockedByOther = "by_other"
+)
 
 // Conversation è una conversazione nell'elenco.
 type Conversation struct {
@@ -151,8 +186,10 @@ type Conversation struct {
 	Listing     *Listing          `json:"listing"`
 	Other       *OtherParticipant `json:"other"`
 	LastMessage *Message          `json:"lastMessage"`
-	UnreadCount int               `json:"unreadCount"`
-	UpdatedAt   time.Time         `json:"updatedAt"`
+	// Blocked è "by_me", "by_other" o null: con un blocco nessuno dei due può scrivere.
+	Blocked     *string   `json:"blocked"`
+	UnreadCount int       `json:"unreadCount"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 // ConversationsPage è una pagina dell'elenco delle conversazioni.
@@ -209,7 +246,16 @@ func (s *Service) Conversations(ctx context.Context, userID, cursor, rawLimit st
 			c.Listing = &Listing{ID: *r.ListingID, Title: r.ListingTitle, Price: r.ListingPrice}
 		}
 		if r.OtherID != "" {
-			c.Other = &OtherParticipant{ID: r.OtherID, FirstName: r.OtherFirstName, PublicKey: r.OtherPublicKey}
+			c.Other = &OtherParticipant{ID: r.OtherID, FirstName: r.OtherFirstName, PublicKey: r.OtherPublicKey, Unavailable: r.OtherSuspended}
+		}
+		// Se si sono bloccati a vicenda conta il blocco di chi guarda: è quello che può togliere
+		switch {
+		case r.BlockedByMe:
+			state := BlockedByMe
+			c.Blocked = &state
+		case r.BlockedByOther:
+			state := BlockedByOther
+			c.Blocked = &state
 		}
 		if r.LastMessage != nil {
 			last := message(*r.LastMessage)
@@ -293,6 +339,9 @@ func (s *Service) SendMessage(ctx context.Context, userID, rawConversationID str
 	if err != nil {
 		return Message{}, fmt.Errorf("lettura partecipanti: %w", err)
 	}
+	if err := s.requireOpen(ctx, userID, participants); err != nil {
+		return Message{}, err
+	}
 
 	// Serve una chiave per ogni partecipante che ha una chiave pubblica, e nessuna in più
 	keys := make(map[string]string, len(in.Keys))
@@ -345,6 +394,35 @@ func (s *Service) MarkRead(ctx context.Context, userID, rawConversationID string
 	}
 	if err := s.store.MarkRead(ctx, conversationID, userID); err != nil {
 		return apperr.Wrap(err, "mark_read_failed", "Impossibile aggiornare i messaggi letti")
+	}
+	return nil
+}
+
+// requireNotBlocked restituisce blockedErr se tra i due utenti c'è un blocco, in qualunque direzione.
+func (s *Service) requireNotBlocked(ctx context.Context, userID, otherID string, blockedErr error) error {
+	relation, err := s.blocks.Relation(ctx, userID, otherID)
+	if err != nil {
+		return fmt.Errorf("verifica blocchi: %w", err)
+	}
+	if relation.Blocked() {
+		return blockedErr
+	}
+	return nil
+}
+
+// requireOpen verifica che nella conversazione si possa ancora scrivere: nessun blocco tra
+// l'utente e gli altri partecipanti, e nessuno di loro sospeso.
+func (s *Service) requireOpen(ctx context.Context, userID string, participants []Participant) error {
+	for _, p := range participants {
+		if p.UserID == userID {
+			continue
+		}
+		if p.Suspended {
+			return errUserUnavailable
+		}
+		if err := s.requireNotBlocked(ctx, userID, p.UserID, errConversationClosed); err != nil {
+			return err
+		}
 	}
 	return nil
 }

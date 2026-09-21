@@ -6,6 +6,7 @@ import RecoveryCodePanel from '../components/RecoveryCodePanel';
 import { MIN_PASSWORD_LENGTH, register } from '../api/auth';
 import { ApiError } from '../api/client';
 import { CITIES, OCCUPATIONS } from '../api/options';
+import { latestAdultBirthdate } from '../api/users';
 import LifestyleTagsPicker from '../components/profile/LifestyleTagsPicker';
 
 export default function Register() {
@@ -227,7 +228,7 @@ export default function Register() {
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Nascita</label>
-                    <input type="date" name="nascita" value={formData.nascita} onChange={handleChange} required className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm" />
+                    <input type="date" name="nascita" value={formData.nascita} onChange={handleChange} required min="1900-01-01" max={latestAdultBirthdate()} title="Per usare RoomDate devi avere almeno 18 anni" className="w-full bg-white border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all shadow-sm" />
                   </div>
                   
                   {userType === 'cerca' && (

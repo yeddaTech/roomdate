@@ -69,6 +69,17 @@ func (s *Service) requireChannelAccess(ctx context.Context, userID, channel stri
 		if !participant {
 			return errChannelForbidden
 		}
+		// Dopo un blocco nemmeno "sta scrivendo" deve arrivare all'altro
+		participants, err := s.store.Participants(ctx, conversationID)
+		if err != nil {
+			return fmt.Errorf("lettura partecipanti: %w", err)
+		}
+		if err := s.requireOpen(ctx, userID, participants); err != nil {
+			if errors.Is(err, errConversationClosed) || errors.Is(err, errUserUnavailable) {
+				return errChannelForbidden
+			}
+			return err
+		}
 		return nil
 	}
 	return errChannelForbidden

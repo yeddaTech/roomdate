@@ -86,11 +86,13 @@ type conversationItem struct {
 		Price int
 	}
 	Other *struct {
-		ID        string
-		FirstName string
-		PublicKey string
+		ID          string
+		FirstName   string
+		PublicKey   string
+		Unavailable bool
 	}
 	LastMessage *chatMessage
+	Blocked     *string
 	UnreadCount int
 	UpdatedAt   time.Time
 }

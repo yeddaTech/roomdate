@@ -28,7 +28,9 @@ func (h *Handler) requireSession(w http.ResponseWriter, r *http.Request) (auth.S
 // List gestisce GET /api/v1/listings?city=&maxPrice=&roomType=&billsIncluded=&sort=&cursor=&limit=.
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-	page, err := h.svc.List(r.Context(), ListParams{
+	// La sessione è facoltativa: serve solo a nascondere gli annunci degli utenti bloccati
+	session, _ := h.sessions.FromRequest(r.Context(), r)
+	page, err := h.svc.List(r.Context(), session.UserID, ListParams{
 		City:          query.Get("city"),
 		MaxPrice:      query.Get("maxPrice"),
 		RoomType:      query.Get("roomType"),

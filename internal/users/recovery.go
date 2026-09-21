@@ -136,6 +136,10 @@ func (s *Service) verifyRecovery(ctx context.Context, p RecoveryProof) (Recovery
 		s.record(ctx, auth.Event{Kind: auth.EventRecoveryFailed, UserID: account.UserID, EmailHash: emailHash, IPHash: p.IPHash})
 		return RecoveryAccount{}, errInvalidRecovery
 	}
+	// Come per l'accesso, la sospensione si rivela solo a chi ha dimostrato di possedere l'account
+	if account.Suspended {
+		return RecoveryAccount{}, errAccountSuspended
+	}
 	return account, nil
 }
 

@@ -5,7 +5,8 @@ import { useAuth } from '../auth/AuthContext';
 import { changePassword } from '../api/auth';
 import { deleteMyAccount } from '../api/users';
 import { useQueryClient } from '@tanstack/react-query';
-import { useMyProfile, useRevokeOtherSessions, useRevokeSession, useSessions } from '../api/hooks';
+import { useBlocks, useMyProfile, useRevokeOtherSessions, useRevokeSession, useSessions, useUnblockUser } from '../api/hooks';
+import { buildDataExport } from '../auth/exportData';
 import { queryKeys } from '../api/queryKeys';
 import { preparePasswordChange, setupRecoveryKey } from '../auth/accountKeys';
 import RecoveryCodePanel from '../components/RecoveryCodePanel';
@@ -129,6 +130,38 @@ export default function Impostazioni() {
     setStatusMsg({ text: 'Chiave di recupero salvata. Quella precedente non vale più.', type: 'success' });
   };
 
+  // --- UTENTI BLOCCATI ---
+  const blocksQuery = useBlocks();
+  const unblockUser = useUnblockUser();
+
+  const handleUnblock = async (blocked) => {
+    try {
+      await unblockUser.mutateAsync(blocked.userId);
+      setStatusMsg({ text: `${blocked.firstName} è stato sbloccato.`, type: 'success' });
+    } catch (err) {
+      setStatusMsg({ text: err.message, type: 'error' });
+    }
+  };
+
+  // --- I TUOI DATI ---
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const url = URL.createObjectURL(await buildDataExport(user.id));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `roomdate-dati-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setStatusMsg({ text: err.message, type: 'error' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // --- DISPOSITIVI COLLEGATI ---
   const sessionsQuery = useSessions();
   const revokeSession = useRevokeSession();
@@ -239,6 +272,13 @@ export default function Impostazioni() {
           <div className={`mb-8 p-4 rounded-2xl font-bold flex items-center gap-3 shadow-sm ${statusMsg.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
             <span className="text-xl">{statusMsg.type === 'success' ? '✅' : '⚠️'}</span> {statusMsg.text}
           </div>
+        )}
+
+        {user?.isAdmin && (
+          <Link to="/moderazione" data-testid="moderation-link" className="mb-8 flex items-center justify-between bg-neutral-900 text-white p-6 rounded-3xl shadow-sm font-bold hover:bg-neutral-800 transition-colors">
+            <span>🛡️ Area moderazione: segnalazioni da esaminare</span>
+            <span aria-hidden="true">→</span>
+          </Link>
         )}
 
         {/* CARD IMPOSTAZIONI */}
@@ -405,14 +445,68 @@ export default function Impostazioni() {
           </div>
         </div>
 
+        {/* UTENTI BLOCCATI */}
+        <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100 mb-8">
+          <h3 className="text-lg font-extrabold text-neutral-900 border-b border-neutral-100 pb-4 mb-6 flex items-center gap-2">
+            🚫 Utenti bloccati
+          </h3>
+          <p className="text-neutral-500 text-sm font-medium mb-6">
+            Con chi hai bloccato non potete scrivervi né trovarvi nelle ricerche. Sbloccando, torna tutto come prima.
+          </p>
+          {blocksQuery.isPending ? (
+            <p className="text-neutral-400 font-medium">Caricamento...</p>
+          ) : blocksQuery.isError ? (
+            <p className="text-rose-600 font-medium">{blocksQuery.error.message}</p>
+          ) : blocksQuery.data.length === 0 ? (
+            <p className="text-neutral-500 font-medium" data-testid="no-blocks">Non hai bloccato nessuno.</p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {blocksQuery.data.map((blocked) => (
+                <li key={blocked.userId} data-testid="blocked-user" className="flex flex-wrap items-center justify-between gap-3 bg-neutral-50 border border-neutral-100 rounded-2xl px-5 py-4">
+                  <div>
+                    <div className="font-bold text-neutral-900">{blocked.firstName}</div>
+                    <div className="text-xs text-neutral-500 font-medium mt-0.5">Bloccato {whenLabel(blocked.createdAt)}</div>
+                  </div>
+                  <button
+                    onClick={() => handleUnblock(blocked)}
+                    disabled={unblockUser.isPending}
+                    className="bg-white border border-neutral-200 text-neutral-700 hover:border-neutral-400 px-5 py-2.5 rounded-full text-sm font-bold transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    Sblocca
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* I TUOI DATI */}
+        <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100 mb-8">
+          <h3 className="text-lg font-extrabold text-neutral-900 border-b border-neutral-100 pb-4 mb-6 flex items-center gap-2">
+            📦 I tuoi dati
+          </h3>
+          <p className="text-neutral-500 text-sm font-medium mb-6">
+            Scarica in un file tutti i dati che RoomDate conserva su di te: profilo, annunci, conversazioni, dispositivi,
+            blocchi e segnalazioni. I messaggi li decifra il tuo browser: sul server sono solo in forma cifrata.
+          </p>
+          <button
+            onClick={handleExport}
+            disabled={isExporting}
+            className="bg-neutral-900 text-white hover:bg-neutral-800 px-6 py-3 rounded-full font-bold transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {isExporting ? 'Preparazione del file...' : '⬇️ Scarica i miei dati'}
+          </button>
+        </div>
+
         {/* DANGER ZONE */}
         <div className="bg-rose-50/50 p-6 md:p-10 rounded-3xl shadow-sm border border-rose-100">
           <h3 className="text-rose-600 font-extrabold text-xl mb-3 flex items-center gap-2">
             ⚠️ Zona Pericolosa
           </h3>
           <p className="text-rose-800/80 text-sm mb-8 leading-relaxed max-w-2xl font-medium">
-            Se elimini il tuo account, perderai tutti i tuoi annunci e le conversazioni crittografate. 
-            Questa operazione è irreversibile e i tuoi dati verranno cancellati in modo permanente dai nostri server.
+            Eliminando l&apos;account cancelli definitivamente profilo, annunci con le foto, dispositivi collegati, blocchi e
+            segnalazioni ricevute. I messaggi che hai inviato restano, cifrati e senza il tuo nome, nelle conversazioni
+            degli altri partecipanti, come accade con un messaggio già consegnato. Prima puoi scaricare una copia dei tuoi dati.
           </p>
           {isDeleting ? (
             <form onSubmit={handleDeleteAccount} className="flex flex-col sm:flex-row gap-3 sm:items-center">

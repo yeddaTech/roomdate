@@ -6,8 +6,9 @@ import (
 )
 
 func TestOptionsLoaded(t *testing.T) {
-	if len(Cities) < 100 || len(Occupations) != 3 || len(LifestyleTags) != 6 || len(Amenities) != 10 {
-		t.Fatalf("elenchi = %d città, %d occupazioni, %d abitudini, %d servizi", len(Cities), len(Occupations), len(LifestyleTags), len(Amenities))
+	if len(Cities) < 100 || len(Occupations) != 3 || len(LifestyleTags) != 6 || len(Amenities) != 10 || len(ReportReasons) != 6 {
+		t.Fatalf("elenchi = %d città, %d occupazioni, %d abitudini, %d servizi, %d motivi di segnalazione",
+			len(Cities), len(Occupations), len(LifestyleTags), len(Amenities), len(ReportReasons))
 	}
 	if !IsCity("Milano") || !IsCity("L'Aquila") || IsCity("milano") || IsCity("") {
 		t.Error("IsCity deve accettare solo i nomi esatti dell'elenco")
@@ -26,7 +27,7 @@ func TestOptionsUnique(t *testing.T) {
 		}
 		seen[c] = true
 	}
-	for name, options := range map[string][]Option{"occupations": Occupations, "lifestyleTags": LifestyleTags, "amenities": Amenities} {
+	for name, options := range map[string][]Option{"occupations": Occupations, "lifestyleTags": LifestyleTags, "amenities": Amenities, "reportReasons": ReportReasons} {
 		keys := map[string]bool{}
 		for _, o := range options {
 			if o.Key == "" || o.Label == "" || keys[o.Key] {

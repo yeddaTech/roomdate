@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useListing, useStartChat } from '../api/hooks';
 import { formatAvailability, formatBills } from '../api/listings';
 import { amenityLabel } from '../api/options';
+import ReportDialog from '../components/ReportDialog';
 
 export default function ListingDetails() {
   const { id } = useParams();
@@ -16,6 +17,7 @@ export default function ListingDetails() {
   const startChat = useStartChat();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [reporting, setReporting] = useState(false);
 
   const handleLogout = async () => {
     setIsMenuOpen(false);
@@ -223,7 +225,11 @@ export default function ListingDetails() {
                 <h3 className="font-serif text-2xl font-extrabold text-neutral-900 mb-1">{listing.owner.firstName}</h3>
                 <p className="text-sm font-bold text-neutral-400 mb-8 uppercase tracking-wider">Host su RoomDate</p>
                 
-                {listing.isOwner ? (
+                {listing.isOwner && listing.removed ? (
+                  <p className="text-sm font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-2xl p-3" data-testid="listing-removed">
+                    Questo annuncio è stato rimosso dalla moderazione perché viola i Termini di utilizzo: lo vedi solo tu e puoi solo eliminarlo dalla tua area personale.
+                  </p>
+                ) : listing.isOwner ? (
                   <>
                     {!listing.isActive && (
                       <p className="mb-4 text-sm font-medium text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-2xl p-3">Questo annuncio è disattivato: lo vedi solo tu.</p>
@@ -233,10 +239,17 @@ export default function ListingDetails() {
                     </button>
                   </>
                 ) : (
-                  /* Bottone Contatto */
-                  <button onClick={handleContact} className="w-full bg-gradient-to-r from-orange-500 to-rose-500 text-white py-4.5 rounded-2xl font-bold shadow-lg hover:shadow-orange-500/25 hover:scale-[1.02] transition-all duration-300 text-lg flex items-center justify-center gap-2 cursor-pointer">
-                    <span className="text-xl">💬</span> Contatta in Chat
-                  </button>
+                  <>
+                    {/* Bottone Contatto */}
+                    <button onClick={handleContact} className="w-full bg-gradient-to-r from-orange-500 to-rose-500 text-white py-4.5 rounded-2xl font-bold shadow-lg hover:shadow-orange-500/25 hover:scale-[1.02] transition-all duration-300 text-lg flex items-center justify-center gap-2 cursor-pointer">
+                      <span className="text-xl">💬</span> Contatta in Chat
+                    </button>
+                    {user && (
+                      <button type="button" onClick={() => setReporting(true)} className="mt-5 text-sm font-bold text-neutral-500 hover:text-rose-600 transition-colors cursor-pointer">
+                        🚩 Segnala annuncio
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -251,6 +264,9 @@ export default function ListingDetails() {
           </div>
         </aside>
       </div>
+      {reporting && (
+        <ReportDialog target={{ listingId: listing.id }} title="Segnala annuncio" onClose={() => setReporting(false)} />
+      )}
     </div>
   );
 }

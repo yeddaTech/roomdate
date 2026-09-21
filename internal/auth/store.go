@@ -37,7 +37,9 @@ type StoredSession struct {
 	Device     string    `json:"device"`
 }
 
-// CreateSession salva la nuova sessione ed elimina quelle scadute dello stesso utente.
+// CreateSession salva la nuova sessione ed elimina quelle scadute: tutte quelle oltre la scadenza
+// assoluta, di qualunque utente (così nessuna resta nel database più di 30 giorni, anche se il suo
+// utente non torna), e quelle inattive dello stesso utente.
 func (s *Store) CreateSession(ctx context.Context, n NewSession) error {
 	_, err := s.db.Exec(ctx, `
         INSERT INTO roomdate_app.sessions (user_id, token_hash, expires_at, user_agent)
@@ -47,17 +49,19 @@ func (s *Store) CreateSession(ctx context.Context, n NewSession) error {
 	}
 	_, err = s.db.Exec(ctx, `
         DELETE FROM roomdate_app.sessions
-        WHERE user_id = $1 AND (expires_at < NOW() OR last_used_at < NOW() - $2::interval)`,
+        WHERE expires_at < NOW() OR (user_id = $1 AND last_used_at < NOW() - $2::interval)`,
 		n.UserID, SessionIdleDuration.String())
 	return err
 }
 
-// SessionByHash cerca la sessione dall'impronta del token; pgx.ErrNoRows se non esiste.
+// SessionByHash cerca la sessione dall'impronta del token; pgx.ErrNoRows se non esiste o se
+// l'account è sospeso: la sospensione vale subito, anche se le sessioni non fossero state chiuse.
 func (s *Store) SessionByHash(ctx context.Context, tokenHash string) (StoredSession, error) {
 	var stored StoredSession
 	err := s.db.QueryRow(ctx, `
-        SELECT id::text, user_id::text, created_at, last_used_at, expires_at, COALESCE(user_agent, '')
-        FROM roomdate_app.sessions WHERE token_hash = $1`, tokenHash,
+        SELECT s.id::text, s.user_id::text, s.created_at, s.last_used_at, s.expires_at, COALESCE(s.user_agent, '')
+        FROM roomdate_app.sessions s JOIN roomdate_app.users u ON u.id = s.user_id
+        WHERE s.token_hash = $1 AND u.suspended_at IS NULL`, tokenHash,
 	).Scan(&stored.ID, &stored.UserID, &stored.CreatedAt, &stored.LastUsedAt, &stored.ExpiresAt, &stored.Device)
 	return stored, err
 }

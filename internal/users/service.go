@@ -15,6 +15,7 @@ import (
 	"roomdate-backend/internal/auth"
 	"roomdate-backend/internal/db"
 	"roomdate-backend/internal/logx"
+	"roomdate-backend/internal/moderation"
 	"roomdate-backend/internal/page"
 	"roomdate-backend/internal/validate"
 	"roomdate-backend/shared"
@@ -38,21 +39,37 @@ var (
 	// quali indirizzi sono registrati.
 	errInvalidCredentials = apperr.Unauthorized("invalid_credentials", "Credenziali non valide")
 	errUserNotFound       = apperr.NotFound("user_not_found", "Utente non trovato")
+	errAccountSuspended   = apperr.Forbidden("account_suspended",
+		"Il tuo account è stato sospeso per una violazione dei Termini di utilizzo")
 )
+
+// MinAge è l'età minima per registrarsi (Termini di utilizzo e GDPR).
+const MinAge = 18
 
 type Service struct {
 	store *Store
 	// security registra accessi e operazioni delicate, e conta i tentativi falliti recenti
 	security *auth.Store
+	// blocks dice se due utenti si sono bloccati: i loro profili si nascondono a vicenda
+	blocks *moderation.Store
 	// hash calcola l'impronta di email e indirizzi IP, che nel registro sostituiscono i valori veri
 	hash func(string) string
 	// images cancella dallo storage le foto degli annunci di un account eliminato
-	images func(ctx context.Context, keys []string)
-	now    func() time.Time
+	images   func(ctx context.Context, keys []string)
+	photoURL func(key string) string
+	now      func() time.Time
 }
 
-func NewService(store *Store, security *auth.Store, hash func(string) string, deleteImages func(ctx context.Context, keys []string)) *Service {
-	return &Service{store: store, security: security, hash: hash, images: deleteImages, now: time.Now}
+// Photos sono le operazioni sulle foto degli annunci che servono ai dati dell'account.
+type Photos struct {
+	// Delete cancella dallo storage le foto di un account eliminato.
+	Delete func(ctx context.Context, keys []string)
+	// URL è l'indirizzo pubblico di una foto, per l'esportazione dei dati.
+	URL func(key string) string
+}
+
+func NewService(store *Store, security *auth.Store, blocks *moderation.Store, hash func(string) string, photos Photos) *Service {
+	return &Service{store: store, security: security, blocks: blocks, hash: hash, images: photos.Delete, photoURL: photos.URL, now: time.Now}
 }
 
 // RegisterInput sono i dati del modulo di registrazione.
@@ -206,6 +223,10 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (Account, error) {
 	if !ok {
 		s.recordFailedLogin(ctx, account.ID, emailHash, in.IPHash)
 		return Account{}, errInvalidCredentials
+	}
+	// Solo dopo la password giusta: a chi non la conosce non si rivela che l'account esiste
+	if account.Suspended {
+		return Account{}, errAccountSuspended
 	}
 
 	// Gli account registrati con bcrypt passano ad Argon2id al primo accesso riuscito
@@ -456,8 +477,18 @@ func (s *Service) PublicProfile(ctx context.Context, viewerID, targetID string) 
 	if err != nil {
 		return PublicProfile{}, fmt.Errorf("lettura profilo: %w", err)
 	}
-	if !profile.IsPublic && profile.ID != viewerID {
-		return PublicProfile{}, errUserNotFound
+	if profile.ID != viewerID {
+		if !profile.IsPublic || profile.Suspended {
+			return PublicProfile{}, errUserNotFound
+		}
+		// Un blocco, in qualunque direzione, nasconde i due profili l'uno all'altro
+		relation, err := s.blocks.Relation(ctx, viewerID, profile.ID)
+		if err != nil {
+			return PublicProfile{}, fmt.Errorf("verifica blocchi: %w", err)
+		}
+		if relation.Blocked() {
+			return PublicProfile{}, errUserNotFound
+		}
 	}
 
 	public := PublicProfile{
@@ -700,6 +731,8 @@ func checkPersonalDetails(v *validate.Validator, now time.Time, d personalDetail
 	v.Check(validate.OneOf(d.UserType, UserTypeSeeker, UserTypeLandlord), "userType", "Tipo di utente non valido")
 	v.Check(d.City == "" || shared.IsCity(d.City), "city", "Scegli la città dall'elenco")
 	v.Check(validate.PastDate(d.Birthdate, now), "birthdate", "Data di nascita non valida")
+	v.Check(!validate.PastDate(d.Birthdate, now) || validate.AgeAtLeast(d.Birthdate, now, MinAge), "birthdate",
+		"Per usare RoomDate devi avere almeno 18 anni")
 	v.Check(validate.Between(d.BudgetMax, 0, 20000), "budgetMax", "Il budget deve essere compreso tra 0 e 20.000 €")
 	v.Check(d.Occupation == "" || shared.HasKey(shared.Occupations, d.Occupation), "occupation", "Occupazione non valida")
 	v.Check(validate.MaxLen(d.Bio, 1000), "bio", "La bio può avere al massimo 1000 caratteri")

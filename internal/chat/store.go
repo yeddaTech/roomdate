@@ -35,19 +35,38 @@ func NewStore(db *pgxpool.Pool) *Store {
 	return &Store{db: db}
 }
 
-// ListingForChat restituisce il proprietario dell'annuncio e se l'annuncio è attivo.
-func (s *Store) ListingForChat(ctx context.Context, listingID int) (ownerID string, active bool, err error) {
-	err = s.db.QueryRow(ctx, `SELECT COALESCE(user_id::text, ''), is_active FROM roomdate_app.listings WHERE id = $1`, listingID).Scan(&ownerID, &active)
-	return ownerID, active, err
+// ListingForChat restituisce il proprietario dell'annuncio e se si può contattare: attivo, non
+// rimosso dalla moderazione e di un account non sospeso.
+func (s *Store) ListingForChat(ctx context.Context, listingID int) (ownerID string, contactable bool, err error) {
+	err = s.db.QueryRow(ctx, `
+        SELECT COALESCE(l.user_id::text, ''), l.is_active AND l.removed_at IS NULL AND u.suspended_at IS NULL
+        FROM roomdate_app.listings l LEFT JOIN roomdate_app.users u ON u.id = l.user_id
+        WHERE l.id = $1`, listingID).Scan(&ownerID, &contactable)
+	return ownerID, contactable, err
 }
 
-// UserID restituisce l'ID dell'utente nella forma salvata nel database; pgx.ErrNoRows se non esiste.
-func (s *Store) UserID(ctx context.Context, userID string) (string, error) {
-	var id string
-	err := s.db.QueryRow(ctx, `SELECT id::text FROM roomdate_app.users WHERE id = $1`, userID).Scan(&id)
+// ChatTarget è l'utente con cui si vuole aprire una chat diretta.
+type ChatTarget struct {
+	// ID nella forma salvata nel database (UUID in minuscolo).
+	ID                  string
+	IsPublic, Suspended bool
+}
+
+// ChatTarget cerca l'utente; pgx.ErrNoRows se non esiste.
+func (s *Store) ChatTarget(ctx context.Context, userID string) (ChatTarget, error) {
+	var t ChatTarget
+	err := s.db.QueryRow(ctx, `SELECT id::text, COALESCE(is_public, true), suspended_at IS NOT NULL FROM roomdate_app.users WHERE id = $1`,
+		userID).Scan(&t.ID, &t.IsPublic, &t.Suspended)
 	if db.IsInvalidInput(err) {
-		return "", pgx.ErrNoRows
+		return ChatTarget{}, pgx.ErrNoRows
 	}
+	return t, err
+}
+
+// ConversationByKey restituisce la conversazione con questa chiave; pgx.ErrNoRows se non esiste.
+func (s *Store) ConversationByKey(ctx context.Context, dedupKey string) (int, error) {
+	var id int
+	err := s.db.QueryRow(ctx, `SELECT id FROM roomdate_app.conversations WHERE dedup_key = $1`, dedupKey).Scan(&id)
 	return id, err
 }
 
@@ -84,12 +103,13 @@ func (s *Store) EnsureConversation(ctx context.Context, dedupKey string, listing
 type Participant struct {
 	UserID    string
 	PublicKey string
+	Suspended bool
 }
 
 // Participants restituisce i partecipanti ancora esistenti, in ordine di ID.
 func (s *Store) Participants(ctx context.Context, conversationID int) ([]Participant, error) {
 	rows, err := s.db.Query(ctx, `
-        SELECT p.user_id::text, COALESCE(u.public_key, '')
+        SELECT p.user_id::text, COALESCE(u.public_key, ''), u.suspended_at IS NOT NULL
         FROM roomdate_app.conversation_participants p
         JOIN roomdate_app.users u ON u.id = p.user_id
         WHERE p.conversation_id = $1
@@ -99,7 +119,7 @@ func (s *Store) Participants(ctx context.Context, conversationID int) ([]Partici
 	}
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (Participant, error) {
 		var p Participant
-		err := row.Scan(&p.UserID, &p.PublicKey)
+		err := row.Scan(&p.UserID, &p.PublicKey, &p.Suspended)
 		return p, err
 	})
 }
@@ -153,7 +173,9 @@ type ConversationRow struct {
 	ListingPrice int
 	// OtherID è vuoto se l'altro partecipante ha eliminato l'account.
 	OtherID, OtherFirstName, OtherPublicKey string
-	UnreadCount                             int
+	// Blocchi tra i due partecipanti e sospensione dell'altro
+	BlockedByMe, BlockedByOther, OtherSuspended bool
+	UnreadCount                                 int
 	// LastActivity è la data dell'ultimo messaggio, o quella della conversazione se non ce ne sono.
 	LastActivity time.Time
 	// LastMessage è nil se la conversazione non ha ancora messaggi.
@@ -184,13 +206,16 @@ func (s *Store) Conversations(ctx context.Context, q ConversationsQuery) ([]Conv
 	rows, err := s.db.Query(ctx, `
         SELECT c.id, l.id, COALESCE(l.title, ''), COALESCE(l.price, 0),
                COALESCE(other.user_id::text, ''), COALESCE(other.first_name, ''), COALESCE(other.public_key, ''),
+               EXISTS (SELECT 1 FROM roomdate_app.user_blocks b WHERE b.blocker_id = me.user_id AND b.blocked_id = other.user_id),
+               EXISTS (SELECT 1 FROM roomdate_app.user_blocks b WHERE b.blocker_id = other.user_id AND b.blocked_id = me.user_id),
+               COALESCE(other.suspended_at IS NOT NULL, false),
                unread.count, COALESCE(m.created_at, c.created_at, 'epoch'),
                `+messageColumns+`
         FROM roomdate_app.conversation_participants me
         JOIN roomdate_app.conversations c ON c.id = me.conversation_id
         LEFT JOIN roomdate_app.listings l ON l.id = c.listing_id
         LEFT JOIN LATERAL (
-            SELECT p.user_id, u.first_name, u.public_key
+            SELECT p.user_id, u.first_name, u.public_key, u.suspended_at
             FROM roomdate_app.conversation_participants p
             JOIN roomdate_app.users u ON u.id = p.user_id
             WHERE p.conversation_id = c.id AND p.user_id <> me.user_id
@@ -223,7 +248,8 @@ func (s *Store) Conversations(ctx context.Context, q ConversationsQuery) ([]Conv
 		var messageID *int
 		var m MessageRow
 		err := row.Scan(&c.ID, &c.ListingID, &c.ListingTitle, &c.ListingPrice,
-			&c.OtherID, &c.OtherFirstName, &c.OtherPublicKey, &c.UnreadCount, &c.LastActivity,
+			&c.OtherID, &c.OtherFirstName, &c.OtherPublicKey, &c.BlockedByMe, &c.BlockedByOther, &c.OtherSuspended,
+			&c.UnreadCount, &c.LastActivity,
 			&messageID, &m.SenderID, &m.Format, &m.Body, &m.IV, &m.WrappedKey, &m.CreatedAt)
 		if err == nil && messageID != nil {
 			m.ID = *messageID

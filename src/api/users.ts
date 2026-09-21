@@ -53,3 +53,15 @@ export function listRoommates(
 export function formatAge(age: number | null): string | null {
   return age === null ? null : `${age} anni`;
 }
+
+/** Età minima per usare RoomDate, la stessa che controlla il server. */
+export const MIN_AGE = 18;
+
+/** Data di nascita più recente ammessa (AAAA-MM-GG): chi compie 18 anni oggi. */
+export function latestAdultBirthdate(today = new Date()): string {
+  const year = today.getFullYear() - MIN_AGE;
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  // Il 29 febbraio di un anno non bisestile non esiste: chi è nato quel giorno compie gli anni il 1° marzo
+  return month === '02' && day === '29' && new Date(year, 1, 29).getMonth() !== 1 ? `${year}-02-28` : `${year}-${month}-${day}`;
+}

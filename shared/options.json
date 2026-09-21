@@ -36,5 +36,13 @@
     { "key": "ascensore", "label": "Ascensore" },
     { "key": "bagno_privato", "label": "Bagno privato" },
     { "key": "animali_ammessi", "label": "Animali ammessi" }
+  ],
+  "reportReasons": [
+    { "key": "fake_listing", "label": "Annuncio falso o ingannevole" },
+    { "key": "scam", "label": "Truffa o richiesta di pagamenti sospetti" },
+    { "key": "discrimination", "label": "Contenuti discriminatori" },
+    { "key": "harassment", "label": "Messaggi offensivi o molesti" },
+    { "key": "spam", "label": "Spam" },
+    { "key": "other", "label": "Altro" }
   ]
 }

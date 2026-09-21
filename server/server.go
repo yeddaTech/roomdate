@@ -22,6 +22,7 @@ import (
 	"roomdate-backend/internal/db"
 	"roomdate-backend/internal/httpx"
 	"roomdate-backend/internal/listings"
+	"roomdate-backend/internal/moderation"
 	"roomdate-backend/internal/realtime"
 	"roomdate-backend/internal/storage"
 	"roomdate-backend/internal/users"
@@ -57,9 +58,12 @@ func New(d Deps) (http.Handler, error) {
 	}
 	deleteImages := func(ctx context.Context, keys []string) { listings.DeleteObjects(ctx, photos, keys) }
 
-	usersHandler := users.NewHandler(users.NewService(users.NewStore(d.DB), security, sessions.Hash, deleteImages), sessions)
-	listingsHandler := listings.NewHandler(listings.NewService(listings.NewStore(d.DB), photos), sessions)
-	chatHandler := chat.NewHandler(chat.NewService(chat.NewStore(d.DB), d.Publisher, realtime.NewAuthorizer(d.Config.Pusher)), sessions)
+	mod := moderation.NewStore(d.DB)
+	usersHandler := users.NewHandler(users.NewService(users.NewStore(d.DB), security, mod, sessions.Hash,
+		users.Photos{Delete: deleteImages, URL: photos.PublicURL}), sessions)
+	listingsHandler := listings.NewHandler(listings.NewService(listings.NewStore(d.DB), photos, mod), sessions)
+	chatHandler := chat.NewHandler(chat.NewService(chat.NewStore(d.DB), d.Publisher, realtime.NewAuthorizer(d.Config.Pusher), mod), sessions)
+	moderationHandler := moderation.NewHandler(moderation.NewService(mod), sessions)
 
 	type methods = map[string]http.HandlerFunc
 	mux := http.NewServeMux()
@@ -96,6 +100,18 @@ func New(d Deps) (http.Handler, error) {
 		http.MethodGet: usersHandler.MySessions, http.MethodDelete: usersHandler.RevokeOtherSessions,
 	}))
 	mux.Handle("/api/v1/me/sessions/{id}", httpx.Methods(methods{http.MethodDelete: usersHandler.RevokeSession}))
+	mux.Handle("/api/v1/me/export", httpx.Methods(methods{http.MethodGet: usersHandler.ExportMe}))
+
+	// Blocchi, segnalazioni e moderazione (modulo M3.3)
+	mux.Handle("/api/v1/me/blocks", httpx.Methods(methods{http.MethodGet: moderationHandler.Blocks}))
+	mux.Handle("/api/v1/me/blocks/{userId}", httpx.Methods(methods{
+		http.MethodPut: moderationHandler.Block, http.MethodDelete: moderationHandler.Unblock,
+	}))
+	mux.Handle("/api/v1/reports", httpx.Methods(methods{http.MethodPost: moderationHandler.Report}))
+	mux.Handle("/api/v1/admin/reports", httpx.Methods(methods{http.MethodGet: moderationHandler.AdminReports}))
+	mux.Handle("/api/v1/admin/reports/{id}/resolve", httpx.Methods(methods{http.MethodPost: moderationHandler.ResolveReport}))
+	mux.Handle("/api/v1/admin/users/{id}/unsuspend", httpx.Methods(methods{http.MethodPost: moderationHandler.Unsuspend}))
+	mux.Handle("/api/v1/admin/listings/{id}/restore", httpx.Methods(methods{http.MethodPost: moderationHandler.RestoreListing}))
 
 	mux.Handle("/api/v1/conversations", httpx.Methods(methods{
 		http.MethodGet: chatHandler.Conversations, http.MethodPost: chatHandler.StartChat,
