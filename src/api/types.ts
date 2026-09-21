@@ -10,6 +10,8 @@ export interface SessionUser {
   lastName: string;
   email: string;
   userType: UserType;
+  /** Mostra l'area di moderazione; le API la verificano comunque da sé. */
+  isAdmin: boolean;
 }
 
 /** Chiave pubblica e chiave privata E2EE cifrata con la password dell'utente. */
@@ -147,6 +149,8 @@ export interface ListingSummary {
   /** Data AAAA-MM-GG da cui la stanza è libera, o null se non indicata. */
   availableFrom: string | null;
   isActive: boolean;
+  /** Rimosso dalla moderazione: lo vede solo il proprietario, che può solo eliminarlo. */
+  removed: boolean;
   /** Prima foto dell'annuncio, o null se non ne ha. */
   coverUrl: string | null;
 }
@@ -222,9 +226,11 @@ export interface Conversation {
   id: number;
   /** Annuncio da cui è nata la chat; null per le chat dirette o se l'annuncio è stato eliminato. */
   listing: { id: number; title: string; price: number } | null;
-  /** null se l'altro partecipante ha eliminato l'account. */
-  other: { id: string; firstName: string; publicKey: string } | null;
+  /** null se l'altro partecipante ha eliminato l'account. unavailable: account sospeso. */
+  other: { id: string; firstName: string; publicKey: string; unavailable: boolean } | null;
   lastMessage: ChatMessage | null;
+  /** Blocco tra i due partecipanti: con un blocco nessuno dei due può scrivere. */
+  blocked: 'by_me' | 'by_other' | null;
   unreadCount: number;
   updatedAt: string;
 }
@@ -239,3 +245,51 @@ export interface MessagesPage {
   items: ChatMessage[];
   nextCursor: string | null;
 }
+
+/** Utente bloccato, nell'elenco delle Impostazioni. */
+export interface BlockedUser {
+  userId: string;
+  firstName: string;
+  createdAt: string;
+}
+
+/** Messaggio della chat allegato a una segnalazione, decifrato nel browser di chi segnala. */
+export interface ReportEvidence {
+  text: string;
+  sentAt: string;
+}
+
+export type ReportReason = 'fake_listing' | 'scam' | 'discrimination' | 'harassment' | 'spam' | 'other';
+
+/** Segnalazione di un utente (userId) o di un annuncio (listingId). */
+export interface ReportInput {
+  userId?: string;
+  listingId?: number;
+  conversationId?: number;
+  reason: ReportReason;
+  details: string;
+  evidence?: ReportEvidence[];
+}
+
+/** Segnalazione nell'area di moderazione. */
+export interface AdminReport {
+  id: number;
+  reason: ReportReason;
+  details: string;
+  evidence: ReportEvidence[];
+  status: 'open' | 'dismissed' | 'resolved';
+  createdAt: string;
+  resolvedAt: string | null;
+  resolution: string;
+  /** null se chi ha segnalato ha eliminato l'account. */
+  reporter: { id: string; firstName: string } | null;
+  target: { id: string; firstName: string; lastName: string; suspended: boolean; isAdmin: boolean; openReports: number };
+  listing: { id: number; title: string; removed: boolean } | null;
+}
+
+export interface AdminReportsPage {
+  items: AdminReport[];
+  nextCursor: string | null;
+}
+
+export type ModerationAction = 'dismiss' | 'remove_listing' | 'suspend_user';

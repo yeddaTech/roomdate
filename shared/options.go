@@ -34,6 +34,8 @@ var (
 	Occupations   []Option
 	LifestyleTags []Option
 	Amenities     []Option
+	// ReportReasons sono i motivi di una segnalazione, gli stessi ammessi dal vincolo reports_reason_check.
+	ReportReasons []Option
 )
 
 func init() {
@@ -42,11 +44,13 @@ func init() {
 		Occupations   []Option `json:"occupations"`
 		LifestyleTags []Option `json:"lifestyleTags"`
 		Amenities     []Option `json:"amenities"`
+		ReportReasons []Option `json:"reportReasons"`
 	}
 	if err := json.Unmarshal(optionsJSON, &options); err != nil {
 		panic("shared/options.json non valido: " + err.Error())
 	}
 	Cities, Occupations, LifestyleTags, Amenities = options.Cities, options.Occupations, options.LifestyleTags, options.Amenities
+	ReportReasons = options.ReportReasons
 }
 
 // IsCity indica se s è una delle città ammesse.

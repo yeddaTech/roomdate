@@ -105,6 +105,20 @@ func PastDate(s string, now time.Time) bool {
 	return err == nil && t.Year() >= 1900 && !t.After(now)
 }
 
+// AgeAtLeast indica se chi è nato nella data AAAA-MM-GG ha già compiuto years anni alla data now.
+// Chi è nato il 29 febbraio li compie il 1° marzo negli anni non bisestili.
+func AgeAtLeast(birthdate string, now time.Time, years int) bool {
+	t, err := time.Parse(time.DateOnly, birthdate)
+	if err != nil {
+		return false
+	}
+	age := now.Year() - t.Year()
+	if now.Month() < t.Month() || (now.Month() == t.Month() && now.Day() < t.Day()) {
+		age--
+	}
+	return age >= years
+}
+
 // DateBetween indica se la stringa è una data AAAA-MM-GG compresa tra min e max (inclusi).
 func DateBetween(s string, min, max time.Time) bool {
 	t, err := time.Parse(time.DateOnly, s)

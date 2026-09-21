@@ -67,19 +67,27 @@ func TestSessionExpiry(t *testing.T) {
 	valid := func() bool {
 		return app.session(u.Cookie).User != nil
 	}
+	// set modifica le date delle sessioni di un utente; un errore (es. un vincolo violato) ferma il
+	// test, che altrimenti controllerebbe una sessione rimasta com'era
+	set := func(userID, assignments string) {
+		t.Helper()
+		if _, err := testPool.Exec(ctx, `UPDATE roomdate_app.sessions SET `+assignments+` WHERE user_id = $1`, userID); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	if !valid() {
 		t.Fatal("la sessione appena creata deve valere")
 	}
 
 	// Scadenza per inattività: la sessione esiste ma non viene usata da troppo tempo
-	testPool.Exec(ctx, `UPDATE roomdate_app.sessions SET last_used_at = NOW() - interval '8 days' WHERE user_id = $1`, u.ID)
+	set(u.ID, `last_used_at = NOW() - interval '8 days'`)
 	if valid() {
 		t.Error("una sessione inattiva da 8 giorni non deve valere")
 	}
 
 	// Scadenza assoluta: usata di continuo, ma aperta troppo tempo fa
-	testPool.Exec(ctx, `UPDATE roomdate_app.sessions SET last_used_at = NOW(), expires_at = NOW() - interval '1 minute' WHERE user_id = $1`, u.ID)
+	set(u.ID, `created_at = NOW() - interval '31 days', last_used_at = NOW(), expires_at = NOW() - interval '1 minute'`)
 	if valid() {
 		t.Error("una sessione oltre la scadenza assoluta non deve valere")
 	}
@@ -88,6 +96,15 @@ func TestSessionExpiry(t *testing.T) {
 	cookie := app.login(u.Email, u.Password)
 	if cookie == "" || countSessions(t, u.ID) != 1 {
 		t.Errorf("sessioni dopo il nuovo accesso: %d", countSessions(t, u.ID))
+	}
+
+	// Anche le sessioni scadute di chi non torna più vanno via, al primo accesso di chiunque:
+	// nessuna resta nel database oltre la scadenza assoluta
+	other := app.registerUser("Carla", "cerca", false)
+	set(other.ID, `created_at = NOW() - interval '31 days', last_used_at = NOW(), expires_at = NOW() - interval '1 minute'`)
+	app.login(u.Email, u.Password)
+	if countSessions(t, other.ID) != 0 {
+		t.Errorf("sessioni scadute di un altro utente ancora presenti: %d", countSessions(t, other.ID))
 	}
 }
 

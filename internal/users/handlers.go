@@ -25,10 +25,12 @@ type sessionUser struct {
 	LastName  string `json:"lastName"`
 	Email     string `json:"email"`
 	UserType  string `json:"userType"`
+	// IsAdmin fa comparire l'area di moderazione; le API la verificano comunque da sé.
+	IsAdmin bool `json:"isAdmin"`
 }
 
 func sessionUserFrom(a Account) sessionUser {
-	return sessionUser{ID: a.ID, FirstName: a.FirstName, LastName: a.LastName, Email: a.Email, UserType: a.UserType}
+	return sessionUser{ID: a.ID, FirstName: a.FirstName, LastName: a.LastName, Email: a.Email, UserType: a.UserType, IsAdmin: a.IsAdmin}
 }
 
 // requireSession restituisce la sessione o risponde 401.

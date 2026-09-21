@@ -2,9 +2,12 @@ package server_test
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type sessionResponse struct {
@@ -147,15 +150,17 @@ func TestEmailIsCaseInsensitive(t *testing.T) {
 	rec := app.do(http.MethodPost, "/api/v1/auth/register", registration("Anna", "anna.rossi@test.IT", b64("altra-chiave"), "cerca", false))
 	expect(t, rec, http.StatusConflict, "registration_failed")
 
-	// Un indirizzo salvato con le maiuscole da un'altra strada (es. a mano nel database) funziona lo stesso
-	testPool.Exec(context.Background(), `UPDATE roomdate_app.users SET email = 'Anna.Rossi@Test.it' WHERE email = 'anna.rossi@test.it'`)
-	app.login("anna.rossi@test.it", testPassword)
-
-	// Il database rifiuta un doppione con maiuscole diverse
-	_, err := testPool.Exec(context.Background(),
-		`INSERT INTO roomdate_app.users (email, password_hash) VALUES ('ANNA.ROSSI@TEST.IT', 'x')`)
-	if err == nil {
-		t.Fatal("indice unico su lower(email) mancante")
+	// Anche fuori dall'API il database accetta solo indirizzi in minuscolo (vincolo di M3.6), e
+	// ciascuno una volta sola: ogni prova deve fallire per il motivo atteso
+	for email, code := range map[string]string{
+		"ANNA.ROSSI@TEST.IT": "23514", // check_violation: maiuscole
+		"anna.rossi@test.it": "23505", // unique_violation: doppione
+	} {
+		_, err := testPool.Exec(context.Background(), `INSERT INTO roomdate_app.users (email, password_hash) VALUES ($1, 'x')`, email)
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != code {
+			t.Errorf("inserimento di %q: errore %v, atteso il codice %s", email, err, code)
+		}
 	}
 }
 

@@ -9,6 +9,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"roomdate-backend/internal/moderation"
 )
 
 // errTooManyImages indica che l'annuncio ha già il numero massimo di foto.
@@ -68,10 +70,11 @@ func (s *Store) SetActive(ctx context.Context, id int, active bool) error {
 }
 
 // Owner restituisce l'ID del proprietario dell'annuncio.
-func (s *Store) Owner(ctx context.Context, id int) (string, error) {
-	var ownerID string
-	err := s.db.QueryRow(ctx, `SELECT COALESCE(user_id::text, '') FROM roomdate_app.listings WHERE id = $1`, id).Scan(&ownerID)
-	return ownerID, err
+// Owner restituisce il proprietario dell'annuncio e se la moderazione l'ha rimosso.
+func (s *Store) Owner(ctx context.Context, id int) (ownerID string, removed bool, err error) {
+	err = s.db.QueryRow(ctx, `SELECT COALESCE(user_id::text, ''), removed_at IS NOT NULL FROM roomdate_app.listings WHERE id = $1`, id).
+		Scan(&ownerID, &removed)
+	return ownerID, removed, err
 }
 
 // Row è un annuncio con tutti i campi.
@@ -85,6 +88,8 @@ type Row struct {
 	BillsIncluded               *bool
 	AvailableFrom               *time.Time
 	IsActive                    bool
+	// Removed: rimosso dalla moderazione. OwnerSuspended: il proprietario è sospeso.
+	Removed, OwnerSuspended bool
 	// CreatedAt serve a costruire il cursore dell'elenco; è NULL su qualche annuncio vecchio.
 	CreatedAt *time.Time
 	// CoverKey è la chiave della prima foto, se c'è (negli elenchi).
@@ -94,13 +99,14 @@ type Row struct {
 // Nel database di produzione user_id, room_type e created_at possono essere NULL.
 const rowColumns = `l.id, COALESCE(l.user_id::text, ''), COALESCE(u.first_name, ''),
     l.title, l.city, COALESCE(l.zone, ''), COALESCE(l.room_type, ''), l.price, COALESCE(l.description, ''),
-    l.amenities, l.bills_included, l.available_from, l.is_active, l.created_at,
+    l.amenities, l.bills_included, l.available_from, l.is_active,
+    l.removed_at IS NOT NULL, COALESCE(u.suspended_at IS NOT NULL, false), l.created_at,
     (SELECT i.storage_key FROM roomdate_app.listing_images i WHERE i.listing_id = l.id ORDER BY i.position, i.id LIMIT 1)`
 
 func scanRow(row pgx.Row) (Row, error) {
 	var r Row
 	err := row.Scan(&r.ID, &r.OwnerID, &r.OwnerFirstName, &r.Title, &r.City, &r.Zone, &r.RoomType, &r.Price, &r.Description,
-		&r.Amenities, &r.BillsIncluded, &r.AvailableFrom, &r.IsActive, &r.CreatedAt, &r.CoverKey)
+		&r.Amenities, &r.BillsIncluded, &r.AvailableFrom, &r.IsActive, &r.Removed, &r.OwnerSuspended, &r.CreatedAt, &r.CoverKey)
 	return r, err
 }
 
@@ -122,6 +128,9 @@ const (
 // ListQuery filtra, ordina e pagina l'elenco pubblico degli annunci.
 // I campi vuoti o a zero non filtrano nulla.
 type ListQuery struct {
+	// ViewerID è chi guarda ('' senza sessione): non vede gli annunci di chi ha bloccato o
+	// di chi l'ha bloccato.
+	ViewerID      string
 	City          string
 	MaxPrice      int
 	RoomType      string
@@ -191,6 +200,9 @@ func (s *Store) Active(ctx context.Context, q ListQuery) ([]Row, error) {
         FROM roomdate_app.listings l
         LEFT JOIN roomdate_app.users u ON l.user_id = u.id
         WHERE l.is_active
+          AND l.removed_at IS NULL
+          AND u.suspended_at IS NULL
+          AND `+moderation.NotBlockedSQL("$8", "l.user_id")+`
           AND ($1 = '' OR l.city = $1)
           AND ($2 = 0 OR l.price <= $2)
           AND ($3 = '' OR l.room_type = $3)
@@ -198,7 +210,7 @@ func (s *Store) Active(ctx context.Context, q ListQuery) ([]Row, error) {
           AND `+order.keyset+`
         ORDER BY `+order.orderBy+`
         LIMIT $7`,
-		q.City, q.MaxPrice, q.RoomType, q.BillsIncluded, key, id, q.Limit)
+		q.City, q.MaxPrice, q.RoomType, q.BillsIncluded, key, id, q.Limit, q.ViewerID)
 }
 
 // ByOwner restituisce tutti gli annunci di un utente, anche quelli disattivati, dal più recente.

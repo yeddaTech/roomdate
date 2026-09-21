@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"roomdate-backend/internal/auth"
+	"roomdate-backend/internal/moderation"
 )
 
 // Store esegue le query sulla tabella roomdate_app.users.
@@ -28,6 +29,9 @@ type Account struct {
 	KDF                                      auth.KDFParams
 	FailedLogins                             int
 	LockedUntil                              *time.Time
+	IsAdmin                                  bool
+	// Suspended è vero per un account sospeso dalla moderazione, che non può più accedere.
+	Suspended bool
 }
 
 // Vault è la chiave privata E2EE cifrata con la password dell'utente, più la chiave pubblica.
@@ -41,14 +45,14 @@ type Vault struct {
 const accountColumns = `id::text, COALESCE(first_name, ''), COALESCE(last_name, ''), email, COALESCE(user_type, ''), password_hash,
     COALESCE(public_key, ''), COALESCE(encrypted_private_key, ''), COALESCE(crypto_salt, ''), COALESCE(crypto_iv, ''),
     COALESCE(kdf_version, 1), COALESCE(kdf_salt, ''), COALESCE(kdf_iterations, 0),
-    COALESCE(failed_login_attempts, 0), locked_until`
+    COALESCE(failed_login_attempts, 0), locked_until, is_admin, suspended_at IS NOT NULL`
 
 func scanAccount(row interface{ Scan(...any) error }) (Account, error) {
 	var a Account
 	err := row.Scan(&a.ID, &a.FirstName, &a.LastName, &a.Email, &a.UserType, &a.PasswordHash,
 		&a.Vault.PublicKey, &a.Vault.EncryptedPrivateKey, &a.Vault.CryptoSalt, &a.Vault.CryptoIV,
 		&a.KDF.Version, &a.KDF.Salt, &a.KDF.Iterations,
-		&a.FailedLogins, &a.LockedUntil)
+		&a.FailedLogins, &a.LockedUntil, &a.IsAdmin, &a.Suspended)
 	return a, err
 }
 
@@ -134,6 +138,7 @@ func (s *Store) SetRecovery(ctx context.Context, userID string, r Recovery) erro
 type RecoveryAccount struct {
 	UserID, PublicKey string
 	Recovery          Recovery
+	Suspended         bool
 }
 
 // RecoveryByEmail cerca l'account con la sua chiave di recupero; Recovery.Hash è vuoto se non ne ha.
@@ -141,9 +146,9 @@ func (s *Store) RecoveryByEmail(ctx context.Context, email string) (RecoveryAcco
 	var a RecoveryAccount
 	err := s.db.QueryRow(ctx, `
         SELECT id::text, COALESCE(public_key, ''), COALESCE(recovery_salt, ''), COALESCE(recovery_hash, ''),
-               COALESCE(recovery_encrypted_private_key, ''), COALESCE(recovery_iv, '')
+               COALESCE(recovery_encrypted_private_key, ''), COALESCE(recovery_iv, ''), suspended_at IS NOT NULL
         FROM roomdate_app.users WHERE lower(email) = lower($1)`, email,
-	).Scan(&a.UserID, &a.PublicKey, &a.Recovery.Salt, &a.Recovery.Hash, &a.Recovery.EncryptedPrivateKey, &a.Recovery.IV)
+	).Scan(&a.UserID, &a.PublicKey, &a.Recovery.Salt, &a.Recovery.Hash, &a.Recovery.EncryptedPrivateKey, &a.Recovery.IV, &a.Suspended)
 	return a, err
 }
 
@@ -201,6 +206,13 @@ func (s *Store) Delete(ctx context.Context, id string) ([]string, error) {
 	if _, err := tx.Exec(ctx, `DELETE FROM roomdate_app.users WHERE id = $1`, id); err != nil {
 		return nil, err
 	}
+	// Le conversazioni rimaste senza partecipanti non le può più leggere nessuno: vanno via con
+	// i loro messaggi. Quelle con l'altro partecipante restano a lui, con i messaggi ricevuti.
+	if _, err := tx.Exec(ctx, `
+        DELETE FROM roomdate_app.conversations c
+        WHERE NOT EXISTS (SELECT 1 FROM roomdate_app.conversation_participants p WHERE p.conversation_id = c.id)`); err != nil {
+		return nil, err
+	}
 	return keys, tx.Commit(ctx)
 }
 
@@ -222,6 +234,8 @@ type Profile struct {
 	HasRecoveryKey bool `json:"hasRecoveryKey"`
 	// Age è calcolata dal database; nil se manca la data di nascita. Il proprietario vede già la data.
 	Age *int `json:"-"`
+	// Suspended: account sospeso dalla moderazione, invisibile agli altri.
+	Suspended bool `json:"-"`
 }
 
 // ageColumn calcola l'età in anni compiuti, così la data di nascita non esce dal database.
@@ -233,10 +247,10 @@ func (s *Store) Profile(ctx context.Context, id string) (Profile, error) {
         SELECT id::text, COALESCE(first_name, ''), COALESCE(last_name, ''), email,
                COALESCE(user_type, ''), COALESCE(citta, ''), COALESCE(birthdate::text, ''),
                COALESCE(budget_max, 0), COALESCE(occupation, ''), COALESCE(bio, ''), lifestyle_tags,
-               COALESCE(is_public, true), recovery_hash IS NOT NULL, `+ageColumn+`
+               COALESCE(is_public, true), recovery_hash IS NOT NULL, `+ageColumn+`, suspended_at IS NOT NULL
         FROM roomdate_app.users WHERE id = $1`, id,
 	).Scan(&p.ID, &p.FirstName, &p.LastName, &p.Email, &p.UserType, &p.City, &p.Birthdate,
-		&p.BudgetMax, &p.Occupation, &p.Bio, &p.LifestyleTags, &p.IsPublic, &p.HasRecoveryKey, &p.Age)
+		&p.BudgetMax, &p.Occupation, &p.Bio, &p.LifestyleTags, &p.IsPublic, &p.HasRecoveryKey, &p.Age, &p.Suspended)
 	return p, err
 }
 
@@ -301,7 +315,9 @@ func (s *Store) Roommates(ctx context.Context, q RoommatesQuery) ([]RoommateRow,
         FROM roomdate_app.users
         WHERE COALESCE(is_public, true)
           AND user_type = 'cerca'
+          AND suspended_at IS NULL
           AND ($1 = '' OR id <> NULLIF($1, '')::uuid)
+          AND `+moderation.NotBlockedSQL("$1", "users.id")+`
           AND ($2 = '' OR citta = $2)
           AND ($3 = 0 OR COALESCE(budget_max, 0) >= $3)
           AND ($5 = '' OR CASE WHEN $4::timestamptz IS NULL

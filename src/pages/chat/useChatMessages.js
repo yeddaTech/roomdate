@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { decryptFromRecipients, decryptMessage } from '../../utils/crypto';
 
 /** Un messaggio che non si riesce ad aprire resta visibile, ma dichiarato come tale. */
-const UNREADABLE = '🔒 [Messaggio non decifrabile]';
+export const UNREADABLE = '🔒 [Messaggio non decifrabile]';
 
 /**
  * Decifra i messaggi con la chiave privata dell'utente e tiene i testi già aperti, così cambiando

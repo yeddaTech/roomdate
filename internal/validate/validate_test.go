@@ -109,3 +109,28 @@ func TestPositiveID(t *testing.T) {
 		}
 	}
 }
+
+func TestAgeAtLeast(t *testing.T) {
+	day := func(s string) time.Time {
+		d, _ := time.Parse(time.DateOnly, s)
+		return d.Add(15 * time.Hour)
+	}
+	for _, c := range []struct {
+		birthdate, today string
+		adult            bool
+	}{
+		{"2008-09-21", "2026-09-21", true},  // compie 18 anni oggi
+		{"2008-09-22", "2026-09-21", false}, // domani
+		{"2008-10-01", "2026-09-21", false}, // mese dopo
+		{"1990-01-01", "2026-09-21", true},
+		{"2008-02-29", "2026-02-28", false}, // nato il 29 febbraio: in un anno non bisestile li compie il 1° marzo
+		{"2008-02-29", "2026-03-01", true},
+		{"2010-03-01", "2028-02-29", false}, // oggi è il 29 febbraio: il 1° marzo è domani
+		{"2010-03-01", "2028-03-01", true},
+		{"non-una-data", "2026-09-21", false},
+	} {
+		if got := AgeAtLeast(c.birthdate, day(c.today), 18); got != c.adult {
+			t.Errorf("AgeAtLeast(%s, %s) = %v, atteso %v", c.birthdate, c.today, got, c.adult)
+		}
+	}
+}
