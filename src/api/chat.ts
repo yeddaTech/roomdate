@@ -35,7 +35,3 @@ export function sendMessage(conversationId: number, message: OutgoingMessage): P
 export function markConversationRead(conversationId: number): Promise<void> {
   return request<void>(`/api/v1/conversations/${conversationId}/read`, { method: 'POST' });
 }
-
-export function notifyTyping(conversationId: number): Promise<void> {
-  return request<void>(`/api/v1/conversations/${conversationId}/typing`, { method: 'POST' });
-}

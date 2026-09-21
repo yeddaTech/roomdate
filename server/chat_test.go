@@ -271,36 +271,6 @@ func TestSendMessageSurvivesRealtimeFailure(t *testing.T) {
 	if countMessages(t) != 1 {
 		t.Fatal("il messaggio va salvato anche se la notifica in tempo reale fallisce")
 	}
-
-	rec = f.app.do(http.MethodPost, "/api/v1/conversations/"+itoa(f.directChat)+"/typing", nil, withSession(f.anna.Cookie))
-	expect(t, rec, http.StatusInternalServerError, "Errore di trasmissione in tempo reale")
-	if strings.Contains(rec.Body.String(), "dettaglio interno") {
-		t.Fatalf("corpo = %q", rec.Body.String())
-	}
-}
-
-func TestTypingAuthorization(t *testing.T) {
-	f := newChatFixture(t)
-	app := f.app
-	path := "/api/v1/conversations/" + itoa(f.directChat) + "/typing"
-
-	expect(t, app.do(http.MethodPost, path, nil, withHeader("Origin", "https://evil.example")), http.StatusForbidden, "")
-	expect(t, app.do(http.MethodPost, path, nil), http.StatusUnauthorized, "")
-	expect(t, app.do(http.MethodPost, path, nil, withSession(f.carla.Cookie)), http.StatusForbidden, "")
-	expect(t, app.do(http.MethodPost, "/api/v1/conversations/abc/typing", nil, withSession(f.anna.Cookie)), http.StatusBadRequest, "")
-	if len(app.publisher.recorded()) != 0 {
-		t.Fatal("nessun evento atteso dalle richieste rifiutate")
-	}
-
-	expect(t, app.do(http.MethodPost, path, nil, withSession(f.anna.Cookie)), http.StatusNoContent, "")
-	events := app.publisher.recorded()
-	if len(events) != 1 || events[0].Name != realtime.EventTyping || events[0].Channel != realtime.UserChannel(f.marco.ID) {
-		t.Fatalf("eventi = %+v", events)
-	}
-	// Il mittente è quello della sessione, non uno indicato dal client
-	if data := events[0].Data.(map[string]string); data["senderId"] != f.anna.ID || data["conversationId"] != itoa(f.directChat) {
-		t.Fatalf("dati evento = %v", events[0].Data)
-	}
 }
 
 func TestConversations(t *testing.T) {

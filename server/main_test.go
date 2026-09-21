@@ -275,8 +275,18 @@ func newApp(t *testing.T) *testApp {
 	return app
 }
 
+// testPusher sono credenziali Pusher finte: servono a firmare le iscrizioni ai canali privati,
+// mentre gli eventi finiscono nel recordingPublisher.
+var testPusher = config.Pusher{AppID: "roomdate-test", Key: "chiave-pusher-di-test", Secret: "segreto-pusher-di-test"}
+
 // newAppWithStorage crea l'applicazione con lo storage indicato (ad esempio storage.Disabled{}).
 func newAppWithStorage(t *testing.T, st storage.Storage) *testApp {
+	t.Helper()
+	return newAppWithConfig(t, st, config.Config{SecretKey: "segreto-di-test", SecureCookies: true, Pusher: testPusher})
+}
+
+// newAppWithConfig crea l'applicazione con una configurazione diversa da quella dei test.
+func newAppWithConfig(t *testing.T, st storage.Storage, cfg config.Config) *testApp {
 	t.Helper()
 	if testPool == nil {
 		t.Skip("TEST_DATABASE_URL non impostata")
@@ -290,7 +300,7 @@ func newAppWithStorage(t *testing.T, st storage.Storage) *testApp {
 
 	publisher := &recordingPublisher{}
 	handler, err := server.New(server.Deps{
-		Config:    config.Config{SecretKey: "segreto-di-test", SecureCookies: true},
+		Config:    cfg,
 		DB:        appPool,
 		Publisher: publisher,
 		Logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),

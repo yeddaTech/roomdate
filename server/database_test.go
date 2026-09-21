@@ -2,10 +2,12 @@ package server_test
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/stdlib"
 
 	"roomdate-backend/internal/db"
@@ -39,9 +41,12 @@ func TestAppRoleHasOnlyDataPrivileges(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// 42501 (insufficient_privilege) vale sia per "permesso negato" sia per "bisogna essere
+		// proprietari", in qualunque lingua sia configurato il server
+		var pgErr *pgconn.PgError
 		if _, err := tx.Exec(ctx, statement); err == nil {
 			t.Errorf("il ruolo dell'applicazione non deve poter eseguire: %s", statement)
-		} else if !strings.Contains(err.Error(), "permission denied") && !strings.Contains(err.Error(), "must be owner") {
+		} else if !errors.As(err, &pgErr) || pgErr.Code != "42501" {
 			t.Errorf("%s è fallita per un altro motivo: %v", statement, err)
 		}
 		tx.Rollback(ctx)
