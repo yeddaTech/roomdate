@@ -15,6 +15,7 @@ import {
 } from '../api/hooks';
 import { formatAvailability, formatBills } from '../api/listings';
 import { CITIES, OCCUPATIONS, isCity } from '../api/options';
+import { latestAdultBirthdate } from '../api/users';
 import PageLoader from '../components/PageLoader';
 import ListingForm from '../components/listings/ListingForm';
 import ListingPhotos from '../components/listings/ListingPhotos';
@@ -243,8 +244,8 @@ export default function Dashboard() {
                           {l.coverUrl
                             ? <img src={l.coverUrl} alt="" className="w-full h-full object-cover" />
                             : <span className="text-sm font-bold text-neutral-400">📷 Nessuna foto</span>}
-                          <span className={`absolute top-3 left-3 px-3 py-1 rounded-full text-[11px] font-bold shadow-sm ${l.isActive ? 'bg-white/90 text-green-700' : 'bg-neutral-900/80 text-white'}`}>
-                            {l.isActive ? 'Pubblicato' : 'Disattivato'}
+                          <span className={`absolute top-3 left-3 px-3 py-1 rounded-full text-[11px] font-bold shadow-sm ${l.removed ? 'bg-rose-600 text-white' : l.isActive ? 'bg-white/90 text-green-700' : 'bg-neutral-900/80 text-white'}`}>
+                            {l.removed ? 'Rimosso dalla moderazione' : l.isActive ? 'Pubblicato' : 'Disattivato'}
                           </span>
                         </div>
                         <div className="p-6 flex flex-col gap-4 grow">
@@ -254,11 +255,16 @@ export default function Dashboard() {
                             {details && <div className="text-sm text-neutral-500 font-medium">{details}</div>}
                             <div className="text-lg font-extrabold text-orange-500 mt-2">€{l.price}/mese</div>
                           </div>
+                          {l.removed && (
+                            <p className="text-sm font-medium text-rose-700">Viola i Termini di utilizzo: non è più visibile agli altri e puoi solo eliminarlo.</p>
+                          )}
                           <div className="flex flex-wrap gap-2 mt-auto">
+                            {!l.removed && (<>
                             <button onClick={() => showView('editListing', l.id)} className="bg-neutral-900 text-white hover:bg-neutral-800 font-bold px-4 py-2.5 rounded-xl transition-colors text-sm cursor-pointer">Modifica</button>
                             <button onClick={() => handleToggleActive(l)} disabled={setListingActive.isPending} className="bg-neutral-100 text-neutral-700 hover:bg-neutral-200 font-bold px-4 py-2.5 rounded-xl transition-colors text-sm cursor-pointer disabled:opacity-50">
                               {l.isActive ? 'Disattiva' : 'Riattiva'}
                             </button>
+                            </>)}
                             <button onClick={() => handleDeleteListing(l.id)} disabled={deleteListing.isPending} className="bg-red-50 text-red-600 hover:bg-red-100 font-bold px-4 py-2.5 rounded-xl transition-colors text-sm cursor-pointer disabled:opacity-50">Elimina</button>
                           </div>
                         </div>
@@ -364,6 +370,9 @@ export default function Dashboard() {
                     <input 
                       name="birthdate" 
                       type="date" 
+                      min="1900-01-01"
+                      max={latestAdultBirthdate()}
+                      title="Per usare RoomDate devi avere almeno 18 anni"
                       value={form.birthdate}
                       onChange={e => setForm({...form, birthdate: e.target.value})}
                       className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 

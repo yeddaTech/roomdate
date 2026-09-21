@@ -26,7 +26,7 @@ export default function Terms() {
         </button>
         
         <h1 className="font-serif text-3xl md:text-4xl font-extrabold text-neutral-900 mb-2 tracking-tight">Termini di Servizio</h1>
-        <p className="text-sm text-neutral-400 font-medium mb-8">Ultimo aggiornamento: Luglio 2026</p>
+        <p className="text-sm text-neutral-400 font-medium mb-8">Ultimo aggiornamento: Settembre 2026</p>
 
         <div className="flex flex-col gap-8 leading-relaxed text-neutral-600 font-medium">
           <section className="bg-neutral-50 p-6 rounded-3xl border border-neutral-100">
@@ -37,14 +37,21 @@ export default function Terms() {
           </section>
 
           <section>
-            <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-3">2. Esclusione di Responsabilità</h2>
+            <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-3">2. Requisiti</h2>
+            <p>
+              Per registrarti devi avere compiuto 18 anni e indicare dati veritieri, compresa la data di nascita.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-3">3. Esclusione di Responsabilità</h2>
             <p>
               RoomDate declina ogni responsabilità per eventuali danni, truffe, perdite economiche, controversie o illeciti derivanti dalle interazioni tra gli utenti, sia all'interno dell'applicazione (es. chat) che nella vita reale. L'utente si assume la totale e completa responsabilità di verificare l'identità dell'interlocutore, l'autenticità degli annunci e la validità legale di eventuali accordi economici o contratti di locazione.
             </p>
           </section>
 
           <section>
-            <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-3">3. Regole di Condotta</h2>
+            <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-3">4. Regole di Condotta</h2>
             <p className="mb-3">
               Gli utenti si impegnano a pubblicare informazioni veritiere e a mantenere un comportamento rispettoso. È severamente vietato utilizzare RoomDate per:
             </p>
@@ -54,7 +61,7 @@ export default function Terms() {
               <li>Inviare messaggi offensivi, spam o contenuti non appropriati.</li>
             </ul>
             <p>
-              RoomDate si riserva il diritto insindacabile di sospendere, bannare o eliminare gli account degli utenti che violano questi Termini o che vengono segnalati per comportamenti illeciti, fornendo eventuale documentazione alle autorità competenti se richiesta dalla legge.
+              Chiunque noti una violazione può segnalare l&apos;utente o l&apos;annuncio dal profilo, dall&apos;annuncio o dalla chat, e bloccare chi lo disturba. Gli amministratori di RoomDate esaminano le segnalazioni e, se riscontrano una violazione, possono rimuovere l&apos;annuncio o sospendere l&apos;account, che non potrà più accedere. RoomDate può fornire la documentazione in suo possesso alle autorità competenti, se richiesta dalla legge.
             </p>
           </section>
         </div>

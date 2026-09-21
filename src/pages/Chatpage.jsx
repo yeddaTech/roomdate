@@ -5,11 +5,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { encryptForRecipients } from '../utils/crypto';
 import { useAuth } from '../auth/AuthContext';
 import { getPrivateKey, getPublicKey, hasStoredVault, unlockPrivateKey } from '../auth/keyStorage';
-import { useConversations, useMarkConversationRead, useMessages, useSendMessage } from '../api/hooks';
+import { useBlockUser, useConversations, useMarkConversationRead, useMessages, useSendMessage, useUnblockUser } from '../api/hooks';
+import ReportDialog from '../components/ReportDialog';
 import { conversationChannel, createRealtimeClient, realtimeEnabled, TYPING_EVENT, userChannel } from '../api/realtime';
 import { queryKeys } from '../api/queryKeys';
 import { isSessionExpired } from '../api/client';
-import { useDecryptedTexts } from './chat/useChatMessages';
+import { UNREADABLE, useDecryptedTexts } from './chat/useChatMessages';
 import { dayLabel, shortDateLabel, timeLabel } from './chat/time';
 
 const FALLBACK_REFRESH_MS = 5000;
@@ -107,6 +108,11 @@ export default function ChatPage() {
 
   const sendMessage = useSendMessage();
   const { mutate: markConversationRead } = useMarkConversationRead();
+  const blockUser = useBlockUser();
+  const unblockUser = useUnblockUser();
+  const [reporting, setReporting] = useState(false);
+  // Con un blocco o un account sospeso non si scrive più: la conversazione resta leggibile
+  const canWrite = Boolean(activeConv) && !activeConv.blocked && !activeConv.other?.unavailable;
 
   // Aprire una conversazione azzera i suoi messaggi non letti
   const unreadHere = activeConv?.unreadCount ?? 0;
@@ -274,6 +280,20 @@ export default function ChatPage() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  const handleBlockToggle = async () => {
+    const other = activeConv?.other;
+    if (!other) return;
+    try {
+      if (activeConv.blocked === 'by_me') {
+        await unblockUser.mutateAsync(other.id);
+      } else if (confirm(`Bloccare ${other.firstName}? Nessuno dei due potrà più scrivere in questa conversazione né trovare l'altro nelle ricerche. Puoi sbloccare in qualsiasi momento.`)) {
+        await blockUser.mutateAsync(other.id);
+      }
+    } catch (err) {
+      alert(err.message);
     }
   };
 
@@ -562,12 +582,24 @@ export default function ChatPage() {
                 <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-sm shrink-0 bg-gradient-to-br from-orange-400 to-rose-500">
                   <span className="drop-shadow-sm">{initial(nameOf(activeConv))}</span>
                 </div>
-                <div className="overflow-hidden">
+                <div className="overflow-hidden flex-1 min-w-0">
                   <h3 className="font-bold text-neutral-900 leading-tight truncate text-lg">{nameOf(activeConv)}</h3>
                   <p className="text-xs text-neutral-500 font-medium truncate h-4 mt-0.5">
                     {activeConv.listing ? `🏠 ${activeConv.listing.title} · €${activeConv.listing.price}/mese` : 'Chat diretta'}
                   </p>
                 </div>
+                {activeConv.other && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button type="button" onClick={() => setReporting(true)} className="text-sm font-bold text-neutral-500 hover:text-rose-600 px-3 py-2 rounded-full hover:bg-neutral-50 transition-colors cursor-pointer">
+                      🚩 <span className="hidden sm:inline">Segnala</span>
+                    </button>
+                    {activeConv.blocked !== 'by_other' && (
+                      <button type="button" onClick={handleBlockToggle} disabled={blockUser.isPending || unblockUser.isPending} className="text-sm font-bold text-neutral-500 hover:text-rose-600 px-3 py-2 rounded-full hover:bg-neutral-50 transition-colors cursor-pointer">
+                        {activeConv.blocked === 'by_me' ? '✅' : '🚫'} <span className="hidden sm:inline">{activeConv.blocked === 'by_me' ? 'Sblocca' : 'Blocca'}</span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Area Messaggi */}
@@ -645,6 +677,17 @@ export default function ChatPage() {
                 <div ref={messagesEndRef} />
               </div>
 
+              {!canWrite && (
+                <div data-testid="conversation-closed" className="shrink-0 bg-white border-t border-neutral-100 p-5 md:px-6 text-center text-sm font-medium text-neutral-600">
+                  {activeConv.other?.unavailable
+                    ? 'Questo account non è più disponibile: non puoi inviargli messaggi.'
+                    : activeConv.blocked === 'by_me'
+                      ? `Hai bloccato ${nameOf(activeConv)}: nessuno dei due può scrivere in questa conversazione.`
+                      : 'Non puoi più inviare messaggi in questa conversazione.'}
+                </div>
+              )}
+
+              {canWrite && (<>
               {/* Quick Replies */}
               <div className="shrink-0 bg-white border-t border-neutral-100 p-3 md:px-6 md:py-4 overflow-x-auto flex gap-2 w-full custom-scrollbar">
                 {QUICK_REPLIES.map((reply) => (
@@ -678,9 +721,25 @@ export default function ChatPage() {
                   <svg className="w-5 h-5 md:w-6 md:h-6 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
                 </button>
               </div>
+              </>)}
             </>
           )}
         </main>
+
+        {reporting && activeConv?.other && (
+          <ReportDialog
+            target={{ userId: activeConv.other.id }}
+            title={`Segnala ${activeConv.other.firstName}`}
+            // Solo i messaggi ricevuti dall'altro, già decifrati: il server non li può leggere
+            conversation={{
+              id: activeConv.id,
+              received: isLocked ? [] : messages
+                .filter((m) => m.senderId === activeConv.other.id && messageTexts[m.id] && messageTexts[m.id] !== UNREADABLE)
+                .map((m) => ({ text: messageTexts[m.id], sentAt: m.createdAt })),
+            }}
+            onClose={() => setReporting(false)}
+          />
+        )}
 
         {/* 🔐 OVERLAY SBLOCCO CRITTOGRAFIA */}
         {isLocked && (

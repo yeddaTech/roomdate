@@ -48,7 +48,11 @@ export default function Privacy() {
               <li>I messaggi della chat, conservati sul server in forma cifrata end-to-end, e le chiavi di cifratura dell&apos;utente. La chiave privata è a sua volta cifrata con una chiave che il browser ricava dalla password e che non riceviamo mai: non possiamo leggere i messaggi.</li>
               <li>Se crei una chiave di recupero: un&apos;impronta che ci permette di riconoscerla e una copia della chiave privata cifrata con la chiave stessa. La chiave di recupero non ci viene mai inviata.</li>
               <li>Un registro di sicurezza con accessi, tentativi falliti, cambi di password ed eliminazioni di account, conservato per 90 giorni. Email e indirizzo IP vi compaiono solo come impronte non reversibili, che servono a rallentare chi tenta di indovinare le password.</li>
+              <li>Gli utenti che hai bloccato e le segnalazioni che invii o che ricevi. Se, segnalando qualcuno dalla chat, scegli di allegare i messaggi che ti ha inviato, il loro testo viene salvato in chiaro perché il moderatore possa leggerlo.</li>
             </ul>
+            <p>
+              RoomDate è riservato ai maggiorenni: la data di nascita serve anche a verificare che tu abbia almeno 18 anni.
+            </p>
             <p>
               I dati raccolti vengono elaborati tramite l&apos;infrastruttura cloud di Vercel e conservati in un database gestito da Neon. Il database e le funzioni del server si trovano in Unione Europea (Francoforte, Germania), e le foto degli annunci sono archiviate da Cloudflare in uno spazio soggetto alla giurisdizione UE. Le pagine del sito, che non contengono dati personali, sono distribuite dalla rete globale di Vercel.
             </p>
@@ -82,9 +86,31 @@ export default function Privacy() {
           </section>
 
           <section>
-            <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-3">6. Diritti dell'Utente</h2>
+            <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-3">6. Blocchi, Segnalazioni e Moderazione</h2>
             <p>
-              In conformità con il GDPR, hai il diritto di accedere ai tuoi dati, chiederne la rettifica, la portabilità o la cancellazione definitiva ("diritto all'oblio") inviando una richiesta all'indirizzo email del Titolare o eliminando direttamente il tuo account dalle impostazioni del profilo.
+              Puoi bloccare un utente: da quel momento nessuno dei due può scrivere all&apos;altro né trovarlo nelle ricerche, e puoi sbloccarlo quando vuoi dalle impostazioni. Puoi anche segnalare un utente o un annuncio che viola i Termini di utilizzo.
+            </p>
+            <p>
+              Le segnalazioni sono esaminate da persone, gli amministratori di RoomDate, senza decisioni automatiche. Vedono il motivo e la descrizione che hai scritto, il nome dell&apos;utente segnalato, l&apos;annuncio e gli eventuali messaggi che hai scelto di allegare: le altre conversazioni restano cifrate e non possono leggerle. Possono archiviare la segnalazione, rimuovere l&apos;annuncio (resta visibile solo al proprietario) o sospendere l&apos;account (che non può più accedere e sparisce da ricerche e annunci).
+            </p>
+          </section>
+
+          <section>
+            <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-3">7. Per Quanto Tempo Conserviamo i Dati</h2>
+            <ul className="list-disc pl-5 flex flex-col gap-2 mb-4 text-neutral-600">
+              <li>Profilo, annunci con le foto, chiavi di cifratura e blocchi: finché non elimini l&apos;account o quei contenuti. Le foto caricate ma mai aggiunte a un annuncio vengono cancellate dopo un giorno.</li>
+              <li>Sessioni di accesso: al massimo 30 giorni, o 7 giorni dall&apos;ultimo utilizzo.</li>
+              <li>Registro di sicurezza: 90 giorni.</li>
+              <li>Segnalazioni: finché sono aperte e poi 180 giorni dalla decisione, insieme ai messaggi allegati. Quelle ricevute da un account eliminato vengono cancellate con l&apos;account; quelle inviate restano ai moderatori, senza il nome di chi le ha inviate.</li>
+              <li>Messaggi della chat: finché uno dei partecipanti è iscritto. Se elimini l&apos;account, i messaggi che hai inviato restano, cifrati e senza il tuo nome, nelle conversazioni degli altri partecipanti, come un messaggio già consegnato; una conversazione rimasta senza partecipanti viene cancellata con tutti i messaggi.</li>
+              <li>Per un breve periodo i dati cancellati possono restare nelle copie di sicurezza tecniche del database, che servono a ripristinarlo in caso di guasto e vengono sovrascritte automaticamente.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-3">8. Diritti dell&apos;Utente</h2>
+            <p>
+              In conformità con il GDPR hai il diritto di accedere ai tuoi dati, chiederne la rettifica, la portabilità o la cancellazione definitiva (&quot;diritto all&apos;oblio&quot;). Puoi farlo direttamente dal sito: in Impostazioni, &quot;Scarica i miei dati&quot; ti dà un file con tutto ciò che conserviamo su di te (i messaggi li decifra il tuo browser), dal profilo puoi correggere i tuoi dati e in Impostazioni puoi eliminare l&apos;account. Per qualsiasi altra richiesta puoi scrivere al Titolare all&apos;indirizzo indicato sopra.
             </p>
           </section>
 

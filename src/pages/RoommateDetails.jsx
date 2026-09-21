@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../auth/AuthContext';
-import { usePublicProfile, useStartChat } from '../api/hooks';
+import { useBlockUser, usePublicProfile, useStartChat } from '../api/hooks';
 import { occupationLabel } from '../api/options';
 import { formatAge } from '../api/users';
 import CompatibilityList from '../components/profile/CompatibilityList';
 import LifestyleTags from '../components/profile/LifestyleTags';
+import ReportDialog from '../components/ReportDialog';
 
 export default function RoommateDetails() {
   const { id } = useParams();
@@ -16,7 +17,20 @@ export default function RoommateDetails() {
   // Profilo pubblico dell'utente (i profili privati risultano non trovati)
   const { data: roommate, isPending: loading } = usePublicProfile(id);
   const startChat = useStartChat();
+  const blockUser = useBlockUser();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [reporting, setReporting] = useState(false);
+
+  // Dopo il blocco il profilo non è più visibile: si torna alla ricerca
+  const handleBlock = async () => {
+    if (!confirm(`Bloccare ${roommate.firstName}? Non potrete più scrivervi né trovarvi nelle ricerche. Puoi sbloccare dalle Impostazioni.`)) return;
+    try {
+      await blockUser.mutateAsync(roommate.id);
+      navigate('/ricerca');
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   const handleLogout = async () => {
     setIsMenuOpen(false);
@@ -199,11 +213,24 @@ export default function RoommateDetails() {
                   <span className="text-xl">💬</span> Invia Messaggio
                 </button>
               )}
+              {user && user.id !== roommate.id && (
+                <div className="flex justify-center gap-6 mt-5 relative z-10">
+                  <button type="button" onClick={() => setReporting(true)} className="text-sm font-bold text-neutral-500 hover:text-rose-600 transition-colors cursor-pointer">
+                    🚩 Segnala
+                  </button>
+                  <button type="button" onClick={handleBlock} disabled={blockUser.isPending} className="text-sm font-bold text-neutral-500 hover:text-rose-600 transition-colors cursor-pointer">
+                    🚫 Blocca
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </aside>
 
       </div>
+      {reporting && (
+        <ReportDialog target={{ userId: roommate.id }} title={`Segnala ${roommate.firstName}`} onClose={() => setReporting(false)} />
+      )}
     </div>
   );
 }

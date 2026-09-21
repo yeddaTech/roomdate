@@ -12,9 +12,10 @@ import {
   updateListing,
   uploadListingPhoto,
 } from './listings';
+import { blockUser, listAdminReports, listBlocks, resolveReport, restoreListing, sendReport, unblockUser, unsuspendUser } from './moderation';
 import { queryKeys } from './queryKeys';
 import type { OutgoingMessage } from './chat';
-import type { ListingFilters, ListingInput, SessionUser } from './types';
+import type { ListingFilters, ListingInput, ModerationAction, SessionUser } from './types';
 import { getMyProfile, getPublicProfile, listRoommates, listSessions, revokeOtherSessions, revokeSession, updateMyProfile } from './users';
 
 export function useMyProfile() {
@@ -224,4 +225,71 @@ export function useStartChat() {
     mutationFn: startChat,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.conversations }),
   });
+}
+
+/** Utenti bloccati da chi guarda. */
+export function useBlocks() {
+  return useQuery({ queryKey: queryKeys.blocks, queryFn: listBlocks });
+}
+
+// Un blocco cambia cosa si vede quasi ovunque: profili, coinquilini, annunci, conversazioni
+function useInvalidateAfterBlock() {
+  const queryClient = useQueryClient();
+  return () => {
+    for (const key of [queryKeys.blocks, queryKeys.conversations, queryKeys.roommates, queryKeys.listings, ['users']]) {
+      queryClient.invalidateQueries({ queryKey: key });
+    }
+  };
+}
+
+export function useBlockUser() {
+  const invalidate = useInvalidateAfterBlock();
+  return useMutation({ mutationFn: blockUser, onSuccess: invalidate });
+}
+
+export function useUnblockUser() {
+  const invalidate = useInvalidateAfterBlock();
+  return useMutation({ mutationFn: unblockUser, onSuccess: invalidate });
+}
+
+export function useSendReport() {
+  return useMutation({ mutationFn: sendReport });
+}
+
+/** Segnalazioni aperte (dalla più vecchia) o chiuse (dalla più recente), a pagine. */
+export function useAdminReports(status: 'open' | 'closed') {
+  return useInfiniteQuery({
+    queryKey: queryKeys.adminReports(status),
+    queryFn: ({ pageParam }) => listAdminReports(status, pageParam),
+    initialPageParam: '',
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  });
+}
+
+// Ogni decisione cambia entrambe le code e ciò che vedono gli utenti
+function useInvalidateAfterModeration() {
+  const queryClient = useQueryClient();
+  return () => {
+    for (const key of [['admin'], queryKeys.listings, queryKeys.roommates, ['users']]) {
+      queryClient.invalidateQueries({ queryKey: key });
+    }
+  };
+}
+
+export function useResolveReport() {
+  const invalidate = useInvalidateAfterModeration();
+  return useMutation({
+    mutationFn: ({ id, action, note }: { id: number; action: ModerationAction; note: string }) => resolveReport(id, action, note),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUnsuspendUser() {
+  const invalidate = useInvalidateAfterModeration();
+  return useMutation({ mutationFn: unsuspendUser, onSuccess: invalidate });
+}
+
+export function useRestoreListing() {
+  const invalidate = useInvalidateAfterModeration();
+  return useMutation({ mutationFn: restoreListing, onSuccess: invalidate });
 }

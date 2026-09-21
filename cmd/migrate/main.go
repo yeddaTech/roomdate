@@ -17,12 +17,18 @@
 // e gli assegna i permessi; alla creazione stampa la stringa di connessione da mettere su Vercel:
 //
 //	go run ./cmd/migrate -host ep-floral-violet-aldznrms grant-app roomdate_app
+//
+// grant-admin e revoke-admin nominano o tolgono un amministratore, che vede le segnalazioni e può
+// sospendere account o rimuovere annunci (modulo M3.3):
+//
+//	go run ./cmd/migrate -host ep-floral-violet-aldznrms grant-admin nome@esempio.it
 package main
 
 import (
 	"bufio"
 	"context"
 	"database/sql"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -33,7 +39,14 @@ import (
 	"roomdate-backend/internal/devenv"
 )
 
-var writeCommands = map[string]bool{"up": true, "up-by-one": true, "down": true, "grant-app": true}
+var writeCommands = map[string]bool{"up": true, "up-by-one": true, "down": true, "grant-app": true, "grant-admin": true, "revoke-admin": true}
+
+// Comandi che vogliono un argomento: il ruolo dell'app o l'email dell'amministratore.
+var argumentHelp = map[string]string{
+	"grant-app":    "Indica il ruolo dell'applicazione, es.: go run ./cmd/migrate grant-app roomdate_app",
+	"grant-admin":  "Indica l'email dell'account, es.: go run ./cmd/migrate grant-admin nome@esempio.it",
+	"revoke-admin": "Indica l'email dell'account, es.: go run ./cmd/migrate revoke-admin nome@esempio.it",
+}
 var readCommands = map[string]bool{"status": true, "version": true, "validate": true}
 
 func main() {
@@ -44,6 +57,7 @@ func main() {
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Uso: go run ./cmd/migrate [-yes] [-env file] [-host host] status|version|validate|up|up-by-one|down")
 		fmt.Fprintln(os.Stderr, "     go run ./cmd/migrate [-yes] [-env file] [-host host] grant-app RUOLO")
+		fmt.Fprintln(os.Stderr, "     go run ./cmd/migrate [-yes] [-env file] [-host host] grant-admin|revoke-admin EMAIL")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -56,8 +70,8 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-	if command == "grant-app" && flag.Arg(1) == "" {
-		log.Fatal("Indica il ruolo dell'applicazione, es.: go run ./cmd/migrate grant-app roomdate_app")
+	if help, needed := argumentHelp[command]; needed && flag.Arg(1) == "" {
+		log.Fatal(help)
 	}
 
 	if _, err := devenv.Load(*envFile); err != nil {
@@ -93,8 +107,12 @@ func main() {
 		log.Fatalf("Database non raggiungibile: %v", err)
 	}
 
-	if command == "grant-app" {
+	switch command {
+	case "grant-app":
 		grantApp(conn, ownerDSN, flag.Arg(1))
+		return
+	case "grant-admin", "revoke-admin":
+		setAdmin(conn, flag.Arg(1), command == "grant-admin")
 		return
 	}
 
@@ -128,6 +146,25 @@ func grantApp(conn *sql.DB, ownerDSN, role string) {
 		fmt.Println(password)
 	}
 	fmt.Println()
+}
+
+// setAdmin nomina o toglie un amministratore, cercando l'account per email.
+func setAdmin(conn *sql.DB, email string, admin bool) {
+	var name string
+	err := conn.QueryRowContext(context.Background(), `
+        UPDATE roomdate_app.users SET is_admin = $2 WHERE lower(email) = lower(btrim($1))
+        RETURNING COALESCE(first_name, '')`, email, admin).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		log.Fatalf("Nessun account con l'email %q: nessuna modifica.", email)
+	}
+	if err != nil {
+		log.Fatalf("Modifica non riuscita: %v", err)
+	}
+	if admin {
+		log.Printf("%s (%s) ora è amministratore: vede l'area Moderazione ricaricando la pagina.", name, email)
+	} else {
+		log.Printf("%s (%s) non è più amministratore.", name, email)
+	}
 }
 
 func confirm(question string) bool {

@@ -15,6 +15,7 @@ import (
 	"roomdate-backend/internal/apperr"
 	"roomdate-backend/internal/db"
 	"roomdate-backend/internal/logx"
+	"roomdate-backend/internal/moderation"
 	"roomdate-backend/internal/page"
 	"roomdate-backend/internal/storage"
 	"roomdate-backend/internal/validate"
@@ -52,19 +53,24 @@ var (
 	errNotLandlordCreate = apperr.Forbidden("landlord_only", "Solo chi affitta una stanza può pubblicare annunci")
 	errNotFound          = apperr.NotFound("listing_not_found", "Annuncio non trovato")
 	errNotOwner          = apperr.Forbidden("listing_not_owned", "Puoi modificare solo i tuoi annunci")
-	errImageNotFound     = apperr.NotFound("image_not_found", "Foto non trovata")
-	errStorageDisabled   = apperr.New(http.StatusServiceUnavailable, "uploads_unavailable", "Il caricamento delle foto non è disponibile al momento")
-	errMissingActive     = apperr.BadRequest("invalid_active", "Indica se l'annuncio deve essere attivo")
+	errRemoved           = apperr.Forbidden("listing_removed",
+		"Annuncio rimosso dalla moderazione perché viola i Termini: puoi solo eliminarlo")
+	errImageNotFound   = apperr.NotFound("image_not_found", "Foto non trovata")
+	errStorageDisabled = apperr.New(http.StatusServiceUnavailable, "uploads_unavailable", "Il caricamento delle foto non è disponibile al momento")
+	errMissingActive   = apperr.BadRequest("invalid_active", "Indica se l'annuncio deve essere attivo")
 )
 
 type Service struct {
 	store   *Store
 	storage storage.Storage
-	now     func() time.Time
+	// moderation dice se chi guarda e il proprietario si sono bloccati, e se chi guarda è un
+	// amministratore (che vede anche gli annunci nascosti, per moderarli)
+	moderation *moderation.Store
+	now        func() time.Time
 }
 
-func NewService(store *Store, st storage.Storage) *Service {
-	return &Service{store: store, storage: st, now: time.Now}
+func NewService(store *Store, st storage.Storage, mod *moderation.Store) *Service {
+	return &Service{store: store, storage: st, moderation: mod, now: time.Now}
 }
 
 // Input sono i dati del modulo di creazione e modifica di un annuncio.
@@ -140,7 +146,9 @@ type Summary struct {
 	BillsIncluded *bool   `json:"billsIncluded"`
 	AvailableFrom *string `json:"availableFrom"`
 	IsActive      bool    `json:"isActive"`
-	CoverURL      *string `json:"coverUrl"`
+	// Removed è vero se la moderazione ha rimosso l'annuncio: lo vede solo il proprietario.
+	Removed  bool    `json:"removed"`
+	CoverURL *string `json:"coverUrl"`
 }
 
 // Owner è il proprietario dell'annuncio, come lo vedono gli altri utenti.
@@ -169,6 +177,7 @@ func (s *Service) summary(r Row) Summary {
 		Price:         r.Price,
 		BillsIncluded: r.BillsIncluded,
 		IsActive:      r.IsActive,
+		Removed:       r.Removed,
 	}
 	if r.AvailableFrom != nil {
 		date := r.AvailableFrom.Format(time.DateOnly)
@@ -194,8 +203,8 @@ type Page struct {
 }
 
 // List restituisce una pagina degli annunci attivi, filtrata e ordinata dal database (anomalia F17).
-func (s *Service) List(ctx context.Context, p ListParams) (Page, error) {
-	q := ListQuery{City: p.City, Sort: SortRecent, Limit: defaultLimit}
+func (s *Service) List(ctx context.Context, viewerID string, p ListParams) (Page, error) {
+	q := ListQuery{ViewerID: viewerID, City: p.City, Sort: SortRecent, Limit: defaultLimit}
 
 	var v validate.Validator
 	v.Check(q.City == "" || shared.IsCity(q.City), "city", "Città non valida")
@@ -319,8 +328,14 @@ func (s *Service) Get(ctx context.Context, viewerID, rawID string) (Detail, erro
 		return Detail{}, fmt.Errorf("lettura annuncio: %w", err)
 	}
 	isOwner := viewerID != "" && viewerID == r.OwnerID
-	if !r.IsActive && !isOwner {
-		return Detail{}, errNotFound
+	if !isOwner {
+		visible, err := s.visible(ctx, viewerID, r)
+		if err != nil {
+			return Detail{}, err
+		}
+		if !visible {
+			return Detail{}, errNotFound
+		}
 	}
 
 	images, err := s.store.Images(ctx, id)
@@ -344,6 +359,27 @@ func (s *Service) Get(ctx context.Context, viewerID, rawID string) (Detail, erro
 		}
 	}
 	return detail, nil
+}
+
+// visible dice se chi non è il proprietario può vedere l'annuncio: deve essere attivo, non rimosso,
+// di un account non sospeso e senza blocchi tra i due. Gli amministratori lo vedono comunque.
+func (s *Service) visible(ctx context.Context, viewerID string, r Row) (bool, error) {
+	hidden := !r.IsActive || r.Removed || r.OwnerSuspended
+	if !hidden {
+		relation, err := s.moderation.Relation(ctx, viewerID, r.OwnerID)
+		if err != nil {
+			return false, fmt.Errorf("verifica blocchi: %w", err)
+		}
+		hidden = relation.Blocked()
+	}
+	if !hidden {
+		return true, nil
+	}
+	admin, err := s.moderation.IsAdmin(ctx, viewerID)
+	if err != nil {
+		return false, fmt.Errorf("verifica amministratore: %w", err)
+	}
+	return admin, nil
 }
 
 // Create pubblica un annuncio e ne restituisce il dettaglio.
@@ -372,13 +408,23 @@ func (s *Service) Create(ctx context.Context, userID string, in Input) (Detail, 
 
 // requireOwner verifica che l'annuncio esista e sia dell'utente. Gestire i propri annunci
 // (modificarli, disattivarli, eliminarli) non richiede il ruolo "affitta": chi cambia ruolo
-// deve poter comunque ritirare gli annunci pubblicati.
+// deve poter comunque ritirare gli annunci pubblicati. Un annuncio rimosso dalla moderazione
+// si può solo eliminare (con le sue foto).
 func (s *Service) requireOwner(ctx context.Context, userID, rawID string) (int, error) {
+	return s.owned(ctx, userID, rawID, true)
+}
+
+// requireEditable è requireOwner per le modifiche: rifiuta gli annunci rimossi dalla moderazione.
+func (s *Service) requireEditable(ctx context.Context, userID, rawID string) (int, error) {
+	return s.owned(ctx, userID, rawID, false)
+}
+
+func (s *Service) owned(ctx context.Context, userID, rawID string, allowRemoved bool) (int, error) {
 	id, ok := validate.PositiveID(rawID)
 	if !ok {
 		return 0, errNotFound
 	}
-	ownerID, err := s.store.Owner(ctx, id)
+	ownerID, removed, err := s.store.Owner(ctx, id)
 	if db.IsNoRows(err) {
 		return 0, errNotFound
 	}
@@ -388,12 +434,15 @@ func (s *Service) requireOwner(ctx context.Context, userID, rawID string) (int, 
 	if ownerID != userID {
 		return 0, errNotOwner
 	}
+	if removed && !allowRemoved {
+		return 0, errRemoved
+	}
 	return id, nil
 }
 
 // Update modifica un annuncio e ne restituisce il dettaglio aggiornato.
 func (s *Service) Update(ctx context.Context, userID, rawID string, in Input) (Detail, error) {
-	id, err := s.requireOwner(ctx, userID, rawID)
+	id, err := s.requireEditable(ctx, userID, rawID)
 	if err != nil {
 		return Detail{}, err
 	}
@@ -409,7 +458,7 @@ func (s *Service) Update(ctx context.Context, userID, rawID string, in Input) (D
 
 // SetActive pubblica o ritira un annuncio senza eliminarlo.
 func (s *Service) SetActive(ctx context.Context, userID, rawID string, active bool) error {
-	id, err := s.requireOwner(ctx, userID, rawID)
+	id, err := s.requireEditable(ctx, userID, rawID)
 	if err != nil {
 		return err
 	}
@@ -459,7 +508,7 @@ type PendingUpload struct {
 // PrepareUpload firma il caricamento di una foto. Il file finisce in "pending/": diventa una foto
 // dell'annuncio solo dopo ConfirmUpload (una regola di scadenza sul bucket elimina quelli abbandonati).
 func (s *Service) PrepareUpload(ctx context.Context, userID, rawID string, in UploadInput) (PendingUpload, error) {
-	id, err := s.requireOwner(ctx, userID, rawID)
+	id, err := s.requireEditable(ctx, userID, rawID)
 	if err != nil {
 		return PendingUpload{}, err
 	}
@@ -499,7 +548,7 @@ type ConfirmInput struct {
 // ConfirmUpload verifica il file caricato (esistenza, dimensione, formato reale) e lo aggiunge
 // alle foto dell'annuncio. Un file non valido viene eliminato.
 func (s *Service) ConfirmUpload(ctx context.Context, userID, rawID string, in ConfirmInput) (Image, error) {
-	id, err := s.requireOwner(ctx, userID, rawID)
+	id, err := s.requireEditable(ctx, userID, rawID)
 	if err != nil {
 		return Image{}, err
 	}

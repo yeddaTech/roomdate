@@ -22,6 +22,7 @@ const Privacy = lazy(() => import('./pages/Privacy'));
 const Terms = lazy(() => import('./pages/Terms'));
 const Guide = lazy(() => import('./pages/Guide'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const Moderation = lazy(() => import('./pages/Moderation'));
 
 function App() {
   return (
@@ -46,6 +47,7 @@ function App() {
               <Route path="/termini" element={<Terms />} />
               <Route path="/guida" element={<Guide />} />
               <Route path="/impostazioni" element={<ProtectedRoute><Impostazioni /></ProtectedRoute>} />
+              <Route path="/moderazione" element={<ProtectedRoute><Moderation /></ProtectedRoute>} />
               <Route path="/dettagli/:id" element={<ListingDetails />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

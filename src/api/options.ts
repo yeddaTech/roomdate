@@ -17,6 +17,8 @@ export const OCCUPATIONS: readonly Option[] = options.occupations;
 export const LIFESTYLE_TAGS: readonly LifestyleTag[] = options.lifestyleTags;
 /** Servizi che un annuncio può indicare, nell'ordine in cui vengono mostrati. */
 export const AMENITIES: readonly Option[] = options.amenities;
+/** Motivi di una segnalazione, gli stessi che il server accetta. */
+export const REPORT_REASONS: readonly Option[] = options.reportReasons;
 
 const SMOKING_TAGS = ['fumatore', 'non_fumatore'];
 
