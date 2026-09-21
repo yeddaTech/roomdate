@@ -11,6 +11,7 @@ import Home from './pages/Home';
 // Usa lazy e Suspense per caricare le altre pagine solo quando servono
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
+const RecoverAccount = lazy(() => import('./pages/RecoverAccount'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Search = lazy(() => import('./pages/Search'));
 const Chatpage = lazy(() => import('./pages/Chatpage'));
@@ -36,6 +37,7 @@ function App() {
               <Route path="/accedi" element={<Login />} />
               <Route path="/registrati" element={<Register />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/recupero" element={<RecoverAccount />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/ricerca" element={<Search />} />
               <Route path="/chat" element={<ProtectedRoute><Chatpage /></ProtectedRoute>} />

@@ -61,6 +61,8 @@ export interface Profile {
   /** Chiavi di LIFESTYLE_TAGS, nell'ordine dell'elenco. */
   lifestyleTags: string[];
   isPublic: boolean;
+  /** true se l'utente ha una chiave di recupero per la password dimenticata. */
+  hasRecoveryKey: boolean;
 }
 
 export type ProfileInput = Pick<Profile, 'userType' | 'city' | 'budgetMax' | 'occupation' | 'birthdate' | 'bio' | 'lifestyleTags' | 'isPublic'>;
@@ -79,6 +81,17 @@ export interface RegisterInput {
   lifestyleTags: string[];
   keys: CryptoKeys;
   kdf: KdfParams;
+  recovery: RecoveryInput;
+}
+
+/** Chiave di recupero preparata dal browser: al server non arriva mai il codice. */
+export interface RecoveryInput {
+  salt: string;
+  /** Chiave ricavata dal codice, con cui si dimostra di averlo. */
+  authKey: string;
+  /** Copia della chiave privata cifrata con il codice; vuota se l'account non ha chiavi. */
+  encryptedPrivateKey: string;
+  iv: string;
 }
 
 /**

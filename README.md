@@ -23,7 +23,7 @@ Signing in creates a session row in the database; the cookie only carries a 256-
 * Wrong credentials always answer `Credenziali non valide`, whether the email exists or not. After five failed attempts for an email (twenty for a network) the wait grows, without ever locking an account: knowing somebody's address would otherwise be enough to lock them out.
 * Deleting the account asks for the password again, and `security_events` records sign-ins, failures, password changes and deletions, with email and IP stored only as salted hashes.
 
-Password reset by email does not exist yet: it needs an email provider (decision D2 in `piano_refactoring.md`), so today a forgotten password cannot be recovered.
+Password reset by email does not exist yet: it needs an email provider (decision D2 in `piano_refactoring.md`). A forgotten password can be replaced only with the recovery key described below.
 
 ## Security & Cryptography Infrastructure
 
@@ -36,7 +36,8 @@ Chat messages are encrypted and decrypted in the browser; the server stores and 
 *   **Hybrid encryption:** each message is encrypted once with AES-256-GCM, and the message key is then encrypted with RSA-OAEP for every participant (table `message_keys`). Message length no longer depends on RSA, which stops at 190 bytes. Messages written before this change carry `format = 1`, one RSA copy per participant, and stay readable.
 *   **Private key in the browser:** once opened, the private key is imported as a non-extractable `CryptoKey` and kept in IndexedDB: the browser can decrypt with it, but no script can read its content, and it survives a page reload. `localStorage` keeps only the encrypted vault and the public key. Signing out deletes all of them.
 *   **Changing the password** re-encrypts the private key in the browser with the key derived from the new password (and a new salt); the server replaces hash, parameters and vault in a single statement.
-*   **Not yet available:** a recovery key to regain the chats after a forgotten password (decision D3), and password reset (it needs an email provider, decision D2).
+*   **Recovery key (decision D3):** at registration the browser generates a 120-bit code (24 characters, Crockford alphabet) and shows it once. With HKDF it derives a *verification key*, whose Argon2id hash the server keeps, and a key that encrypts a second copy of the private key. Whoever forgets the password opens `/recupero`, enters email and code, and sets a new password: the copy is opened in the browser and re-encrypted with the new password, so no message is lost, and every open session is closed. The endpoints are `auth/recovery/start`, `auth/recovery/verify` and `auth/recovery/complete`; unknown emails get a fake but stable salt, and wrong codes slow down like wrong passwords. Accounts created earlier can create or replace the key from the settings page (`PUT /api/v1/me/recovery`), which invalidates the previous one.
+*   **Not yet available:** password reset by email, which needs an email provider (decision D2). Without a recovery key, a forgotten password cannot be recovered: nobody, the server included, can open the private key.
 
 ## Local Development
 

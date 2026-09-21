@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { prepareRegistration } from '../auth/accountKeys';
 import { passwordProblem } from '../auth/passwordPolicy';
+import RecoveryCodePanel from '../components/RecoveryCodePanel';
 import { MIN_PASSWORD_LENGTH, register } from '../api/auth';
 import { ApiError } from '../api/client';
 import { CITIES, OCCUPATIONS } from '../api/options';
@@ -12,6 +13,7 @@ export default function Register() {
 
   const [userType, setUserType] = useState('cerca'); 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState(null);
   
   const [formData, setFormData] = useState({
     nome: '',
@@ -70,7 +72,7 @@ export default function Register() {
 
     setIsSubmitting(true);
     try {
-      const { authKey, kdf, keys } = await prepareRegistration(formData.password);
+      const { authKey, kdf, keys, recovery, recoveryCode: code } = await prepareRegistration(formData.password);
 
       await register({
         firstName: formData.nome,
@@ -87,10 +89,12 @@ export default function Register() {
         bio: formData.bio,
         lifestyleTags: formData.lifestyleTags,
         keys,
+        recovery,
       });
 
-      alert('🎉 Registrazione completata! Ora puoi accedere e vedere il tuo profilo già impostato.');
-      navigate('/accedi');
+      // Prima dell'accesso si mostra la chiave di recupero: è l'unica occasione per salvarla
+      setRecoveryCode(code);
+      window.scrollTo(0, 0);
     } catch (error) {
       if (error instanceof ApiError) {
         alert('❌ Errore: ' + error.message);
@@ -144,7 +148,10 @@ export default function Register() {
           <div className="absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-orange-400/5 blur-[100px] rounded-full pointer-events-none"></div>
 
           <div className="w-full max-w-2xl bg-white p-8 md:p-10 rounded-3xl shadow-lg border border-neutral-100 relative z-10 animate-fade-in-up my-auto">
-            
+            {recoveryCode ? (
+              <RecoveryCodePanel code={recoveryCode} doneLabel="Vai all'accesso" onDone={() => navigate('/accedi')} />
+            ) : (
+            <>
             <h1 className="font-serif text-4xl text-neutral-900 font-extrabold mb-2 tracking-tight">Crea il tuo account</h1>
             <p className="text-neutral-500 text-sm mb-8 font-medium">Compila il tuo profilo per farti notare subito dalla community.</p>
 
@@ -270,6 +277,8 @@ export default function Register() {
                 {isSubmitting ? 'Creazione in corso...' : 'Crea Account e Profilo 🚀'}
               </button>
             </form>
+            </>
+            )}
           </div>
         </div>
       </div>

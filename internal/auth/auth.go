@@ -156,6 +156,11 @@ func (m *Manager) RevokeSession(ctx context.Context, userID, sessionID string) (
 	return m.store.DeleteUserSession(ctx, userID, sessionID)
 }
 
+// RevokeAllSessions revoca tutte le sessioni dell'utente, compresa quella in uso.
+func (m *Manager) RevokeAllSessions(ctx context.Context, userID string) error {
+	return m.store.DeleteAllUserSessions(ctx, userID)
+}
+
 // RevokeOtherSessions revoca tutte le altre sessioni dell'utente e restituisce quante ne ha chiuse.
 func (m *Manager) RevokeOtherSessions(ctx context.Context, userID, keepSessionID string) (int, error) {
 	return m.store.DeleteUserSessions(ctx, userID, keepSessionID)
