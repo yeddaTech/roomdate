@@ -108,16 +108,3 @@ func (h *Handler) MarkRead(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-
-// Typing gestisce POST /api/v1/conversations/{id}/typing.
-func (h *Handler) Typing(w http.ResponseWriter, r *http.Request) {
-	session, ok := h.requireSession(w, r)
-	if !ok {
-		return
-	}
-	if err := h.svc.Typing(r.Context(), session.UserID, r.PathValue("id")); err != nil {
-		httpx.WriteError(w, r, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}

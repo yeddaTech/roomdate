@@ -17,7 +17,9 @@ func TestRoutingAndHeaders(t *testing.T) {
 
 	// Tutte le API sono v1, con errori in JSON
 	expect(t, app.do(http.MethodOptions, "/api/v1/conversations", nil), http.StatusNoContent, "")
-	expect(t, app.do(http.MethodGet, "/api/v1/conversations/1/typing", nil), http.StatusMethodNotAllowed, `"code":"method_not_allowed"`)
+	expect(t, app.do(http.MethodGet, "/api/v1/realtime/auth", nil), http.StatusMethodNotAllowed, `"code":"method_not_allowed"`)
+	// "Sta scrivendo" passa tra i browser sul canale privato della conversazione (modulo M3.5)
+	expect(t, app.do(http.MethodGet, "/api/v1/conversations/1/typing", nil), http.StatusNotFound, `"code":"endpoint_not_found"`)
 	expect(t, app.do(http.MethodGet, "/api/v1/auth/login", nil), http.StatusMethodNotAllowed, `"code":"method_not_allowed"`)
 	expect(t, app.do(http.MethodPatch, "/api/v1/me", nil), http.StatusMethodNotAllowed, "")
 	expect(t, app.do(http.MethodGet, "/api/v1/health", nil), http.StatusOK, `{"status":"ok"}`)

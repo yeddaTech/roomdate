@@ -72,9 +72,13 @@ Both lists answer `{"items": [...], "nextCursor": "…"}` and are paginated by c
 
 Public profiles show the age, never the birth date. For a signed-in viewer, profiles also carry `compatibility`: what the two profiles have in common (same city, budgets within 100 €, shared lifestyle tags) and whether one smokes and the other does not. There is deliberately no percentage score, so every item shown to users has a stated reason.
 
-* Chat: `conversations` (list, start), `conversations/{id}/messages` (read, send), `conversations/{id}/read`, `conversations/{id}/typing`. The conversation list carries the last message, the unread count and the other participant; messages are paginated newest-first, so opening a chat no longer loads its whole history. Every message the caller receives already contains the ciphertext and the key that caller can open.
+* Chat: `conversations` (list, start), `conversations/{id}/messages` (read, send), `conversations/{id}/read`, and `realtime/auth` (signature for private real-time channels). The conversation list carries the last message, the unread count and the other participant; messages are paginated newest-first, so opening a chat no longer loads its whole history. Every message the caller receives already contains the ciphertext and the key that caller can open.
 
-Real-time events go to one channel per user (`user-<id>`) and carry only the conversation and message IDs, so a message notifies its participants instead of every connected client. Without the `PUSHER_*` variables the app still works: the chat page refreshes every few seconds instead.
+Real-time events use Pusher **private** channels, which carry only IDs, never message content. Pusher accepts a subscription only with a signature from `POST /api/v1/realtime/auth`. The API signs only the caller's own channel and the channels of conversations they take part in.
+* `private-user-<id>`: the server's "new message" notice (conversation and message ID), so a message wakes only its participants instead of every connected client.
+* `private-conversation-<id>`: "typing" travels as a client event (`client-typing`, carrying only the sender's ID) straight between the participants' browsers, with no API call. In the Pusher dashboard, **App Settings → Enable client events** must be on, otherwise the typing indicator stays silent (everything else works).
+
+Without the `PUSHER_*` variables the app still works: the chat page refreshes every few seconds instead. To try real time locally without a Pusher app, run a Pusher-compatible server such as [soketi](https://docs.soketi.app/) and set `PUSHER_HOST` / `VITE_PUSHER_HOST` (see `.env.example`).
 
 ### Frontend data layer
 

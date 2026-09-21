@@ -12,6 +12,8 @@ import (
 // Pusher contiene le credenziali per gli eventi in tempo reale (facoltative in sviluppo).
 type Pusher struct {
 	AppID, Key, Secret, Cluster string
+	// Host (facoltativo, solo sviluppo) è un server compatibile con Pusher in locale, es. "127.0.0.1:6001".
+	Host string
 }
 
 // Enabled indica se le credenziali Pusher sono complete.
@@ -50,6 +52,7 @@ func FromEnv() (Config, error) {
 			Key:     os.Getenv("PUSHER_KEY"),
 			Secret:  os.Getenv("PUSHER_SECRET"),
 			Cluster: os.Getenv("PUSHER_CLUSTER"),
+			Host:    strings.TrimSpace(os.Getenv("PUSHER_HOST")),
 		},
 		Storage: storage.S3Config{
 			Endpoint:        strings.TrimSpace(os.Getenv("R2_ENDPOINT")),

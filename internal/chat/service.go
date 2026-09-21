@@ -33,12 +33,13 @@ var (
 )
 
 type Service struct {
-	store     *Store
-	publisher realtime.Publisher
+	store      *Store
+	publisher  realtime.Publisher
+	authorizer realtime.Authorizer
 }
 
-func NewService(store *Store, publisher realtime.Publisher) *Service {
-	return &Service{store: store, publisher: publisher}
+func NewService(store *Store, publisher realtime.Publisher, authorizer realtime.Authorizer) *Service {
+	return &Service{store: store, publisher: publisher, authorizer: authorizer}
 }
 
 // StartChatInput identifica l'annuncio (chat su annuncio) o l'utente (chat diretta).
@@ -344,29 +345,6 @@ func (s *Service) MarkRead(ctx context.Context, userID, rawConversationID string
 	}
 	if err := s.store.MarkRead(ctx, conversationID, userID); err != nil {
 		return apperr.Wrap(err, "mark_read_failed", "Impossibile aggiornare i messaggi letti")
-	}
-	return nil
-}
-
-// Typing segnala agli altri partecipanti che l'utente sta scrivendo.
-func (s *Service) Typing(ctx context.Context, userID, rawConversationID string) error {
-	conversationID, err := s.requireParticipantByID(ctx, userID, rawConversationID)
-	if err != nil {
-		return err
-	}
-	participants, err := s.store.Participants(ctx, conversationID)
-	if err != nil {
-		return fmt.Errorf("lettura partecipanti: %w", err)
-	}
-	for _, p := range participants {
-		if p.UserID == userID {
-			continue
-		}
-		err := s.publisher.Publish(ctx, realtime.UserChannel(p.UserID), realtime.EventTyping,
-			map[string]string{"conversationId": strconv.Itoa(conversationID), "senderId": userID})
-		if err != nil {
-			return apperr.Wrap(err, "realtime_failed", "Errore di trasmissione in tempo reale")
-		}
 	}
 	return nil
 }
