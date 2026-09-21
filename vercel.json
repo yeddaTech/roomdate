@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "regions": ["fra1"],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.go" },
     { "source": "/(.*)", "destination": "/index.html" }

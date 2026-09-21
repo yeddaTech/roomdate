@@ -96,7 +96,20 @@ Migrations are SQL files in `internal/db/migrations` (goose format), embedded in
 * `npm run db:status` shows which migrations are applied; `npm run db:migrate` applies the pending ones.
 * To change the schema, add a new file such as `00003_short_description.sql` with `-- +goose Up` and `-- +goose Down` sections. Never edit a migration that has already run in production.
 * `00001_baseline.sql` is a copy of the production schema (checked against `pg_dump --schema-only --schema=roomdate_app` in September 2026): user IDs are UUIDs, and some columns are nullable or have `VARCHAR` limits that the API validation follows. The tool asks for confirmation before changing a non-local database.
-* Always migrate the database that Vercel uses: take `DATABASE_URL` from Vercel → Settings → Environment Variables (Production), not from the Neon connection dialog, which may show another branch or project. Create a Neon backup branch first, then run `go run ./cmd/migrate -host <expected host> up`: with `-host` (for example `ep-floral-violet-aldznrms`) the tool refuses to touch any other database. It always removes `-pooler` from Neon hosts, because migrations need a direct connection.
+* Migrations run as the schema owner, never with the app's role (see below). Take the owner's connection string from Neon → **Connect** (branch `production`, role `neondb_owner`). The dialog may show another branch or project, so check that its host is the one in Vercel's `DATABASE_URL` (Production). Create a Neon backup branch first, then run `go run ./cmd/migrate -host <expected host> up`: with `-host` (for example `ep-floral-violet-aldznrms`) the tool refuses to touch any other database. It always removes `-pooler` from Neon hosts, because migrations need a direct connection.
+
+### Database access, TLS and restore (module M3.6)
+
+* **Constraints:** besides foreign keys and unique emails, the database enforces with CHECK constraints the same limits as the code (roles, budget 0–20,000 €, text lengths, key-derivation parameters, message format). Migration `00010` adds each one only when every existing row satisfies it, and warns otherwise: a violated constraint would block any update to those rows.
+* **TLS:** every connection to a non-local host uses TLS with certificate and host-name verification (`verify-full`), whatever the connection string says. Neon's strings use `sslmode=require`, which encrypts but does not check the certificate.
+* **Two roles.** The app connects as `roomdate_app`, which can only read and write rows: no DDL, no `TRUNCATE`, no access to `public.goose_db_version`. Migrations run as the schema owner (`neondb_owner`). The integration tests run every endpoint as such a restricted role, so a missing privilege shows up as a failing test. One-time setup:
+  1. Take the **owner** connection string from Neon → Connect (branch `production`, role `neondb_owner`) and run `go run ./cmd/migrate -host ep-floral-violet-aldznrms grant-app roomdate_app`. The command creates the role with a random password and grants only row privileges. Tables created later by the owner get the same privileges automatically. It checks that every table actually received them, and changes nothing if it finds a problem. **Do not create the role from Neon → Roles**: roles made there belong to `neon_superuser`, which can read and write every table and create roles and databases. `grant-app` refuses such roles.
+  2. The command prints the app's connection string once (pooled host, `roomdate_app` role and its password). Paste it into Vercel → Settings → Environment Variables → `DATABASE_URL` (Production), keep it nowhere else, then redeploy and check that `/api/v1/health`, login and the chat work. To roll back, put the owner's pooled string back and redeploy.
+  3. From then on, Vercel's `DATABASE_URL` cannot run migrations: use the owner string from Neon, always with `-host`. Running `grant-app` again only refreshes the privileges and does not change the password. If the password is lost, run `grant-app` with a new name (for example `roomdate_app2`) and switch Vercel to it. Then drop the old role from the Neon SQL Editor with `DROP OWNED BY roomdate_app; DROP ROLE roomdate_app;`.
+* **Region:** the database is in Frankfurt (`eu-central-1`) and `vercel.json` runs the functions in `fra1`: the API and its data stay in the EU, and queries no longer cross the Atlantic.
+* **Restore drill** (point-in-time restore, to repeat every few months): Neon → **Branches** → **Create branch** → from `production`, *point in time* one hour ago. In the SQL Editor on the new branch, run
+  `SELECT (SELECT count(*) FROM roomdate_app.users) users, (SELECT count(*) FROM roomdate_app.listings) listings, (SELECT count(*) FROM roomdate_app.messages) messages, (SELECT max(created_at) FROM roomdate_app.messages) last_message;`
+  and compare with the same query on `production`: the numbers must match, except for what was written in the last hour. Then delete the branch. The restore window depends on the Neon plan (history retention setting).
 
 ### Listing photos (Cloudflare R2)
 
@@ -117,7 +130,7 @@ One-time setup:
 
 ### Neon branches and Vercel previews
 
-Create a Neon branch for development and use its connection string locally. In Vercel → Settings → Environment Variables, make sure the **Preview** `DATABASE_URL` points to a non-production branch (the Neon integration for Vercel can create one per preview deployment).
+Create a Neon branch for development and use its connection string locally. In Vercel → Settings → Environment Variables, make sure the **Preview** `DATABASE_URL` points to a non-production branch (the Neon integration for Vercel can create one per preview deployment). A branch copied from `production` contains real personal data: prefer an empty branch, migrated and filled with `npm run db:seed`.
 
 ## Development Workflow
 
