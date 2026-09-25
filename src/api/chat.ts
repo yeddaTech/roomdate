@@ -31,6 +31,12 @@ export function sendMessage(conversationId: number, message: OutgoingMessage): P
   return request<ChatMessage>(`/api/v1/conversations/${conversationId}/messages`, { method: 'POST', body: message });
 }
 
+/** Quante conversazioni hanno messaggi non ancora letti: il numero sul badge della chat. */
+export async function getUnreadCount(): Promise<number> {
+  const { conversations } = await request<{ conversations: number }>('/api/v1/me/unread');
+  return conversations;
+}
+
 /** Segna come letti i messaggi della conversazione fino a ora. */
 export function markConversationRead(conversationId: number): Promise<void> {
   return request<void>(`/api/v1/conversations/${conversationId}/read`, { method: 'POST' });

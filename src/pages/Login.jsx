@@ -56,24 +56,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-dvh flex flex-col font-sans bg-[#FAFAFA] selection:bg-orange-200">
+    <div className="flex-1 flex flex-col font-sans bg-[#FAFAFA] selection:bg-orange-200">
       
-      {/* --- TOP NAV MINIMALE (GLASSMORPHISM) --- */}
-      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-xs border-b border-neutral-100 absolute top-0 w-full">
-        <div className="flex items-center gap-6">
-          <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900 decoration-none">
-            Room<span className="text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500">Date</span>
-          </Link>
-          <Link to="/" className="hidden md:flex text-sm text-neutral-500 hover:text-neutral-900 font-medium transition-colors">
-            ← Torna alla home
-          </Link>
-        </div>
-        
-        <div className="flex items-center gap-4">
-          <span className="hidden md:inline text-sm text-neutral-500 font-medium">Non hai un account?</span>
-          <Link to="/registrati" className="bg-neutral-900 hover:bg-neutral-800 px-5 py-2 rounded-full text-sm font-bold text-white transition-colors shadow-xs">Registrati gratis</Link>
-        </div>
-      </nav>
 
       {/* --- MAIN LAYOUT SPLIT --- */}
       <div className="flex-1 flex flex-col lg:flex-row w-full pt-16 md:pt-0">

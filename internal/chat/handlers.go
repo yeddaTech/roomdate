@@ -62,6 +62,20 @@ func (h *Handler) Conversations(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, page)
 }
 
+// Unread gestisce GET /api/v1/me/unread: {"conversations": n}, il numero sul badge della chat.
+func (h *Handler) Unread(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.requireSession(w, r)
+	if !ok {
+		return
+	}
+	n, err := h.svc.UnreadCount(r.Context(), session.UserID)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]int{"conversations": n})
+}
+
 // Messages gestisce GET /api/v1/conversations/{id}/messages?cursor=&limit=.
 func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 	session, ok := h.requireSession(w, r)

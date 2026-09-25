@@ -1,6 +1,4 @@
 import { Link } from 'react-router-dom';
-import Footer from '../components/Footer';
-import Navbar from '../components/Navbar';
 import { useLatestListings } from '../api/hooks';
 
 export default function Home() {
@@ -8,11 +6,10 @@ export default function Home() {
   const error = isError ? "Impossibile caricare le stanze al momento." : null;
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] font-sans selection:bg-orange-200 flex flex-col">
-      <Navbar />
+    <div className="bg-[#FAFAFA] font-sans selection:bg-orange-200 flex flex-col">
 
       {/* HERO SECTION */}
-      <section className="relative pt-32 md:pt-40 pb-20 px-6 overflow-hidden flex flex-col items-center justify-center min-h-[80vh]">
+      <section className="relative pt-16 md:pt-24 pb-20 px-6 overflow-hidden flex flex-col items-center justify-center min-h-[80vh]">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-orange-400/20 blur-[100px] rounded-full pointer-events-none"></div>
         <div className="relative z-10 max-w-4xl mx-auto text-center mt-12 md:mt-0">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-50 border border-orange-100 text-orange-600 text-sm font-bold mb-8 shadow-xs">
@@ -101,7 +98,6 @@ export default function Home() {
         </div>
       </section>
 
-      <Footer />
     </div>
   );
 }

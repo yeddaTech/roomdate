@@ -1,16 +1,15 @@
-import { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { lazy } from 'react';
+import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 
-import { AuthProvider } from './auth/AuthProvider';
-import { ProtectedRoute } from './auth/ProtectedRoute';
-import PageLoader from './components/PageLoader';
-import ConfirmProvider from './components/ui/ConfirmProvider';
-import Toaster from './components/ui/Toaster';
+import AppLayout from './components/layout/AppLayout';
+import AuthLayout from './components/layout/AuthLayout';
+import PublicLayout from './components/layout/PublicLayout';
+import RootLayout from './components/layout/RootLayout';
+import RouteError from './components/layout/RouteError';
 
-// Importa normalmente solo le pagine essenziali (es. la Home)
+// La home si carica subito; le altre pagine solo quando servono
 import Home from './pages/Home';
 
-// Usa lazy e Suspense per caricare le altre pagine solo quando servono
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const RecoverAccount = lazy(() => import('./pages/RecoverAccount'));
@@ -28,43 +27,60 @@ const Moderation = lazy(() => import('./pages/Moderation'));
 // Vetrina dei componenti del design system: solo in sviluppo, non finisce nel sito pubblicato
 const DesignSystem = import.meta.env.DEV ? lazy(() => import('./pages/DesignSystem')) : null;
 
-function App() {
-  return (
-    <BrowserRouter>
-      {/* La sessione viene verificata dal server una volta all'avvio (AuthProvider) */}
-      <AuthProvider>
-        <ConfirmProvider>
-        {/* Aggiunto il tag <main> per definire il punto di riferimento principale */}
-        <main className="flex flex-col min-h-screen">
-          {/* Suspense mostra un caricamento mentre React scarica il file JS della pagina */}
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/accedi" element={<Login />} />
-              <Route path="/registrati" element={<Register />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/recupero" element={<RecoverAccount />} />
-              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/ricerca" element={<Search />} />
-              <Route path="/chat" element={<ProtectedRoute><Chatpage /></ProtectedRoute>} />
-              <Route path="/coinquilino/:id" element={<RoommateDetails />} />
-              <Route path="/privacy" element={<Privacy />} />
-              <Route path="/termini" element={<Terms />} />
-              <Route path="/guida" element={<Guide />} />
-              <Route path="/impostazioni" element={<ProtectedRoute><Impostazioni /></ProtectedRoute>} />
-              <Route path="/moderazione" element={<ProtectedRoute><Moderation /></ProtectedRoute>} />
-              <Route path="/dettagli/:id" element={<ListingDetails />} />
-              {DesignSystem && <Route path="/design-system" element={<DesignSystem />} />}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-          {/* Nessun banner cookie: l'app usa solo cookie e memoria locale tecnici (sessione e chiavi della chat) */}
-        </main>
-        <Toaster />
-        </ConfirmProvider>
-      </AuthProvider>
-    </BrowserRouter>
-  );
-}
+// Ogni gruppo di pagine ha il suo layout; il livello intermedio senza percorso raccoglie gli errori
+// delle pagine, così il messaggio compare dentro il layout e la navigazione resta utilizzabile.
+const router = createBrowserRouter([
+  {
+    element: <RootLayout />,
+    errorElement: <RouteError />,
+    children: [
+      {
+        // Pagine pubbliche e informative (anche Privacy e Termini: servono la stessa navigazione)
+        element: <PublicLayout />,
+        children: [{
+          errorElement: <RouteError />,
+          children: [
+            { index: true, element: <Home /> },
+            { path: 'ricerca', element: <Search /> },
+            { path: 'dettagli/:id', element: <ListingDetails /> },
+            { path: 'coinquilino/:id', element: <RoommateDetails /> },
+            { path: 'guida', element: <Guide /> },
+            { path: 'privacy', element: <Privacy /> },
+            { path: 'termini', element: <Terms /> },
+            ...(DesignSystem ? [{ path: 'design-system', element: <DesignSystem /> }] : []),
+            { path: '*', element: <NotFound /> },
+          ],
+        }],
+      },
+      {
+        // Area personale: serve una sessione (AppLayout rimanda all'accesso)
+        element: <AppLayout />,
+        children: [{
+          errorElement: <RouteError />,
+          children: [
+            { path: 'dashboard', element: <Dashboard /> },
+            { path: 'chat', element: <Chatpage />, handle: { fullHeight: true } },
+            { path: 'impostazioni', element: <Impostazioni /> },
+            { path: 'moderazione', element: <Moderation /> },
+          ],
+        }],
+      },
+      {
+        element: <AuthLayout />,
+        children: [{
+          errorElement: <RouteError />,
+          children: [
+            { path: 'accedi', element: <Login />, handle: { authSwitch: { text: 'Non hai un account?', label: 'Registrati', to: '/registrati' } } },
+            { path: 'registrati', element: <Register />, handle: { authSwitch: { text: 'Hai già un account?', label: 'Accedi', to: '/accedi' } } },
+            { path: 'register', element: <Navigate to="/registrati" replace /> },
+            { path: 'recupero', element: <RecoverAccount />, handle: { authSwitch: { text: 'Ricordi la password?', label: 'Accedi', to: '/accedi' } } },
+          ],
+        }],
+      },
+    ],
+  },
+]);
 
-export default App;
+export default function App() {
+  return <RouterProvider router={router} />;
+}

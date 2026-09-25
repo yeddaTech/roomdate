@@ -362,6 +362,48 @@ func TestUnreadCount(t *testing.T) {
 	expect(t, app.do(http.MethodPost, "/api/v1/conversations/"+itoa(f.directChat)+"/read", nil, withSession(f.carla.Cookie)), http.StatusForbidden, "")
 }
 
+// Il badge della chat conta le conversazioni con messaggi da leggere, non i singoli messaggi.
+func TestUnreadConversationsBadge(t *testing.T) {
+	f := newChatFixture(t)
+	app := f.app
+	badge := func(cookie string) int {
+		t.Helper()
+		rec := app.do(http.MethodGet, "/api/v1/me/unread", nil, withSession(cookie))
+		expect(t, rec, http.StatusOK, "")
+		var body struct{ Conversations int }
+		decode(t, rec, &body)
+		return body.Conversations
+	}
+	if n := badge(f.anna.Cookie); n != 0 {
+		t.Fatalf("senza messaggi il badge vale %d", n)
+	}
+	app.send(f.marco.Cookie, f.directChat, message("uno", f.anna, f.marco))
+	app.send(f.marco.Cookie, f.directChat, message("due", f.anna, f.marco))
+	app.send(f.marco.Cookie, f.listingChat, message("tre", f.anna, f.marco))
+	if n := badge(f.anna.Cookie); n != 2 {
+		t.Errorf("due conversazioni con messaggi nuovi: badge %d", n)
+	}
+	if n := badge(f.marco.Cookie); n != 0 {
+		t.Errorf("i propri messaggi non contano: badge %d", n)
+	}
+	expect(t, app.do(http.MethodPost, "/api/v1/conversations/"+itoa(f.directChat)+"/read", nil, withSession(f.anna.Cookie)), http.StatusNoContent, "")
+	if n := badge(f.anna.Cookie); n != 1 {
+		t.Errorf("dopo aver letto una conversazione: badge %d", n)
+	}
+	// Un messaggio senza mittente (dati precedenti alla 00003) conta come nuovo, come nell'elenco delle chat
+	if _, err := testPool.Exec(context.Background(), `
+        INSERT INTO roomdate_app.messages (conversation_id, sender_id, content, sender_content, format, created_at)
+        VALUES ($1, NULL, $2, $2, 1, NOW() + interval '1 second')`, f.directChat, b64("senza-mittente")); err != nil {
+		t.Fatal(err)
+	}
+	if n := badge(f.anna.Cookie); n != 2 {
+		t.Errorf("messaggio senza mittente dopo la lettura: badge %d", n)
+	}
+	if n := badge(f.carla.Cookie); n != 0 {
+		t.Errorf("chi non partecipa non vede nulla: badge %d", n)
+	}
+}
+
 // I messaggi arrivano a pagine, dal più recente: la chat non li carica più tutti insieme (anomalia F12).
 func TestMessagesPagination(t *testing.T) {
 	f := newChatFixture(t)

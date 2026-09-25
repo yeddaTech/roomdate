@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import PageMeta from '../components/PageMeta';
 import { useAuth } from '../auth/AuthContext';
@@ -12,20 +12,14 @@ export default function ListingDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   const { data: listing, isPending: loading } = useListing(id);
   const imageCount = listing?.images.length ?? 0;
   const startChat = useStartChat();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
 
-  const handleLogout = async () => {
-    setIsMenuOpen(false);
-    navigate('/');
-    await logout();
-  };
 
   const nextImage = () => {
     setCurrentIndex((prev) => (prev >= imageCount - 1 ? 0 : prev + 1));
@@ -53,7 +47,7 @@ export default function ListingDetails() {
 
   if (loading) {
     return (
-      <div className="min-h-dvh bg-[#FAFAFA] flex justify-center items-center font-sans">
+      <div className="min-h-[50vh] flex justify-center items-center font-sans">
         <div className="font-serif text-2xl font-bold text-orange-500 animate-pulse tracking-tight">Caricamento annuncio...</div>
       </div>
     );
@@ -61,7 +55,7 @@ export default function ListingDetails() {
 
   if (!listing) {
     return (
-      <div className="min-h-dvh bg-[#FAFAFA] flex flex-col justify-center items-center font-sans p-6 text-center">
+      <div className="min-h-[50vh] flex flex-col justify-center items-center font-sans p-6 text-center">
         <div className="text-6xl mb-4 opacity-50">🏜️</div>
         <h2 className="font-serif text-3xl font-extrabold text-neutral-900 mb-4 tracking-tight">Annuncio non trovato</h2>
         <p className="text-neutral-500 mb-8 font-medium">L'annuncio che stai cercando potrebbe essere stato rimosso o non è più disponibile.</p>
@@ -80,55 +74,9 @@ export default function ListingDetails() {
   ].filter(Boolean);
 
   return (
-    <div className="min-h-dvh bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
+    <div className="bg-[#FAFAFA] pb-12 font-sans selection:bg-orange-200">
       <PageMeta title={`${listing.title} a ${listing.city} | RoomDate`} description={`Stanza ${listing.roomType} in affitto a ${listing.city}${listing.zone ? `, zona ${listing.zone}` : ''}.`} />
 
-      {/* --- TOP NAV (GLASSMORPHISM) --- */}
-      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-xs border-b border-neutral-100 sticky top-0">
-        <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900 decoration-none">
-          Room<span className="text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500">Date</span>
-        </Link>
-        <div className="hidden md:flex gap-8 items-center text-sm font-medium text-neutral-500">
-          <Link to="/" className="hover:text-neutral-900 transition-colors">Home</Link>
-          <Link to="/ricerca" className="text-orange-500 font-bold transition-colors">Cerca Stanza</Link>
-          <Link to="/chat" className="hover:text-neutral-900 transition-colors">Chat</Link>
-          <Link to="/dashboard" className="hover:text-neutral-900 transition-colors">Profilo</Link>
-        </div>
-        <div className="hidden md:flex gap-4 items-center">
-          {user ? (
-            <>
-              <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{user.firstName}</strong>!</span>
-              <button onClick={handleLogout} className="border border-neutral-200 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer">Esci</button>
-            </>
-          ) : (
-            <>
-              <Link to="/accedi" className="text-neutral-600 hover:text-neutral-900 px-4 py-2 text-sm font-medium transition-colors">Accedi</Link>
-              <Link to="/registrati" className="bg-neutral-900 hover:bg-neutral-800 text-white px-5 py-2 rounded-full text-sm font-bold transition-colors shadow-xs">Registrati Gratis</Link>
-            </>
-          )}
-        </div>
-        <button className="md:hidden flex flex-col gap-1.5 z-1001 cursor-pointer" onClick={() => setIsMenuOpen(!isMenuOpen)}>          
-          <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
-          <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></div>
-          <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
-        </button>
-      </nav>
-
-      {/* --- MOBILE SIDEBAR APP MENU --- */}
-      <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-1000 p-8 pt-24 transform transition-transform duration-300 ease-in-out border-l border-neutral-100 ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="flex flex-col gap-6 text-lg font-medium text-neutral-600">
-          <Link to="/" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">🏠 Home</Link>
-          <Link to="/ricerca" onClick={() => setIsMenuOpen(false)} className="text-orange-500 font-bold">🔍 Cerca</Link>
-          <Link to="/chat" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">💬 Chat</Link>
-          <Link to="/dashboard" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">👤 Profilo</Link>
-          {user ? (
-            <button onClick={handleLogout} className="bg-neutral-900 text-white w-full py-3 rounded-2xl font-bold mt-4 hover:bg-neutral-800 transition-colors cursor-pointer">Esci</button>
-          ) : (
-            <Link to="/accedi" className="bg-neutral-900 text-white text-center py-3 rounded-2xl font-bold mt-4 shadow-xs" onClick={() => setIsMenuOpen(false)}>Accedi</Link>
-          )}
-        </div>
-      </div>
-      {isMenuOpen && <div className="fixed inset-0 bg-neutral-900/20 backdrop-blur-xs z-999 md:hidden transition-opacity" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* --- HERO (GRADIENTE VIBRANTE) --- */}
       <section className="bg-linear-to-br from-orange-500 to-rose-500 px-6 py-12 md:py-16 relative overflow-hidden text-white">

@@ -44,16 +44,12 @@ export default function RecoverAccount() {
   };
 
   return (
-    <div className="min-h-dvh bg-[#FAFAFA] font-sans flex items-center justify-center p-6 selection:bg-orange-200">
+    <div className="flex-1 bg-[#FAFAFA] font-sans flex items-center justify-center p-6 selection:bg-orange-200">
       <PageMeta title="Recupera l'accesso | RoomDate" noindex />
 
       <div className="w-full max-w-lg bg-white p-8 md:p-10 rounded-3xl shadow-lg border border-neutral-100">
-        <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900">
-          Room<span className="text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500">Date</span>
-        </Link>
-
         {done ? (
-          <div className="mt-8 flex flex-col gap-4" data-testid="recovery-done">
+          <div className="flex flex-col gap-4" data-testid="recovery-done">
             <h1 className="text-3xl font-extrabold text-neutral-900 tracking-tight">Password aggiornata</h1>
             <p className="text-neutral-600 font-medium leading-relaxed">
               Ora puoi accedere con la nuova password: i tuoi messaggi sono ancora tutti leggibili.
@@ -65,7 +61,7 @@ export default function RecoverAccount() {
             </Link>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <div>
               <h1 className="text-3xl font-extrabold text-neutral-900 tracking-tight mb-2">Password dimenticata?</h1>
               <p className="text-neutral-500 font-medium leading-relaxed">

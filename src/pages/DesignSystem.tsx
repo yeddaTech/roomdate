@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Heart, Inbox, MessageCircle, Search, Trash2 } from 'lucide-react';
 import PageMeta from '../components/PageMeta';
@@ -137,9 +138,16 @@ function Showcase() {
   );
 }
 
+// Con ?errore=1 la vetrina va in errore mentre si disegna: serve a provare la pagina d'errore
+function CrashForTesting(): never {
+  throw new Error('Errore di prova della vetrina del design system');
+}
+
 export default function DesignSystem() {
+  const [params] = useSearchParams();
+  if (params.get('errore')) return <CrashForTesting />;
   return (
-    <div className="min-h-dvh bg-background text-foreground">
+    <div className="bg-background text-foreground">
       <PageMeta title="Design system | RoomDate" noindex />
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 lg:grid-cols-2">
         <section aria-label="Tema chiaro" className="flex flex-col gap-6">

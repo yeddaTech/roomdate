@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import PageMeta from '../components/PageMeta';
 import { useQueryClient } from '@tanstack/react-query';
 import { encryptForRecipients } from '../utils/crypto';
@@ -7,6 +7,7 @@ import { useAuth } from '../auth/AuthContext';
 import { getPrivateKey, getPublicKey, hasStoredVault, unlockPrivateKey } from '../auth/keyStorage';
 import { useBlockUser, useConversations, useMarkConversationRead, useMessages, useSendMessage, useUnblockUser } from '../api/hooks';
 import ReportDialog from '../components/ReportDialog';
+import { useHideTabBar } from '../components/layout/layoutContext';
 import { useConfirm } from '../components/ui/confirm';
 import { toast } from 'sonner';
 import { conversationChannel, createRealtimeClient, realtimeEnabled, TYPING_EVENT, userChannel } from '../api/realtime';
@@ -26,13 +27,6 @@ const QUICK_REPLIES = [
   '🚇 Linea metro vicina?',
 ];
 
-const NAV_LINKS = [
-  { name: 'Home', path: '/', icon: '🏠' },
-  { name: 'Cerca Stanza', path: '/ricerca', icon: '🔍' },
-  { name: 'Chat', path: '/chat', icon: '💬' },
-  { name: 'Profilo', path: '/dashboard', icon: '👤' },
-  { name: 'Impostazioni', path: '/impostazioni', icon: '⚙️' },
-];
 
 // Nome dell'altro partecipante: chi ha eliminato l'account non ha più un nome da mostrare
 const nameOf = (conversation) => conversation?.other?.firstName || 'Utente eliminato';
@@ -43,13 +37,14 @@ export default function ChatPage() {
   const confirm = useConfirm();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { user, logout, endLocalSession } = useAuth();
+  const { user, endLocalSession } = useAuth();
 
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeId, setActiveId] = useState(null);
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileView, setMobileView] = useState('list');
+  // Sul telefono, con una conversazione aperta, la barra in basso lascia il posto a messaggi e tastiera
+  useHideTabBar(mobileView === 'chat');
   // La chiave privata è una CryptoKey conservata in IndexedDB: si legge in modo asincrono
   const [privateKey, setPrivateKey] = useState(null);
   const [keyChecked, setKeyChecked] = useState(false);
@@ -188,11 +183,6 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeId, lastMessageId, pendingHere.length, typingIn]);
 
-  const handleLogout = async () => {
-    setIsMenuOpen(false);
-    navigate('/');
-    await logout();
-  };
 
   const handleUnlock = async (e) => {
     e.preventDefault();
@@ -337,7 +327,7 @@ export default function ChatPage() {
   ];
 
   return (
-    <div className="flex flex-col h-dvh w-full max-w-[100vw] bg-white font-sans overflow-hidden selection:bg-orange-200">
+    <div className="flex flex-col h-full w-full max-w-[100vw] bg-white font-sans overflow-hidden selection:bg-orange-200">
       <PageMeta title="Area Privata | RoomDate" noindex />
 
       {/* STILI PER L'ANIMAZIONE DEI 3 PUNTINI E SCROLLBAR */}
@@ -387,88 +377,9 @@ export default function ChatPage() {
         `}
       </style>
       
-      {/* --- TOP NAV GENERATA DINAMICAMENTE (5 OPZIONI) --- */}
-      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-xs border-b border-neutral-100 sticky top-0">
-        <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900 decoration-none">
-          Room<span className="text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500">Date</span>
-        </Link>
-        
-        {/* Menu Desktop integrato con l'array a 5 elementi */}
-        <div className="hidden md:flex gap-8 items-center text-sm font-medium">
-          {NAV_LINKS.map((link) => {
-            const isActive = location.pathname === link.path;
-            return (
-              <Link 
-                key={link.path} 
-                to={link.path} 
-                className={`transition-colors ${isActive ? 'text-orange-500 font-bold' : 'text-neutral-500 hover:text-neutral-900'}`}
-              >
-                {link.name}
-              </Link>
-            );
-          })}
-        </div>
-
-        <div className="hidden md:flex gap-4 items-center">
-          {user ? (
-            <>
-              <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{user.firstName}</strong>!</span>
-              <button onClick={handleLogout} className="border border-neutral-200 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 px-4 py-2 rounded-full text-sm transition-colors cursor-pointer font-medium">Esci</button>
-            </>
-          ) : (
-            <>
-              <Link to="/accedi" className="text-neutral-600 hover:text-neutral-900 px-4 py-2 text-sm font-medium transition-colors">Accedi</Link>
-              <Link to="/registrati" className="bg-neutral-900 hover:bg-neutral-800 text-white px-5 py-2 rounded-full text-sm font-bold transition-colors shadow-xs">Registrati</Link>
-            </>
-          )}
-        </div>
-
-        <button className="md:hidden flex flex-col gap-1.5 z-1001 cursor-pointer" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Menu">          
-          <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
-          <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></div>
-          <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
-        </button>
-      </nav>
-
-      {/* --- MOBILE SIDEBAR APP MENU (5 OPZIONI AGGIORNATE) --- */}
-      <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-1000 p-8 pt-24 transform transition-transform duration-300 ease-in-out border-l border-neutral-100 ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="flex flex-col gap-6 text-lg font-medium text-neutral-600">
-          {user && (
-             <div className="border-b border-neutral-100 pb-4 mb-2">
-               <h3 className="text-xl text-neutral-900 font-bold">👤 Ciao, {user.firstName}!</h3>
-             </div>
-          )}
-          
-          {NAV_LINKS.map((link) => {
-            const isActive = location.pathname === link.path;
-            return (
-              <Link 
-                key={link.path} 
-                to={link.path} 
-                onClick={() => setIsMenuOpen(false)} 
-                className={`transition-colors flex items-center gap-3 ${isActive ? 'text-orange-500 font-bold' : 'hover:text-orange-500'}`}
-              >
-                <span>{link.icon}</span> {link.name}
-              </Link>
-            );
-          })}
-          
-          <div className="mt-8 flex flex-col gap-3">
-            {user ? (
-              <button onClick={handleLogout} className="bg-neutral-900 text-white w-full py-3 rounded-2xl font-bold hover:bg-neutral-800 transition-colors cursor-pointer">Esci</button>
-            ) : (
-              <>
-                <Link to="/accedi" className="border border-neutral-200 text-center py-3 rounded-2xl hover:bg-neutral-50 transition-colors" onClick={() => setIsMenuOpen(false)}>Accedi</Link>
-                <Link to="/registrati" className="bg-neutral-900 text-white text-center py-3 rounded-2xl font-bold shadow-xs" onClick={() => setIsMenuOpen(false)}>Registrati</Link>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-      {isMenuOpen && <div className="fixed inset-0 bg-neutral-900/20 backdrop-blur-xs z-999 md:hidden transition-opacity" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* ── LAYOUT CHAT CONTAINER ── */}
-      <div className={`flex-1 flex overflow-hidden relative w-full bg-white border-t border-neutral-100 ${mobileView === 'list' ? 'pb-16 md:pb-0' : ''}`}>
+      <div className="flex-1 min-h-0 flex overflow-hidden relative w-full bg-white">
 
         {/* ── SIDEBAR LISTA CHAT ── */}
         <aside className={`${mobileView === 'chat' ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[380px] bg-white border-r border-neutral-100 flex-col h-full shrink-0 z-10`}>
@@ -571,7 +482,7 @@ export default function ChatPage() {
         </aside>
 
         {/* ── CHAT MAIN AREA ── */}
-        <main className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 min-w-0 flex-col h-full bg-[#FAFAFA] w-full max-w-full relative`}>
+        <section aria-label="Conversazione" className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 min-w-0 flex-col h-full bg-[#FAFAFA] w-full max-w-full relative`}>
           {!activeConv ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-[#FAFAFA]">
               <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-xs mb-6 border border-neutral-100">
@@ -708,7 +619,7 @@ export default function ChatPage() {
               </div>
 
               {/* Input Area */}
-              <div className="shrink-0 bg-white p-4 md:px-6 md:pb-6 flex items-end gap-3 w-full border-t border-neutral-50">
+              <div className="shrink-0 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 md:pb-6 flex items-end gap-3 w-full border-t border-neutral-50">
                 <textarea
                   ref={textareaRef}
                   className="flex-1 bg-neutral-50 border border-neutral-200 text-neutral-900 text-base rounded-3xl px-5 py-3.5 focus:outline-hidden focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all resize-none max-h-[140px] w-full placeholder:text-neutral-400 custom-scrollbar"
@@ -730,7 +641,7 @@ export default function ChatPage() {
               </>)}
             </>
           )}
-        </main>
+        </section>
 
         {reporting && activeConv?.other && (
           <ReportDialog

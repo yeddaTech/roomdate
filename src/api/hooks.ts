@@ -1,6 +1,6 @@
 // Hook per leggere e modificare i dati: le pagine usano questi, non le chiamate API dirette.
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { listConversations, listMessages, markConversationRead, sendMessage, startChat } from './chat';
+import { getUnreadCount, listConversations, listMessages, markConversationRead, sendMessage, startChat } from './chat';
 import {
   createListing,
   deleteListing,
@@ -184,6 +184,21 @@ export function useConversations({ enabled = true } = {}) {
     initialPageParam: '',
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled,
+  });
+}
+
+/**
+ * Conversazioni con messaggi da leggere, per il badge della navigazione. Si aggiorna quando la
+ * scheda torna in primo piano e ogni minuto mentre è visibile; nella chat, i nuovi messaggi e le
+ * letture lo aggiornano subito.
+ */
+export function useUnreadCount({ enabled = true } = {}) {
+  return useQuery({
+    queryKey: queryKeys.unread,
+    queryFn: getUnreadCount,
+    enabled,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   });
 }
 

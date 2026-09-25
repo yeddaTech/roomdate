@@ -13,7 +13,9 @@ import (
 
 func TestMinimumAge(t *testing.T) {
 	app := newApp(t)
-	today := time.Now().UTC()
+	// Lo stesso orologio del server (time.Now nel fuso del processo): con UTC, tra mezzanotte e le
+	// 2 in Italia il test e il server vedrebbero due giorni diversi e il test fallirebbe
+	today := time.Now()
 	// Il giorno esatto del compleanno (anche il 29 febbraio) lo verifica TestAgeAtLeast
 	minor := today.AddDate(-18, 0, 1).Format(time.DateOnly)  // compie 18 anni domani
 	adult := today.AddDate(-18, 0, -1).Format(time.DateOnly) // li ha compiuti ieri
