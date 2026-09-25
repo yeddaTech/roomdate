@@ -332,6 +332,20 @@ func (s *Store) InsertMessage(ctx context.Context, m NewMessage) (MessageRow, er
 	return saved, tx.Commit(ctx)
 }
 
+// UnreadConversations conta le conversazioni dell'utente con almeno un messaggio non ancora letto
+// (scritto da altri dopo la sua ultima lettura): è il numero del badge della chat.
+func (s *Store) UnreadConversations(ctx context.Context, userID string) (int, error) {
+	var n int
+	err := s.db.QueryRow(ctx, `
+        SELECT count(*) FROM roomdate_app.conversation_participants me
+        WHERE me.user_id = $1 AND EXISTS (
+            SELECT 1 FROM roomdate_app.messages m
+            WHERE m.conversation_id = me.conversation_id
+              AND (m.sender_id IS NULL OR m.sender_id <> me.user_id)
+              AND (me.last_read_at IS NULL OR COALESCE(m.created_at, 'epoch') > me.last_read_at))`, userID).Scan(&n)
+	return n, err
+}
+
 // MarkRead segna come letti i messaggi fino a ora.
 func (s *Store) MarkRead(ctx context.Context, conversationID int, userID string) error {
 	_, err := s.db.Exec(ctx, `

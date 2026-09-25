@@ -83,6 +83,7 @@ func TestEveryEndpointChecksAccess(t *testing.T) {
 		"GET /api/v1/conversations/{id}/messages":  {path: chat + "/messages", anonymous: 401, intruder: 403},
 		"POST /api/v1/conversations/{id}/messages": {path: chat + "/messages", body: message, anonymous: 401, intruder: 403},
 		"POST /api/v1/conversations/{id}/read":     {path: chat + "/read", anonymous: 401, intruder: 403},
+		"GET /api/v1/me/unread":                    {path: "/api/v1/me/unread", anonymous: 401},
 		"POST /api/v1/realtime/auth": {path: "/api/v1/realtime/auth", anonymous: 401, intruder: 403,
 			body: map[string]string{"socketId": "1.2", "channelName": realtime.ConversationChannel(f.directChat)}},
 
