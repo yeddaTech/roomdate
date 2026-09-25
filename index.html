@@ -22,15 +22,6 @@
     <meta name="twitter:title" content="Roomdate — Trova Coinquilini e Stanze in Affitto" />
     <meta name="twitter:description" content="La piattaforma per trovare la stanza ideale e il coinquilino perfetto." />
 
-    <!-- Font e Stili (Fix Render-Blocking) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" media="print" onload="this.media='all'" />
-    <noscript>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" />
-    </noscript>
-    
     <link rel="icon" type="image/png" href="/favicon.png" />
 
     <!-- Dati Strutturati di Base (Schema.org per l'AIO) -->
@@ -57,13 +48,13 @@
         body { margin: 0; background-color: #FAFAFA; }
         .roomdate-loader-container { 
           display: flex; flex-direction: column; align-items: center; justify-content: center; 
-          height: 100vh; width: 100vw; font-family: 'DM Sans', system-ui, sans-serif; 
+          height: 100vh; width: 100vw; font-family: system-ui, sans-serif; 
         }
         .roomdate-spinner { 
           width: 50px; height: 50px; border: 4px solid #f3e8e0; border-top: 4px solid #F97316; 
           border-radius: 50%; animation: roomdate-spin 1s linear infinite; margin-bottom: 20px; 
         }
-        .roomdate-logo { font-size: 26px; font-weight: 800; color: #171717; letter-spacing: -0.5px; font-family: 'Playfair Display', serif; }
+        .roomdate-logo { font-size: 26px; font-weight: 800; color: #171717; letter-spacing: -0.5px; font-family: Georgia, serif; }
         .roomdate-logo span { color: #F97316; }
         @keyframes roomdate-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
       </style>

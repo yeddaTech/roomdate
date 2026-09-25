@@ -1,22 +1,21 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
+// Font ospitati sul sito: la CSP li accetta e l'indirizzo IP di chi visita non arriva a Google
+import '@fontsource-variable/dm-sans'
+import '@fontsource-variable/playfair-display'
+import '@fontsource-variable/playfair-display/wght-italic.css'
 import './index.css'
-// 1. Importa il provider per la gestione dei meta tag
-import { HelmetProvider } from 'react-helmet-async'
 import { createQueryClient } from './api/queryClient'
 
 // Cache condivisa dei dati letti dalle API
 const queryClient = createQueryClient()
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
     <QueryClientProvider client={queryClient}>
-      {/* 2. Avvolgi l'app così il modulo è attivo ovunque */}
-      <HelmetProvider>
-        <App />
-      </HelmetProvider>
+      <App />
     </QueryClientProvider>
-  </React.StrictMode>,
+  </StrictMode>,
 )

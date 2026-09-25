@@ -15,12 +15,12 @@ export default function Home() {
       <section className="relative pt-32 md:pt-40 pb-20 px-6 overflow-hidden flex flex-col items-center justify-center min-h-[80vh]">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-orange-400/20 blur-[100px] rounded-full pointer-events-none"></div>
         <div className="relative z-10 max-w-4xl mx-auto text-center mt-12 md:mt-0">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-50 border border-orange-100 text-orange-600 text-sm font-bold mb-8 shadow-sm">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-50 border border-orange-100 text-orange-600 text-sm font-bold mb-8 shadow-xs">
              Trova casa a Milano e nel resto d'Italia
           </div>
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-neutral-900 mb-6 leading-tight">
+          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-neutral-900 mb-6 leading-tight md:leading-none">
             Trova la tua stanza <br className="hidden md:block"/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">senza stress.</span>
+            <span className="text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500">senza stress.</span>
           </h1>
           <p className="text-lg text-neutral-500 mb-10 max-w-xl mx-auto font-medium">
             Esplora annunci reali e chatta subito per trovare la tua sistemazione o il tuo prossimo coinquilino.
@@ -29,7 +29,7 @@ export default function Home() {
             <Link to="/ricerca?intent=stanza" className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-neutral-900 text-white text-lg font-bold shadow-lg hover:bg-neutral-800 hover:scale-[1.02] transition-all text-center">
                Cerca Stanza
             </Link>
-            <Link to="/ricerca?intent=coinquilino" className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white text-neutral-900 text-lg font-bold border border-neutral-200 shadow-sm hover:bg-neutral-50 hover:scale-[1.02] transition-all text-center">
+            <Link to="/ricerca?intent=coinquilino" className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white text-neutral-900 text-lg font-bold border border-neutral-200 shadow-xs hover:bg-neutral-50 hover:scale-[1.02] transition-all text-center">
               Cerca Coinquilini
             </Link>
           </div>
@@ -49,7 +49,7 @@ export default function Home() {
           {isLoading ? (
             /* 🚀 SKELETON LOADING */
             [1, 2, 3, 4].map((n) => (
-              <div key={n} className="bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col h-full min-h-[300px]">
+              <div key={n} className="bg-white rounded-3xl shadow-xs border border-neutral-100 flex flex-col h-full min-h-[300px]">
                 <div className="h-48 w-full bg-neutral-100 animate-pulse rounded-t-3xl"></div>
                 <div className="p-4 flex flex-col gap-3 grow">
                   <div className="h-5 w-3/4 bg-neutral-100 animate-pulse rounded-md"></div>
@@ -62,7 +62,7 @@ export default function Home() {
               {error}
             </div>
           ) : listings.length === 0 ? (
-            <div className="col-span-full text-center py-16 bg-white rounded-3xl border border-dashed border-neutral-200 shadow-sm">
+            <div className="col-span-full text-center py-16 bg-white rounded-3xl border border-dashed border-neutral-200 shadow-xs">
               <span className="text-5xl block mb-4 opacity-50">📭</span>
               <p className="text-neutral-500 font-medium">Nessuna stanza disponibile al momento.</p>
             </div>
@@ -72,13 +72,13 @@ export default function Home() {
               <Link 
                 to={`/dettagli/${l.id}`} 
                 key={l.id} 
-                className="w-full bg-white rounded-3xl shadow-sm border border-neutral-100 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-orange-100 cursor-pointer overflow-hidden group decoration-none"
+                className="w-full bg-white rounded-3xl shadow-xs border border-neutral-100 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-orange-100 cursor-pointer overflow-hidden group decoration-none"
               >
                 <div className="h-48 flex items-center justify-center relative overflow-hidden bg-neutral-100">
                   {l.coverUrl
                     ? <img src={l.coverUrl} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                     : <span className="text-sm font-bold text-neutral-400">📷 Nessuna foto</span>}
-                  <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-2xl shadow-sm">
+                  <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-2xl shadow-xs">
                     <span className="font-extrabold text-lg text-orange-500">€{Number(l.price) || 0}</span><span className="text-[11px] text-neutral-500 font-bold">/mese</span>
                   </div>
                 </div>
@@ -97,7 +97,7 @@ export default function Home() {
         </div>
         
         <div className="mt-8 md:hidden">
-            <Link to="/ricerca" className="block text-center bg-white border border-neutral-200 text-neutral-900 font-bold py-4 rounded-2xl hover:bg-neutral-50 transition-colors shadow-sm">Vedi tutti gli annunci</Link>
+            <Link to="/ricerca" className="block text-center bg-white border border-neutral-200 text-neutral-900 font-bold py-4 rounded-2xl hover:bg-neutral-50 transition-colors shadow-xs">Vedi tutti gli annunci</Link>
         </div>
       </section>
 

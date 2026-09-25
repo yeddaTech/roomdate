@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import PageMeta from '../components/PageMeta';
 import { recoverAccount } from '../auth/accountKeys';
 import { passwordProblem } from '../auth/passwordPolicy';
 
-const inputClass = 'w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-5 py-3.5 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium placeholder:text-neutral-400';
+const inputClass = 'w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-5 py-3.5 focus:outline-hidden focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium placeholder:text-neutral-400';
 
 /**
  * Password dimenticata: con l'email e la chiave di recupero si imposta una password nuova.
@@ -44,15 +44,12 @@ export default function RecoverAccount() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[#FAFAFA] font-sans flex items-center justify-center p-6 selection:bg-orange-200">
-      <Helmet>
-        <title>Recupera l&apos;accesso | RoomDate</title>
-        <meta name="robots" content="noindex, nofollow" />
-      </Helmet>
+    <div className="min-h-dvh bg-[#FAFAFA] font-sans flex items-center justify-center p-6 selection:bg-orange-200">
+      <PageMeta title="Recupera l'accesso | RoomDate" noindex />
 
       <div className="w-full max-w-lg bg-white p-8 md:p-10 rounded-3xl shadow-lg border border-neutral-100">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900">
-          Room<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">Date</span>
+          Room<span className="text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500">Date</span>
         </Link>
 
         {done ? (
@@ -110,7 +107,7 @@ export default function RecoverAccount() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="mt-2 w-full bg-gradient-to-r from-orange-500 to-rose-500 text-white py-4 rounded-full font-bold transition-all disabled:bg-none disabled:bg-neutral-300 cursor-pointer"
+              className="mt-2 w-full bg-linear-to-r from-orange-500 to-rose-500 text-white py-4 rounded-full font-bold transition-all disabled:bg-none disabled:bg-neutral-300 cursor-pointer"
             >
               {isSubmitting ? 'Verifica in corso...' : 'Imposta la nuova password'}
             </button>

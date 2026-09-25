@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { toast } from 'sonner';
+import PageMeta from '../components/PageMeta';
 import { useAuth } from '../auth/AuthContext';
 import { useBlockUser, usePublicProfile, useStartChat } from '../api/hooks';
 import { occupationLabel } from '../api/options';
@@ -8,10 +9,13 @@ import { formatAge } from '../api/users';
 import CompatibilityList from '../components/profile/CompatibilityList';
 import LifestyleTags from '../components/profile/LifestyleTags';
 import ReportDialog from '../components/ReportDialog';
+import { useConfirm } from '../components/ui/confirm';
 
 export default function RoommateDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const confirm = useConfirm();
   const { user, logout } = useAuth();
 
   // Profilo pubblico dell'utente (i profili privati risultano non trovati)
@@ -23,12 +27,19 @@ export default function RoommateDetails() {
 
   // Dopo il blocco il profilo non è più visibile: si torna alla ricerca
   const handleBlock = async () => {
-    if (!confirm(`Bloccare ${roommate.firstName}? Non potrete più scrivervi né trovarvi nelle ricerche. Puoi sbloccare dalle Impostazioni.`)) return;
+    const ok = await confirm({
+      title: `Bloccare ${roommate.firstName}?`,
+      description: 'Non potrete più scrivervi né trovarvi nelle ricerche. Puoi sbloccare in qualsiasi momento dalle Impostazioni.',
+      confirmLabel: 'Blocca',
+      tone: 'danger',
+    });
+    if (!ok) return;
     try {
       await blockUser.mutateAsync(roommate.id);
+      toast.success(`${roommate.firstName} è stato bloccato.`);
       navigate('/ricerca');
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -41,8 +52,8 @@ export default function RoommateDetails() {
   // 🛡️ ZERO-TRUST: Invia solo il targetId
   const handleContact = async () => {
     if (!user) {
-      alert("Devi accedere o registrarti per contattare questo utente!");
-      navigate('/accedi');
+      toast.info('Accedi o registrati per scrivere a questa persona.');
+      navigate('/accedi', { state: { from: location.pathname } });
       return;
     }
 
@@ -50,13 +61,13 @@ export default function RoommateDetails() {
       const conversationId = await startChat.mutateAsync({ targetId: id });
       navigate('/chat', { state: { openChatId: conversationId } });
     } catch (err) {
-      alert("Errore nell'avvio della chat: " + err.message);
+      toast.error(err.message);
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-[100dvh] bg-[#FAFAFA] flex justify-center items-center font-sans">
+      <div className="min-h-dvh bg-[#FAFAFA] flex justify-center items-center font-sans">
         <div className="font-serif text-2xl font-bold text-orange-500 animate-pulse tracking-tight">Caricamento profilo...</div>
       </div>
     );
@@ -64,7 +75,7 @@ export default function RoommateDetails() {
 
   if (!roommate) {
     return (
-      <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col justify-center items-center font-sans p-6 text-center">
+      <div className="min-h-dvh bg-[#FAFAFA] flex flex-col justify-center items-center font-sans p-6 text-center">
         <div className="text-6xl mb-4 opacity-50">👤</div>
         <h2 className="font-serif text-3xl font-extrabold text-neutral-900 mb-4 tracking-tight">Profilo non trovato</h2>
         <p className="text-neutral-500 mb-8 font-medium">L'utente che stai cercando potrebbe aver rimosso il profilo o non è disponibile.</p>
@@ -74,15 +85,13 @@ export default function RoommateDetails() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
-      <Helmet>
-        <title>{roommate.firstName} | RoomDate</title>
-      </Helmet>
+    <div className="min-h-dvh bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
+      <PageMeta title={`${roommate.firstName} | RoomDate`} />
 
       {/* --- TOP NAV (GLASSMORPHISM) --- */}
-      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-sm border-b border-neutral-100 sticky top-0">
+      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-xs border-b border-neutral-100 sticky top-0">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900 decoration-none">
-          Room<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">Date</span>
+          Room<span className="text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500">Date</span>
         </Link>
         <div className="hidden md:flex gap-8 items-center text-sm font-medium text-neutral-500">
           <Link to="/" className="hover:text-neutral-900 transition-colors">Home</Link>
@@ -99,11 +108,11 @@ export default function RoommateDetails() {
           ) : (
             <>
               <Link to="/accedi" className="text-neutral-600 hover:text-neutral-900 px-4 py-2 text-sm font-medium transition-colors">Accedi</Link>
-              <Link to="/registrati" className="bg-neutral-900 hover:bg-neutral-800 text-white px-5 py-2 rounded-full text-sm font-bold transition-colors shadow-sm">Registrati Gratis</Link>
+              <Link to="/registrati" className="bg-neutral-900 hover:bg-neutral-800 text-white px-5 py-2 rounded-full text-sm font-bold transition-colors shadow-xs">Registrati Gratis</Link>
             </>
           )}
         </div>
-        <button className="md:hidden flex flex-col gap-1.5 z-[1001] cursor-pointer" onClick={() => setIsMenuOpen(!isMenuOpen)}>          
+        <button className="md:hidden flex flex-col gap-1.5 z-1001 cursor-pointer" onClick={() => setIsMenuOpen(!isMenuOpen)}>          
           <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
           <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></div>
           <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
@@ -111,7 +120,7 @@ export default function RoommateDetails() {
       </nav>
 
       {/* --- MOBILE SIDEBAR APP MENU --- */}
-      <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-[1000] p-8 pt-24 transform transition-transform duration-300 ease-in-out border-l border-neutral-100 ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-1000 p-8 pt-24 transform transition-transform duration-300 ease-in-out border-l border-neutral-100 ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex flex-col gap-6 text-lg font-medium text-neutral-600">
           <Link to="/" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">🏠 Home</Link>
           <Link to="/ricerca" onClick={() => setIsMenuOpen(false)} className="text-orange-500 font-bold">🔍 Cerca</Link>
@@ -120,20 +129,20 @@ export default function RoommateDetails() {
           {user ? (
             <button onClick={handleLogout} className="bg-neutral-900 text-white w-full py-3 rounded-2xl font-bold mt-4 hover:bg-neutral-800 transition-colors cursor-pointer">Esci</button>
           ) : (
-            <Link to="/accedi" className="bg-neutral-900 text-white text-center py-3 rounded-2xl font-bold mt-4 shadow-sm" onClick={() => setIsMenuOpen(false)}>Accedi</Link>
+            <Link to="/accedi" className="bg-neutral-900 text-white text-center py-3 rounded-2xl font-bold mt-4 shadow-xs" onClick={() => setIsMenuOpen(false)}>Accedi</Link>
           )}
         </div>
       </div>
-      {isMenuOpen && <div className="fixed inset-0 bg-neutral-900/20 backdrop-blur-sm z-[999] md:hidden transition-opacity" onClick={() => setIsMenuOpen(false)}></div>}
+      {isMenuOpen && <div className="fixed inset-0 bg-neutral-900/20 backdrop-blur-xs z-999 md:hidden transition-opacity" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* --- HERO PROFILO (GRADIENTE VIBRANTE) --- */}
-      <section className="bg-gradient-to-br from-orange-500 to-rose-500 px-6 py-14 relative overflow-hidden text-white">
+      <section className="bg-linear-to-br from-orange-500 to-rose-500 px-6 py-14 relative overflow-hidden text-white">
         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, white 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/20 blur-[80px] rounded-full pointer-events-none"></div>
 
         <div className="max-w-4xl mx-auto flex flex-col items-center text-center gap-4 relative z-10 animate-fade-in-up">
           <div className="w-32 h-32 rounded-full flex items-center justify-center text-6xl shadow-xl bg-white text-neutral-900 border-4 border-white/20">
-            <span className="drop-shadow-sm">{(roommate.firstName || 'U').charAt(0).toUpperCase()}</span>
+            <span className="drop-shadow-xs">{(roommate.firstName || 'U').charAt(0).toUpperCase()}</span>
           </div>
           <div>
             <h1 className="font-serif text-4xl md:text-5xl font-extrabold mb-2 tracking-tight">
@@ -151,18 +160,18 @@ export default function RoommateDetails() {
         
         {/* COLONNA SINISTRA: BIO E DETTAGLI */}
         <div className="w-full lg:w-2/3 flex flex-col gap-6">
-          <div className="bg-white p-8 rounded-3xl shadow-sm border border-neutral-100">
+          <div className="bg-white p-8 rounded-3xl shadow-xs border border-neutral-100">
             <h2 className="font-serif text-2xl font-extrabold text-neutral-900 mb-4 tracking-tight">Chi sono</h2>
             <p className="text-neutral-600 leading-relaxed text-lg whitespace-pre-line font-medium">
               {roommate.bio || "Questo utente non ha ancora inserito una descrizione."}
             </p>
           </div>
 
-          <div className="bg-white p-8 rounded-3xl shadow-sm border border-neutral-100">
+          <div className="bg-white p-8 rounded-3xl shadow-xs border border-neutral-100">
             <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-6 tracking-tight">Stile di vita</h2>
             <div className="flex flex-wrap gap-2.5">
               {roommate.lifestyleTags.length > 0 ? (
-                <LifestyleTags tags={roommate.lifestyleTags} className="bg-orange-50 border border-orange-100 text-orange-600 px-4 py-2 rounded-full font-bold text-sm shadow-sm" />
+                <LifestyleTags tags={roommate.lifestyleTags} className="bg-orange-50 border border-orange-100 text-orange-600 px-4 py-2 rounded-full font-bold text-sm shadow-xs" />
               ) : (
                 <span className="text-neutral-400 font-medium italic">Nessuna abitudine indicata.</span>
               )}
@@ -170,11 +179,11 @@ export default function RoommateDetails() {
           </div>
 
           {roommate.compatibility ? (
-            <div className="bg-white p-8 rounded-3xl shadow-sm border border-neutral-100" data-testid="compatibility">
+            <div className="bg-white p-8 rounded-3xl shadow-xs border border-neutral-100" data-testid="compatibility">
               <CompatibilityList compatibility={roommate.compatibility} />
             </div>
           ) : !user && (
-            <div className="bg-white p-8 rounded-3xl shadow-sm border border-neutral-100 text-neutral-500 font-medium">
+            <div className="bg-white p-8 rounded-3xl shadow-xs border border-neutral-100 text-neutral-500 font-medium">
               <Link to="/accedi" className="text-orange-500 font-bold hover:text-orange-600">Accedi</Link> per vedere cosa avete in comune.
             </div>
           )}
@@ -209,7 +218,7 @@ export default function RoommateDetails() {
                   Questo è il tuo profilo: modificalo
                 </Link>
               ) : (
-                <button onClick={handleContact} className="w-full bg-gradient-to-r from-orange-500 to-rose-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-orange-500/25 hover:scale-[1.02] transition-all duration-300 text-lg flex items-center justify-center gap-2 cursor-pointer relative z-10">
+                <button onClick={handleContact} className="w-full bg-linear-to-r from-orange-500 to-rose-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-orange-500/25 hover:scale-[1.02] transition-all duration-300 text-lg flex items-center justify-center gap-2 cursor-pointer relative z-10">
                   <span className="text-xl">💬</span> Invia Messaggio
                 </button>
               )}

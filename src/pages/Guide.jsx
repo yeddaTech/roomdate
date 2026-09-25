@@ -1,4 +1,4 @@
-import { Helmet } from 'react-helmet-async';
+import PageMeta from '../components/PageMeta';
 import { Link } from 'react-router-dom';
 import Footer from '../components/Footer';
 
@@ -52,14 +52,8 @@ export default function Guide() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[#FAFAFA] font-sans selection:bg-orange-200 flex flex-col">
-      <Helmet>
-        <title>Come trovare coinquilini affidabili e stanze in affitto | RoomDate</title>
-        <meta name="description" content="Guida pratica: dove cercare stanze e coinquilini, cosa guardare in un profilo e come contattare chi affitta, a Milano e in tutta Italia." />
-        <script type="application/ld+json">
-          {JSON.stringify(faqSchema)}
-        </script>
-      </Helmet>
+    <div className="min-h-dvh bg-[#FAFAFA] font-sans selection:bg-orange-200 flex flex-col">
+      <PageMeta title="Come trovare coinquilini affidabili e stanze in affitto | RoomDate" description="Guida pratica: dove cercare stanze e coinquilini, cosa guardare in un profilo e come contattare chi affitta, a Milano e in tutta Italia." />
 
       {/* --- HERO SECTION (LUMINOSA E MODERNA) --- */}
       <section className="relative bg-white border-b border-neutral-100 py-24 md:py-32 px-6 text-center overflow-hidden">
@@ -68,14 +62,14 @@ export default function Guide() {
         <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-rose-400/5 blur-[100px] rounded-full pointer-events-none"></div>
 
         <div className="relative z-10 max-w-4xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-50 border border-orange-100 text-orange-600 text-[11px] font-bold mb-6 shadow-sm uppercase tracking-widest">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-50 border border-orange-100 text-orange-600 text-[11px] font-bold mb-6 shadow-xs uppercase tracking-widest">
              Guida Ufficiale RoomDate
           </div>
-          <h1 className="font-serif text-4xl md:text-6xl font-extrabold mb-6 leading-tight text-neutral-900 tracking-tight">
+          <h1 className="font-serif text-4xl md:text-6xl font-extrabold mb-6 leading-tight md:leading-none text-neutral-900 tracking-tight">
             Tutto quello che devi sapere per <br className="hidden md:block" />
-            <em className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500 not-italic">trovare casa.</em>
+            <em className="text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500 not-italic">trovare casa.</em>
           </h1>
-          <p className="text-neutral-500 text-lg md:text-xl leading-relaxed max-w-2xl mx-auto font-medium">
+          <p className="text-neutral-500 text-lg md:text-xl leading-relaxed md:leading-7 max-w-2xl mx-auto font-medium">
             Dimentica i vecchi gruppi social. Rispondiamo alle domande più cercate online su come affrontare la ricerca di una stanza senza brutte sorprese.
           </p>
         </div>
@@ -89,8 +83,8 @@ export default function Guide() {
         
         <div className="space-y-6 animate-fade-in-up">
           {faqSchema.mainEntity.map((faq, index) => (
-            <div key={index} className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-neutral-100 hover:shadow-md hover:border-orange-100 transition-all duration-300 group">
-              <h3 className="font-bold text-lg md:text-xl text-neutral-900 mb-3 group-hover:text-orange-500 transition-colors leading-tight">
+            <div key={index} className="bg-white p-6 md:p-8 rounded-3xl shadow-xs border border-neutral-100 hover:shadow-md hover:border-orange-100 transition-all duration-300 group">
+              <h3 className="font-bold text-lg md:text-xl text-neutral-900 mb-3 group-hover:text-orange-500 transition-colors leading-tight md:leading-7">
                 {faq.name}
               </h3>
               <p className="text-neutral-500 leading-relaxed font-medium">
@@ -103,7 +97,7 @@ export default function Guide() {
 
       {/* --- CALL TO ACTION (GRADIENTE VIBRANTE) --- */}
       <section className="pb-24 px-6 relative z-10">
-        <div className="max-w-4xl mx-auto text-center bg-gradient-to-br from-orange-500 to-rose-500 p-12 md:p-16 rounded-3xl shadow-xl relative overflow-hidden">
+        <div className="max-w-4xl mx-auto text-center bg-linear-to-br from-orange-500 to-rose-500 p-12 md:p-16 rounded-3xl shadow-xl relative overflow-hidden">
           {/* Pattern decorativo */}
           <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, white 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
           <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/20 blur-[80px] rounded-full pointer-events-none"></div>

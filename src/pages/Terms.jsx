@@ -1,18 +1,15 @@
 import React from 'react';
-import { Helmet } from 'react-helmet-async';
+import PageMeta from '../components/PageMeta';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function Terms() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-[100dvh] bg-[#FAFAFA] font-sans text-neutral-900 py-12 px-6 selection:bg-orange-200">
-      <Helmet>
-        <title>Termini di Servizio | RoomDate</title>
-        <meta name="robots" content="index, follow" />
-      </Helmet>
+    <div className="min-h-dvh bg-[#FAFAFA] font-sans text-neutral-900 py-12 px-6 selection:bg-orange-200">
+      <PageMeta title="Termini di Servizio | RoomDate" />
 
-      <div className="max-w-3xl mx-auto bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-neutral-100 relative overflow-hidden">
+      <div className="max-w-3xl mx-auto bg-white p-8 md:p-12 rounded-3xl shadow-xs border border-neutral-100 relative overflow-hidden">
         
         {/* Sottile orb decorativo */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-orange-400/5 blur-[80px] rounded-full pointer-events-none"></div>
@@ -20,7 +17,7 @@ export default function Terms() {
         {/* Bottone Indietro */}
         <button 
           onClick={() => navigate(-1)} 
-          className="mb-8 bg-neutral-50 border border-neutral-200 hover:bg-neutral-100 text-neutral-700 px-5 py-2.5 rounded-full text-sm font-bold transition-all cursor-pointer shadow-sm"
+          className="mb-8 bg-neutral-50 border border-neutral-200 hover:bg-neutral-100 text-neutral-700 px-5 py-2.5 rounded-full text-sm font-bold transition-all cursor-pointer shadow-xs"
         >
           ← Torna indietro
         </button>
