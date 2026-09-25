@@ -53,21 +53,21 @@ const Navbar = () => {
 
   return (
     <>
-      <nav className={`fixed top-0 left-0 right-0 z-[1000] transition-all duration-300 ${scrolled ? 'pt-4' : 'pt-6'}`}>
+      <nav className={`fixed top-0 left-0 right-0 z-1000 transition-all duration-300 ${scrolled ? 'pt-4' : 'pt-6'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className={`flex justify-between items-center px-6 py-3 rounded-full transition-all duration-300 ${
             scrolled 
               ? 'bg-white/90 backdrop-blur-lg shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/50' 
-              : 'bg-white/70 backdrop-blur-md border border-transparent shadow-sm'
+              : 'bg-white/70 backdrop-blur-md border border-transparent shadow-xs'
           }`}>
             
             {/* LOGO */}
             <Link to="/" onClick={chiudiMenu} className="flex items-center gap-2 group" aria-label="Torna alla Home">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/30 group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-xl bg-linear-to-br from-orange-400 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/30 group-hover:scale-105 transition-transform">
                 <span className="font-bold text-xl" aria-hidden="true">R</span>
               </div>
               <span className="font-display text-2xl font-extrabold tracking-tight text-neutral-800">
-                Room<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">Date</span>
+                Room<span className="text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500">Date</span>
               </span>
             </Link>
 
@@ -108,7 +108,7 @@ const Navbar = () => {
 
             {/* Hamburger Mobile */}
             <button 
-              className="md:hidden p-2 rounded-full hover:bg-neutral-100 transition-colors z-[1002]" 
+              className="md:hidden p-2 rounded-full hover:bg-neutral-100 transition-colors z-1002" 
               onClick={() => setMenuOpen(!menuOpen)}
               aria-label="Apri menu"
             >
@@ -123,7 +123,7 @@ const Navbar = () => {
       </nav>
 
       {/* OVERLAY E MENU MOBILE UNIFICATI (Dinamico a 5 opzioni) */}
-      <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-[1001] p-8 pt-28 transform transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${menuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-1001 p-8 pt-28 transform transition-transform duration-300 ease-in-out ${menuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex flex-col gap-6 text-lg font-bold text-neutral-700">
           {user && (
              <div className="border-b border-neutral-100 pb-6 mb-2">
@@ -164,7 +164,7 @@ const Navbar = () => {
       {/* Sfondo scuro Mobile */}
       {menuOpen && (
         <div 
-          className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm z-[1000] md:hidden animate-in fade-in duration-300" 
+          className="fixed inset-0 bg-neutral-900/40 backdrop-blur-xs z-1000 md:hidden animate-fade-in" 
           onClick={chiudiMenu}
         ></div>
       )}

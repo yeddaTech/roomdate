@@ -4,6 +4,8 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthProvider';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import PageLoader from './components/PageLoader';
+import ConfirmProvider from './components/ui/ConfirmProvider';
+import Toaster from './components/ui/Toaster';
 
 // Importa normalmente solo le pagine essenziali (es. la Home)
 import Home from './pages/Home';
@@ -23,12 +25,15 @@ const Terms = lazy(() => import('./pages/Terms'));
 const Guide = lazy(() => import('./pages/Guide'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Moderation = lazy(() => import('./pages/Moderation'));
+// Vetrina dei componenti del design system: solo in sviluppo, non finisce nel sito pubblicato
+const DesignSystem = import.meta.env.DEV ? lazy(() => import('./pages/DesignSystem')) : null;
 
 function App() {
   return (
     <BrowserRouter>
       {/* La sessione viene verificata dal server una volta all'avvio (AuthProvider) */}
       <AuthProvider>
+        <ConfirmProvider>
         {/* Aggiunto il tag <main> per definire il punto di riferimento principale */}
         <main className="flex flex-col min-h-screen">
           {/* Suspense mostra un caricamento mentre React scarica il file JS della pagina */}
@@ -49,11 +54,14 @@ function App() {
               <Route path="/impostazioni" element={<ProtectedRoute><Impostazioni /></ProtectedRoute>} />
               <Route path="/moderazione" element={<ProtectedRoute><Moderation /></ProtectedRoute>} />
               <Route path="/dettagli/:id" element={<ListingDetails />} />
+              {DesignSystem && <Route path="/design-system" element={<DesignSystem />} />}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
           {/* Nessun banner cookie: l'app usa solo cookie e memoria locale tecnici (sessione e chiavi della chat) */}
         </main>
+        <Toaster />
+        </ConfirmProvider>
       </AuthProvider>
     </BrowserRouter>
   );

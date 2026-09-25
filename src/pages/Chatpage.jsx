@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import PageMeta from '../components/PageMeta';
 import { useQueryClient } from '@tanstack/react-query';
 import { encryptForRecipients } from '../utils/crypto';
 import { useAuth } from '../auth/AuthContext';
 import { getPrivateKey, getPublicKey, hasStoredVault, unlockPrivateKey } from '../auth/keyStorage';
 import { useBlockUser, useConversations, useMarkConversationRead, useMessages, useSendMessage, useUnblockUser } from '../api/hooks';
 import ReportDialog from '../components/ReportDialog';
+import { useConfirm } from '../components/ui/confirm';
+import { toast } from 'sonner';
 import { conversationChannel, createRealtimeClient, realtimeEnabled, TYPING_EVENT, userChannel } from '../api/realtime';
 import { queryKeys } from '../api/queryKeys';
 import { isSessionExpired } from '../api/client';
@@ -38,6 +40,7 @@ const initial = (name) => (name || '?').charAt(0).toUpperCase();
 
 export default function ChatPage() {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const location = useLocation();
   const queryClient = useQueryClient();
   const { user, logout, endLocalSession } = useAuth();
@@ -289,11 +292,17 @@ export default function ChatPage() {
     try {
       if (activeConv.blocked === 'by_me') {
         await unblockUser.mutateAsync(other.id);
-      } else if (confirm(`Bloccare ${other.firstName}? Nessuno dei due potrà più scrivere in questa conversazione né trovare l'altro nelle ricerche. Puoi sbloccare in qualsiasi momento.`)) {
+        toast.success(`${other.firstName} è stato sbloccato.`);
+      } else if (await confirm({
+        title: `Bloccare ${other.firstName}?`,
+        description: "Nessuno dei due potrà più scrivere in questa conversazione né trovare l'altro nelle ricerche. Puoi sbloccare in qualsiasi momento.",
+        confirmLabel: 'Blocca',
+        tone: 'danger',
+      })) {
         await blockUser.mutateAsync(other.id);
       }
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -328,11 +337,8 @@ export default function ChatPage() {
   ];
 
   return (
-    <div className="flex flex-col h-[100dvh] w-full max-w-[100vw] bg-white font-sans overflow-hidden selection:bg-orange-200">
-      <Helmet>
-        <title>Area Privata | RoomDate</title>
-        <meta name="robots" content="noindex, nofollow" />
-      </Helmet>
+    <div className="flex flex-col h-dvh w-full max-w-[100vw] bg-white font-sans overflow-hidden selection:bg-orange-200">
+      <PageMeta title="Area Privata | RoomDate" noindex />
 
       {/* STILI PER L'ANIMAZIONE DEI 3 PUNTINI E SCROLLBAR */}
       <style>
@@ -382,9 +388,9 @@ export default function ChatPage() {
       </style>
       
       {/* --- TOP NAV GENERATA DINAMICAMENTE (5 OPZIONI) --- */}
-      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-sm border-b border-neutral-100 sticky top-0">
+      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-xs border-b border-neutral-100 sticky top-0">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900 decoration-none">
-          Room<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">Date</span>
+          Room<span className="text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500">Date</span>
         </Link>
         
         {/* Menu Desktop integrato con l'array a 5 elementi */}
@@ -412,12 +418,12 @@ export default function ChatPage() {
           ) : (
             <>
               <Link to="/accedi" className="text-neutral-600 hover:text-neutral-900 px-4 py-2 text-sm font-medium transition-colors">Accedi</Link>
-              <Link to="/registrati" className="bg-neutral-900 hover:bg-neutral-800 text-white px-5 py-2 rounded-full text-sm font-bold transition-colors shadow-sm">Registrati</Link>
+              <Link to="/registrati" className="bg-neutral-900 hover:bg-neutral-800 text-white px-5 py-2 rounded-full text-sm font-bold transition-colors shadow-xs">Registrati</Link>
             </>
           )}
         </div>
 
-        <button className="md:hidden flex flex-col gap-1.5 z-[1001] cursor-pointer" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Menu">          
+        <button className="md:hidden flex flex-col gap-1.5 z-1001 cursor-pointer" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Menu">          
           <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
           <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></div>
           <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
@@ -425,7 +431,7 @@ export default function ChatPage() {
       </nav>
 
       {/* --- MOBILE SIDEBAR APP MENU (5 OPZIONI AGGIORNATE) --- */}
-      <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-[1000] p-8 pt-24 transform transition-transform duration-300 ease-in-out border-l border-neutral-100 ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-1000 p-8 pt-24 transform transition-transform duration-300 ease-in-out border-l border-neutral-100 ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex flex-col gap-6 text-lg font-medium text-neutral-600">
           {user && (
              <div className="border-b border-neutral-100 pb-4 mb-2">
@@ -453,13 +459,13 @@ export default function ChatPage() {
             ) : (
               <>
                 <Link to="/accedi" className="border border-neutral-200 text-center py-3 rounded-2xl hover:bg-neutral-50 transition-colors" onClick={() => setIsMenuOpen(false)}>Accedi</Link>
-                <Link to="/registrati" className="bg-neutral-900 text-white text-center py-3 rounded-2xl font-bold shadow-sm" onClick={() => setIsMenuOpen(false)}>Registrati</Link>
+                <Link to="/registrati" className="bg-neutral-900 text-white text-center py-3 rounded-2xl font-bold shadow-xs" onClick={() => setIsMenuOpen(false)}>Registrati</Link>
               </>
             )}
           </div>
         </div>
       </div>
-      {isMenuOpen && <div className="fixed inset-0 bg-neutral-900/20 backdrop-blur-sm z-[999] md:hidden transition-opacity" onClick={() => setIsMenuOpen(false)}></div>}
+      {isMenuOpen && <div className="fixed inset-0 bg-neutral-900/20 backdrop-blur-xs z-999 md:hidden transition-opacity" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* ── LAYOUT CHAT CONTAINER ── */}
       <div className={`flex-1 flex overflow-hidden relative w-full bg-white border-t border-neutral-100 ${mobileView === 'list' ? 'pb-16 md:pb-0' : ''}`}>
@@ -473,7 +479,7 @@ export default function ChatPage() {
               <input
                 type="text"
                 placeholder="Cerca conversazioni..."
-                className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 text-base md:text-sm rounded-2xl pl-11 pr-4 py-3 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all placeholder:text-neutral-400"
+                className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 text-base md:text-sm rounded-2xl pl-11 pr-4 py-3 focus:outline-hidden focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all placeholder:text-neutral-400"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -513,8 +519,8 @@ export default function ChatPage() {
                       onClick={() => handleSelectConv(conversation)}
                     >
                       {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500 rounded-r-md"></div>}
-                      <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white shrink-0 shadow-sm bg-gradient-to-br from-orange-400 to-rose-500">
-                        <span className="drop-shadow-sm">{initial(nameOf(conversation))}</span>
+                      <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white shrink-0 shadow-xs bg-linear-to-br from-orange-400 to-rose-500">
+                        <span className="drop-shadow-xs">{initial(nameOf(conversation))}</span>
                       </div>
                       <div className="flex flex-col justify-center overflow-hidden w-full">
                         <div className="flex justify-between items-center gap-2">
@@ -568,7 +574,7 @@ export default function ChatPage() {
         <main className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 min-w-0 flex-col h-full bg-[#FAFAFA] w-full max-w-full relative`}>
           {!activeConv ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-[#FAFAFA]">
-              <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-sm mb-6 border border-neutral-100">
+              <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-xs mb-6 border border-neutral-100">
                 <span className="text-4xl opacity-50">💬</span>
               </div>
               <h3 className="text-2xl text-neutral-900 mb-2 font-extrabold tracking-tight">I tuoi messaggi</h3>
@@ -577,10 +583,10 @@ export default function ChatPage() {
           ) : (
             <>
               {/* Header Chat Attiva */}
-              <div className="bg-white/90 backdrop-blur-md px-4 md:px-6 py-4 border-b border-neutral-100 flex items-center gap-4 shrink-0 shadow-sm z-10 w-full">
+              <div className="bg-white/90 backdrop-blur-md px-4 md:px-6 py-4 border-b border-neutral-100 flex items-center gap-4 shrink-0 shadow-xs z-10 w-full">
                 <button className="md:hidden text-2xl text-neutral-500 hover:text-neutral-900 px-2 cursor-pointer transition-colors" onClick={() => setMobileView('list')}>←</button>
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-sm shrink-0 bg-gradient-to-br from-orange-400 to-rose-500">
-                  <span className="drop-shadow-sm">{initial(nameOf(activeConv))}</span>
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-xs shrink-0 bg-linear-to-br from-orange-400 to-rose-500">
+                  <span className="drop-shadow-xs">{initial(nameOf(activeConv))}</span>
                 </div>
                 <div className="overflow-hidden flex-1 min-w-0">
                   <h3 className="font-bold text-neutral-900 leading-tight truncate text-lg">{nameOf(activeConv)}</h3>
@@ -608,14 +614,14 @@ export default function ChatPage() {
                   <button
                     onClick={() => messagesQuery.fetchNextPage()}
                     disabled={messagesQuery.isFetchingNextPage}
-                    className="self-center bg-white border border-neutral-200 text-neutral-600 text-sm font-bold px-5 py-2.5 rounded-full hover:bg-neutral-50 transition-colors cursor-pointer shadow-sm"
+                    className="self-center bg-white border border-neutral-200 text-neutral-600 text-sm font-bold px-5 py-2.5 rounded-full hover:bg-neutral-50 transition-colors cursor-pointer shadow-xs"
                   >
                     {messagesQuery.isFetchingNextPage ? 'Caricamento...' : 'Carica messaggi precedenti'}
                   </button>
                 )}
 
                 {visibleMessages.length === 0 ? (
-                  <div className="text-center p-6 text-neutral-500 text-sm font-medium bg-white rounded-3xl border border-neutral-100 shadow-sm self-center my-auto">
+                  <div className="text-center p-6 text-neutral-500 text-sm font-medium bg-white rounded-3xl border border-neutral-100 shadow-xs self-center my-auto">
                     👋 Invia il primo messaggio a {nameOf(activeConv)} per iniziare!
                   </div>
                 ) : (
@@ -626,18 +632,18 @@ export default function ChatPage() {
                     return (
                       <div key={message.id} className="flex flex-col gap-6 w-full min-w-0">
                         {newDay && (
-                          <div className="self-center bg-white border border-neutral-100 text-neutral-500 text-[11px] font-bold px-4 py-1.5 rounded-full shadow-sm">
+                          <div className="self-center bg-white border border-neutral-100 text-neutral-500 text-[11px] font-bold px-4 py-1.5 rounded-full shadow-xs">
                             {dayLabel(message.createdAt)}
                           </div>
                         )}
                         <div className={`flex ${isMine ? 'justify-end' : 'justify-start'} items-end gap-3 w-full ${message.isPending ? 'opacity-70' : ''}`}>
                           {!isMine && (
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-sm relative bottom-1 bg-gradient-to-br from-orange-400 to-rose-500">
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-xs relative bottom-1 bg-linear-to-br from-orange-400 to-rose-500">
                               {initial(nameOf(activeConv))}
                             </div>
                           )}
                           <div className={`flex flex-col min-w-0 ${isMine ? 'items-end' : 'items-start'} max-w-[85%] md:max-w-[70%]`}>
-                            <div className={`px-5 py-3.5 text-[15px] shadow-sm break-words whitespace-pre-wrap w-full leading-relaxed ${
+                            <div className={`px-5 py-3.5 text-[15px] shadow-xs wrap-break-word whitespace-pre-wrap w-full leading-relaxed ${
                               isMine
                                 ? `bg-neutral-900 text-white rounded-3xl rounded-br-sm ${message.isFailed ? 'ring-2 ring-rose-300' : ''}`
                                 : 'bg-white border border-neutral-100 text-neutral-800 rounded-3xl rounded-bl-sm'
@@ -664,10 +670,10 @@ export default function ChatPage() {
 
                 {typingIn === activeConv.id && (
                   <div className="flex justify-start items-end gap-3 w-full mt-2 animate-fade-in-up">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-sm opacity-60 relative bottom-1 bg-gradient-to-br from-orange-400 to-rose-500">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-xs opacity-60 relative bottom-1 bg-linear-to-br from-orange-400 to-rose-500">
                       {initial(nameOf(activeConv))}
                     </div>
-                    <div className="bg-white border border-neutral-100 px-5 py-4 rounded-3xl rounded-bl-sm shadow-sm flex gap-1.5 items-center h-[42px]">
+                    <div className="bg-white border border-neutral-100 px-5 py-4 rounded-3xl rounded-bl-sm shadow-xs flex gap-1.5 items-center h-[42px]">
                       <span className="typing-dot"></span>
                       <span className="typing-dot"></span>
                       <span className="typing-dot"></span>
@@ -693,7 +699,7 @@ export default function ChatPage() {
                 {QUICK_REPLIES.map((reply) => (
                   <button
                     key={reply}
-                    className="shrink-0 bg-white border border-neutral-200 text-neutral-600 text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-neutral-50 hover:border-orange-300 hover:text-orange-600 transition-all cursor-pointer whitespace-nowrap shadow-sm"
+                    className="shrink-0 bg-white border border-neutral-200 text-neutral-600 text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-neutral-50 hover:border-orange-300 hover:text-orange-600 transition-all cursor-pointer whitespace-nowrap shadow-xs"
                     onClick={() => handleQuickReply(reply)}
                   >
                     {reply}
@@ -705,7 +711,7 @@ export default function ChatPage() {
               <div className="shrink-0 bg-white p-4 md:px-6 md:pb-6 flex items-end gap-3 w-full border-t border-neutral-50">
                 <textarea
                   ref={textareaRef}
-                  className="flex-1 bg-neutral-50 border border-neutral-200 text-neutral-900 text-base rounded-3xl px-5 py-3.5 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all resize-none max-h-[140px] w-full placeholder:text-neutral-400 custom-scrollbar"
+                  className="flex-1 bg-neutral-50 border border-neutral-200 text-neutral-900 text-base rounded-3xl px-5 py-3.5 focus:outline-hidden focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all resize-none max-h-[140px] w-full placeholder:text-neutral-400 custom-scrollbar"
                   placeholder="Scrivi un messaggio..."
                   value={inputText}
                   onChange={handleTextareaChange}
@@ -713,7 +719,7 @@ export default function ChatPage() {
                   rows={1}
                 />
                 <button
-                  className={`shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-white font-bold transition-all duration-200 ${!inputText.trim() ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed shadow-none' : 'bg-gradient-to-r from-orange-500 to-rose-500 hover:scale-[1.05] shadow-lg hover:shadow-orange-500/25 cursor-pointer'}`}
+                  className={`shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-white font-bold transition-all duration-200 ${!inputText.trim() ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed shadow-none' : 'bg-linear-to-r from-orange-500 to-rose-500 hover:scale-[1.05] shadow-lg hover:shadow-orange-500/25 cursor-pointer'}`}
                   onClick={handleSend}
                   disabled={!inputText.trim()}
                   aria-label="Invia messaggio"
@@ -743,7 +749,7 @@ export default function ChatPage() {
 
         {/* 🔐 OVERLAY SBLOCCO CRITTOGRAFIA */}
         {isLocked && (
-          <div className="absolute inset-0 z-[1100] bg-white/60 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="absolute inset-0 z-1100 bg-white/60 backdrop-blur-xl flex items-center justify-center p-4">
             <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl max-w-sm w-full text-center border border-neutral-100 animate-fade-in-up">
               <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl shadow-inner">
                 🔐
@@ -759,7 +765,7 @@ export default function ChatPage() {
                   placeholder="La tua password"
                   value={unlockPassword}
                   onChange={(e) => setUnlockPassword(e.target.value)}
-                  className="w-full bg-neutral-50 border text-center text-neutral-900 rounded-2xl px-5 py-4 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium"
+                  className="w-full bg-neutral-50 border text-center text-neutral-900 rounded-2xl px-5 py-4 focus:outline-hidden focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium"
                 />
                 {unlockError && <div className="text-rose-500 text-xs font-bold -mt-2">{unlockError}</div>}
                 

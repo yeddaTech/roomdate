@@ -7,7 +7,7 @@ RoomDate is a web platform for finding rooms to rent and roommates. Users contac
 
 The platform operates on a decoupled full-stack architecture:
 
-*   **Frontend:** React, Tailwind CSS, Vite
+*   **Frontend:** React 19, Tailwind CSS v4, Vite, Radix primitives
 *   **Backend:** Go (Golang) REST API
 *   **Database:** PostgreSQL (hosted on Neon)
 *   **Real-time Communication:** Pusher (WebSockets)
@@ -61,7 +61,9 @@ Requirements: Go 1.25+, Node.js 20+ and a **development** PostgreSQL database (a
 4. Optional sample data: `npm run db:seed` — users such as `giulia@seed.roomdate.test`, password `roomdate-dev`
 5. Start the API (`npm run dev:api`, on `http://127.0.0.1:8080`) and, in a second terminal, the frontend (`npm run dev`), then open `http://127.0.0.1:5173`.
 
-Vite proxies `/api` to the local Go server, so the frontend and the API share the same origin, as they do on Vercel.
+Vite proxies `/api` to the local Go server, so the frontend and the API share the same origin, as they do on Vercel. In development, `/design-system` shows the interface components in both themes.
+
+After pulling changes that touch `package.json`, run `npm ci` again: modules M2.1 moved the project to Tailwind v4 (no `tailwind.config.js` or `postcss.config.js` any more, the theme lives in `src/index.css`) and to React 19, and added the interface dependencies.
 
 ### Backend structure
 
@@ -98,6 +100,18 @@ Without the `PUSHER_*` variables the app still works: the chat page refreshes ev
 * Search filters live in the URL (`/ricerca?intent=&citta=&budget=&tipo=&spese=&ordina=`), the only source the queries read: a search is shareable and the back button steps through searches. Typing in the budget field replaces the current history entry instead of adding one, and the request waits until typing stops. A failed request is shown as an error with a "Riprova" button, never as "no results".
 * `src/auth/` — `AuthProvider` holds the session verified by the server (no user copy in `localStorage`), `ProtectedRoute` guards private pages, `keyStorage.ts` manages the E2EE keys kept in the browser. A request that finds the session expired sends the user back to the login page; after a logout or account deletion, the page the user left sends them to the home page.
 * `npm run typecheck` checks the TypeScript files; `npm run build` runs it before building.
+
+### Design system (module M2.1)
+
+The interface is built on tokens and a small set of accessible components; the pages are being moved onto them one module at a time (M2.2 onwards).
+
+* **Tokens** live in `src/index.css`, inside `@theme`: colours have names that say what they are for (`bg-surface`, `text-foreground-muted`, `bg-primary`, `border-control`), so a page never names a colour. Warm neutrals with a deep orange for actions; the orange-to-pink gradient (`bg-brand`) is kept for brand moments. Every pair was checked against WCAG 2.2 AA: 4.5:1 for text, 3:1 for field borders and the focus ring. Three radii (`rounded-control`, `rounded-card`, `rounded-full`), two shadows (`shadow-card`, `shadow-overlay`), Tailwind's 4px spacing grid, animations of 150–250 ms that stop under `prefers-reduced-motion`.
+* **Dark theme:** the same tokens have dark values under `.dark`. Nothing switches yet: it is turned on once every page uses the tokens, so half the site is not left unreadable in the meantime.
+* **Components** in `src/components/ui/`: `Button`, `Field` with `Input`/`Textarea`/`Select` (label, hint and error tied to the control), `Chip`, `Card`, `Badge`, `Avatar`, `Dialog`, `Sheet`, `Tabs`, `Toaster`, `Skeleton`, `EmptyState`. Dialogs, sheets and tabs are Radix primitives: focus trap, Esc, focus returned to the opener, arrow keys between tabs. `cn()` merges classes so a `className` passed in wins over the default one.
+* **Feedback instead of `alert`/`confirm`:** `toast.success(...)` / `toast.error(...)` (sonner) for the outcome of an action, and `useConfirm()` for a question — an AlertDialog that does not close on an outside click, starts focused on "Annulla" and returns a promise. The 23 native `alert`, `confirm` and `prompt` calls are gone; an E2E test fails if any of them comes back. The confirm dialog's code is loaded after the page, so Radix does not weigh on the first load.
+* **Fonts** (DM Sans and Playfair Display) are served by the site itself through Fontsource, imported in `main.jsx`. They used to come from Google Fonts and the CSP blocked them, so the site never showed them (anomaly F20); now no visitor IP reaches Google and `font-src` is `'self'`.
+* **Page title and meta:** `<PageMeta title=… noindex />`. React 19 hoists these into `<head>` by itself, so react-helmet-async is gone.
+* `/design-system` shows every component in both themes, side by side. It exists only in development: the production build has no such route.
 
 ### Tests
 
