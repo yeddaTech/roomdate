@@ -16,16 +16,17 @@ interface AvatarProps {
   src?: string | null;
   size?: AvatarSize;
   className?: string;
+  /** Accanto al nome scritto l'avatar è solo decorativo: i lettori di schermo lo saltano. */
+  decorative?: boolean;
 }
 
-export default function Avatar({ name, src, size = 'md', className }: AvatarProps) {
+export default function Avatar({ name, src, size = 'md', className, decorative = false }: AvatarProps) {
   const [failed, setFailed] = useState(false);
   const initial = (name.trim().charAt(0) || '?').toUpperCase();
   return (
     <span
       className={cn('inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand font-bold text-white', sizes[size], className)}
-      role="img"
-      aria-label={name || 'Utente'}
+      {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': name || 'Utente' })}
     >
       {src && !failed ? (
         <img src={src} alt="" className="size-full object-cover" onError={() => setFailed(true)} />

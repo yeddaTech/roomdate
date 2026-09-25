@@ -1,4 +1,3 @@
-import React from 'react';
 import PageMeta from '../components/PageMeta';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -6,7 +5,7 @@ export default function Terms() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-dvh bg-[#FAFAFA] font-sans text-neutral-900 py-12 px-6 selection:bg-orange-200">
+    <div className="bg-[#FAFAFA] font-sans text-neutral-900 py-12 px-6 selection:bg-orange-200">
       <PageMeta title="Termini di Servizio | RoomDate" />
 
       <div className="max-w-3xl mx-auto bg-white p-8 md:p-12 rounded-3xl shadow-xs border border-neutral-100 relative overflow-hidden">

@@ -1,6 +1,5 @@
 import PageMeta from '../components/PageMeta';
 import { Link } from 'react-router-dom';
-import Footer from '../components/Footer';
 
 export default function Guide() {
   // --- INIZIO SCHEMA MARKUP AGGIORNATO (5 Domande Strategiche) ---
@@ -52,7 +51,7 @@ export default function Guide() {
   };
 
   return (
-    <div className="min-h-dvh bg-[#FAFAFA] font-sans selection:bg-orange-200 flex flex-col">
+    <div className="bg-[#FAFAFA] font-sans selection:bg-orange-200 flex flex-col">
       <PageMeta title="Come trovare coinquilini affidabili e stanze in affitto | RoomDate" description="Guida pratica: dove cercare stanze e coinquilini, cosa guardare in un profilo e come contattare chi affitta, a Milano e in tutta Italia." />
 
       {/* --- HERO SECTION (LUMINOSA E MODERNA) --- */}
@@ -114,7 +113,6 @@ export default function Guide() {
         </div>
       </section>
 
-      <Footer />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import PageMeta from '../components/PageMeta';
 import { useAuth } from '../auth/AuthContext';
 import { changePassword } from '../api/auth';
@@ -25,11 +25,9 @@ function whenLabel(isoDate) {
 }
 
 export default function Impostazioni() {
-  const navigate = useNavigate();
   const confirm = useConfirm();
   // La pagina è protetta: qui l'utente in sessione c'è sempre
-  const { user, logout, endLocalSession } = useAuth();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, endLocalSession } = useAuth();
 
   // Stati per le password e i messaggi a schermo
   const [currentPassword, setCurrentPassword] = useState('');
@@ -38,11 +36,6 @@ export default function Impostazioni() {
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' }); // type: 'success' o 'error'
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogout = async () => {
-    setIsMenuOpen(false);
-    navigate('/');
-    await logout();
-  };
 
   // --- CAMBIO PASSWORD ---
   const handleSaveSettings = async (e) => {
@@ -215,54 +208,9 @@ export default function Impostazioni() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
+    <div className="bg-[#FAFAFA] pb-12 font-sans selection:bg-orange-200">
       <PageMeta title="Impostazioni | RoomDate" noindex />
       
-      {/* --- TOP NAV (GLASSMORPHISM) --- */}
-      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-xs border-b border-neutral-100 sticky top-0">
-        <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900 decoration-none">
-          Room<span className="text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500">Date</span>
-        </Link>
-        
-        <div className="hidden md:flex gap-8 items-center text-sm font-medium text-neutral-500">
-          <Link to="/" className="hover:text-neutral-900 transition-colors">Home</Link>
-          <Link to="/ricerca" className="hover:text-neutral-900 transition-colors">Cerca Stanza</Link>
-          <Link to="/chat" className="hover:text-neutral-900 transition-colors">Chat</Link>
-          <Link to="/dashboard" className="hover:text-neutral-900 transition-colors">Profilo</Link>
-          <Link to="/impostazioni" className="text-orange-500 font-bold transition-colors">Impostazioni</Link>
-        </div>
-
-        <div className="hidden md:flex gap-4 items-center">
-          <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{user.firstName}</strong>!</span>
-          <button onClick={handleLogout} className="border border-neutral-200 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer">Esci</button>
-        </div>
-
-        {/* Hamburger Mobile */}
-        <button className="md:hidden flex flex-col gap-1.5 z-1001 cursor-pointer" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Menu">          
-          <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
-          <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></div>
-          <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
-        </button>
-      </nav>
-
-      {/* --- MOBILE SIDEBAR APP MENU --- */}
-      <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-1000 p-8 pt-24 transform transition-transform duration-300 ease-in-out border-l border-neutral-100 ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="flex flex-col gap-6 text-lg font-medium text-neutral-600">
-          {user && (
-             <div className="border-b border-neutral-100 pb-4 mb-2">
-               <h3 className="text-xl text-neutral-900 font-bold">👤 Ciao, {user.firstName}!</h3>
-             </div>
-          )}
-          <Link to="/" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">🏠 Home</Link>
-          <Link to="/ricerca" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">🔍 Cerca Stanza</Link>
-          <Link to="/chat" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">💬 Chat</Link>
-          <Link to="/dashboard" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">👤 Il mio Profilo</Link>
-          <Link to="/impostazioni" onClick={() => setIsMenuOpen(false)} className="text-orange-500 font-bold">⚙️ Impostazioni</Link>
-          
-          <button onClick={handleLogout} className="bg-neutral-900 text-white w-full py-3 rounded-2xl font-bold mt-4 hover:bg-neutral-800 transition-colors cursor-pointer">Esci</button>
-        </div>
-      </div>
-      {isMenuOpen && <div className="fixed inset-0 bg-neutral-900/20 backdrop-blur-xs z-999 md:hidden transition-opacity" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* --- CONTENUTO PAGINA --- */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 animate-fade-in-up">

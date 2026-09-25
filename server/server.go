@@ -120,6 +120,7 @@ func New(d Deps) (http.Handler, error) {
 		http.MethodGet: chatHandler.Messages, http.MethodPost: chatHandler.SendMessage,
 	}))
 	mux.Handle("/api/v1/conversations/{id}/read", httpx.Methods(methods{http.MethodPost: chatHandler.MarkRead}))
+	mux.Handle("/api/v1/me/unread", httpx.Methods(methods{http.MethodGet: chatHandler.Unread}))
 	mux.Handle("/api/v1/realtime/auth", httpx.Methods(methods{http.MethodPost: chatHandler.AuthorizeRealtime}))
 
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {

@@ -386,6 +386,15 @@ func (s *Service) SendMessage(ctx context.Context, userID, rawConversationID str
 	return message(saved), nil
 }
 
+// UnreadCount restituisce quante conversazioni hanno messaggi non letti.
+func (s *Service) UnreadCount(ctx context.Context, userID string) (int, error) {
+	n, err := s.store.UnreadConversations(ctx, userID)
+	if err != nil {
+		return 0, apperr.Wrap(err, "unread_read_failed", "Impossibile leggere i messaggi non letti")
+	}
+	return n, nil
+}
+
 // MarkRead segna come letti i messaggi della conversazione fino a ora.
 func (s *Service) MarkRead(ctx context.Context, userID, rawConversationID string) error {
 	conversationID, err := s.requireParticipantByID(ctx, userID, rawConversationID)

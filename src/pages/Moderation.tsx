@@ -151,7 +151,7 @@ export default function Moderation() {
   const items = reports.data?.pages.flatMap((page) => page.items) ?? [];
 
   return (
-    <div className="min-h-dvh bg-[#FAFAFA] font-sans">
+    <div className="bg-[#FAFAFA] font-sans">
       <PageMeta title="Moderazione | RoomDate" noindex />
       <div className="max-w-3xl mx-auto px-4 py-10 md:py-16">
         <Link to="/impostazioni" className="text-sm font-bold text-neutral-500 hover:text-neutral-900">← Impostazioni</Link>

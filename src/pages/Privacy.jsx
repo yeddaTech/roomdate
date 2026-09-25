@@ -5,7 +5,7 @@ export default function Privacy() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-dvh bg-[#FAFAFA] font-sans text-neutral-900 py-12 px-6 selection:bg-orange-200">
+    <div className="bg-[#FAFAFA] font-sans text-neutral-900 py-12 px-6 selection:bg-orange-200">
       <PageMeta title="Informativa sulla Privacy e Sicurezza | RoomDate" />
 
       <div className="max-w-3xl mx-auto bg-white p-8 md:p-12 rounded-3xl shadow-xs border border-neutral-100 relative overflow-hidden">

@@ -113,6 +113,30 @@ The interface is built on tokens and a small set of accessible components; the p
 * **Page title and meta:** `<PageMeta title=… noindex />`. React 19 hoists these into `<head>` by itself, so react-helmet-async is gone.
 * `/design-system` shows every component in both themes, side by side. It exists only in development: the production build has no such route.
 
+### Layouts and navigation (module M2.2)
+
+* **Routing** is a data router (`createBrowserRouter` in `App.jsx`). Every page sits in one of three layouts in `src/components/layout/`:
+  * `PublicLayout`: header, content, footer. It is used by home, search, detail pages, guide, legal pages and the 404.
+  * `AppLayout`: header only, with the pages behind `ProtectedRoute`. It is used by dashboard, chat, settings and moderation.
+  * `AuthLayout`: a minimal header with "Torna al sito" and a link to the other form. It is used by login, registration and recovery.
+
+  The legal pages use the public layout, because they need the same navigation. A route's `handle` tweaks its layout: `{ fullHeight: true }` makes the chat fill the screen without page scroll, and `{ authSwitch }` sets the header link on the auth pages.
+* **One header** (`SiteHeader`) replaces the nine copies each page used to carry, each with different links.
+  * **Desktop:** Cerca, Chat with an unread badge, Come funziona, and an account menu. The account menu is a disclosure, not `role="menu"`: a button with `aria-expanded` and a list of links. It closes with Esc (focus back on the button), an outside click, tabbing out, or a page change.
+  * **Phone:** a side panel holds the rest. Its code (Radix Dialog) is fetched when the browser is idle, not with the page.
+* **Bottom tab bar on phones** (`MobileTabBar`): Home, Cerca, Chat, Profilo/Accedi.
+  * Content above it gets bottom padding (`tabBarPadding`), so the bar never covers a button.
+  * A page can hide the bar with `useHideTabBar(true)`. The chat does this while a conversation is open, to leave room for messages and the keyboard.
+  * The bar is absent on auth pages.
+* **Unread badge:** `GET /api/v1/me/unread` returns `{ "conversations": n }`, the number of conversations with messages the user has not read. Its query key sits under `conversations`, so reading or receiving a message refreshes it; it also refreshes every minute.
+* **Errors:** `RouteError` is the `errorElement` of each layout, so a crash in a page shows a message inside the layout, with the navigation still there.
+  * If the page's code fails to load (the site was updated since the tab was opened), it reloads once by itself, then offers "Ricarica la pagina".
+  * Unknown URLs render the 404 (`noindex`) inside the public layout. `/register` redirects to `/registrati`.
+* **Scroll and focus:**
+  * `ScrollRestoration`: back and forward return to where the user was, and a new page starts at the top. Search filters use `preventScrollReset`, so changing one does not jump to the top.
+  * After every navigation, focus moves to the main content (`#contenuto`) so screen readers announce the new page. "Salta al contenuto" is the first Tab stop.
+* **iOS safe areas:** `viewport-fit=cover` plus `env(safe-area-inset-*)` padding on the header, tab bar, side panel and chat composer.
+
 ### Tests
 
 `npm run test:api` runs the Go tests. Unit tests need nothing else; the integration tests in `server/` (every endpoint through the real router, middleware and database, with an in-memory photo storage) run when `TEST_DATABASE_URL` is set, and are skipped otherwise. They create a temporary `roomdate_test_…` database, migrate it from scratch and drop it at the end.

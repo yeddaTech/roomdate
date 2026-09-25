@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import PageMeta from '../components/PageMeta';
-import { useAuth } from '../auth/AuthContext';
 import {
   useConversations,
   useCreateListing,
@@ -24,11 +23,8 @@ import ListingPhotos from '../components/listings/ListingPhotos';
 import LifestyleTagsPicker from '../components/profile/LifestyleTagsPicker';
 
 export default function Dashboard() {
-  const navigate = useNavigate();
   const confirm = useConfirm();
   const location = useLocation();
-  const { logout } = useAuth();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Da "Modifica annuncio" nella pagina di dettaglio si arriva direttamente alla modifica
   const [editingId, setEditingId] = useState(location.state?.editListingId ?? null);
@@ -70,11 +66,6 @@ export default function Dashboard() {
     setActiveView(nextView);
   };
 
-  const handleLogout = async () => {
-    setIsMenuOpen(false);
-    navigate('/');
-    await logout();
-  };
 
   const handleDeleteListing = async (id) => {
     const ok = await confirm({
@@ -135,7 +126,7 @@ export default function Dashboard() {
 
   if (!form) {
     return profileQuery.isError
-      ? <div className="flex min-h-screen items-center justify-center p-6 text-center font-sans text-neutral-600">{profileQuery.error.message}</div>
+      ? <div className="flex min-h-[50vh] items-center justify-center p-6 text-center font-sans text-neutral-600">{profileQuery.error.message}</div>
       : <PageLoader />;
   }
 
@@ -143,43 +134,9 @@ export default function Dashboard() {
   const isCerca = form.userType === 'cerca';
 
   return (
-    <div className="min-h-dvh bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
+    <div className="bg-[#FAFAFA] pb-12 font-sans selection:bg-orange-200">
       <PageMeta title="Area Privata | RoomDate" noindex />
 
-      {/* --- TOP NAV --- */}
-      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-xs border-b border-neutral-100 sticky top-0">
-        <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900 decoration-none">
-          Room<span className="text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500">Date</span>
-        </Link>
-        <div className="hidden md:flex gap-8 items-center text-sm font-medium text-neutral-500">
-          <Link to="/" className="hover:text-neutral-900 transition-colors">Home</Link>
-          <Link to="/ricerca" className="hover:text-neutral-900 transition-colors">Cerca Stanza</Link>
-          <Link to="/chat" className="hover:text-neutral-900 transition-colors">Chat</Link>
-          <Link to="/dashboard" className="text-orange-500 font-bold transition-colors">Profilo</Link>
-          <Link to="/impostazioni" className="hover:text-neutral-900 transition-colors">Impostazioni</Link>
-        </div>
-        <div className="hidden md:flex gap-4 items-center">
-          <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{form.firstName}</strong>!</span>
-          <button onClick={handleLogout} className="border border-neutral-200 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer">Esci</button>
-        </div>
-        <button className="md:hidden flex flex-col gap-1.5 z-1001 cursor-pointer" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Menu">          
-          <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
-          <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></div>
-          <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
-        </button>
-      </nav>
-
-      {/* MOBILE MENU */}
-      <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-1000 p-8 pt-24 transform transition-transform duration-300 ease-in-out border-l border-neutral-100 ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="flex flex-col gap-6 text-lg font-medium text-neutral-600">
-          <Link to="/" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">🏠 Home</Link>
-          <Link to="/ricerca" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">🔍 Cerca Stanza</Link>
-          <Link to="/chat" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">💬 Chat</Link>
-          <Link to="/dashboard" onClick={() => setIsMenuOpen(false)} className="text-orange-500 font-bold">👤 Il mio Profilo</Link>
-          <button onClick={handleLogout} className="bg-neutral-900 text-white w-full py-3 rounded-2xl font-bold mt-4 hover:bg-neutral-800 transition-colors cursor-pointer">Esci</button>
-        </div>
-      </div>
-      {isMenuOpen && <div className="fixed inset-0 bg-neutral-900/20 backdrop-blur-xs z-999 md:hidden transition-opacity" onClick={() => setIsMenuOpen(false)}></div>}
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         
