@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import PageMeta from '../components/PageMeta';
 import { useAuth } from '../auth/AuthContext';
 import {
   useConversations,
@@ -17,12 +17,15 @@ import { formatAvailability, formatBills } from '../api/listings';
 import { CITIES, OCCUPATIONS, isCity } from '../api/options';
 import { latestAdultBirthdate } from '../api/users';
 import PageLoader from '../components/PageLoader';
+import { useConfirm } from '../components/ui/confirm';
+import { toast } from 'sonner';
 import ListingForm from '../components/listings/ListingForm';
 import ListingPhotos from '../components/listings/ListingPhotos';
 import LifestyleTagsPicker from '../components/profile/LifestyleTagsPicker';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const location = useLocation();
   const { logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -74,21 +77,28 @@ export default function Dashboard() {
   };
 
   const handleDeleteListing = async (id) => {
-    if (window.confirm("Eliminare definitivamente questo annuncio e le sue foto? Le conversazioni con chi ti ha scritto resteranno.")) {
-      try {
-        await deleteListing.mutateAsync(id);
-        showView('myListings');
-      } catch (err) {
-        alert("❌ " + err.message);
-      }
+    const ok = await confirm({
+      title: 'Eliminare questo annuncio?',
+      description: 'Verranno cancellate anche le foto. Le conversazioni con chi ti ha scritto resteranno.',
+      confirmLabel: 'Elimina annuncio',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await deleteListing.mutateAsync(id);
+      toast.success('Annuncio eliminato.');
+      showView('myListings');
+    } catch (err) {
+      toast.error(err.message);
     }
   };
 
   const handleToggleActive = async (listing) => {
     try {
       await setListingActive.mutateAsync({ id: listing.id, active: !listing.isActive });
+      toast.success(listing.isActive ? 'Annuncio disattivato: non compare più nelle ricerche.' : 'Annuncio di nuovo pubblicato.');
     } catch (err) {
-      alert("❌ " + err.message);
+      toast.error(err.message);
     }
   };
 
@@ -106,9 +116,9 @@ export default function Dashboard() {
         lifestyleTags: form.lifestyleTags,
         isPublic: form.isPublic
       });
-      alert("✅ Profilo aggiornato con successo!");
+      toast.success('Profilo aggiornato.');
     } catch (err) {
-      alert("❌ Errore dal server: " + err.message);
+      toast.error(err.message);
     }
   };
 
@@ -133,16 +143,13 @@ export default function Dashboard() {
   const isCerca = form.userType === 'cerca';
 
   return (
-    <div className="min-h-[100dvh] bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
-      <Helmet>
-        <title>Area Privata | RoomDate</title>
-        <meta name="robots" content="noindex, nofollow" />
-      </Helmet>
+    <div className="min-h-dvh bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
+      <PageMeta title="Area Privata | RoomDate" noindex />
 
       {/* --- TOP NAV --- */}
-      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-sm border-b border-neutral-100 sticky top-0">
+      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-xs border-b border-neutral-100 sticky top-0">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900 decoration-none">
-          Room<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">Date</span>
+          Room<span className="text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500">Date</span>
         </Link>
         <div className="hidden md:flex gap-8 items-center text-sm font-medium text-neutral-500">
           <Link to="/" className="hover:text-neutral-900 transition-colors">Home</Link>
@@ -155,7 +162,7 @@ export default function Dashboard() {
           <span className="text-sm text-neutral-500">Ciao, <strong className="text-neutral-900">{form.firstName}</strong>!</span>
           <button onClick={handleLogout} className="border border-neutral-200 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer">Esci</button>
         </div>
-        <button className="md:hidden flex flex-col gap-1.5 z-[1001] cursor-pointer" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Menu">          
+        <button className="md:hidden flex flex-col gap-1.5 z-1001 cursor-pointer" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Menu">          
           <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
           <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></div>
           <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
@@ -163,7 +170,7 @@ export default function Dashboard() {
       </nav>
 
       {/* MOBILE MENU */}
-      <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-[1000] p-8 pt-24 transform transition-transform duration-300 ease-in-out border-l border-neutral-100 ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-1000 p-8 pt-24 transform transition-transform duration-300 ease-in-out border-l border-neutral-100 ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex flex-col gap-6 text-lg font-medium text-neutral-600">
           <Link to="/" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">🏠 Home</Link>
           <Link to="/ricerca" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">🔍 Cerca Stanza</Link>
@@ -172,15 +179,15 @@ export default function Dashboard() {
           <button onClick={handleLogout} className="bg-neutral-900 text-white w-full py-3 rounded-2xl font-bold mt-4 hover:bg-neutral-800 transition-colors cursor-pointer">Esci</button>
         </div>
       </div>
-      {isMenuOpen && <div className="fixed inset-0 bg-neutral-900/20 backdrop-blur-sm z-[999] md:hidden transition-opacity" onClick={() => setIsMenuOpen(false)}></div>}
+      {isMenuOpen && <div className="fixed inset-0 bg-neutral-900/20 backdrop-blur-xs z-999 md:hidden transition-opacity" onClick={() => setIsMenuOpen(false)}></div>}
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         
         {/* HEADER PROFILO */}
-        <div className="bg-white rounded-3xl p-8 md:p-12 text-center relative shadow-sm border border-neutral-100 mb-8 overflow-hidden">
+        <div className="bg-white rounded-3xl p-8 md:p-12 text-center relative shadow-xs border border-neutral-100 mb-8 overflow-hidden">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-orange-400/10 blur-[80px] rounded-full pointer-events-none"></div>
           
-          <div className="relative z-10 w-28 h-28 rounded-full mx-auto mb-6 flex justify-center items-center text-5xl border-4 border-white shadow-lg bg-gradient-to-br from-orange-400 to-rose-500 text-white font-bold">
+          <div className="relative z-10 w-28 h-28 rounded-full mx-auto mb-6 flex justify-center items-center text-5xl border-4 border-white shadow-lg bg-linear-to-br from-orange-400 to-rose-500 text-white font-bold">
             {(form.firstName || 'U').charAt(0).toUpperCase()}
           </div>
           <h1 className="font-serif text-3xl font-extrabold mb-2 text-neutral-900 tracking-tight">
@@ -194,13 +201,13 @@ export default function Dashboard() {
         {/* STATS: solo conteggi reali (i preferiti non esistono ancora) */}
         <div className={`grid ${canManageListings ? 'grid-cols-2' : 'grid-cols-1'} gap-4 md:gap-6 mb-10`}>
           {canManageListings && (
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100 text-center flex flex-col justify-center transition-transform hover:scale-[1.02]">
-              <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">{myListings.length}</div>
+            <div className="bg-white p-6 rounded-3xl shadow-xs border border-neutral-100 text-center flex flex-col justify-center transition-transform hover:scale-[1.02]">
+              <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500">{myListings.length}</div>
               <div className="text-[11px] md:text-xs text-neutral-500 font-bold mt-2 uppercase tracking-wider">Annunci</div>
             </div>
           )}
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100 text-center flex flex-col justify-center transition-transform hover:scale-[1.02]">
-            <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">{conversations ? `${conversations.length}${hasMoreConversations ? '+' : ''}` : '–'}</div>
+          <div className="bg-white p-6 rounded-3xl shadow-xs border border-neutral-100 text-center flex flex-col justify-center transition-transform hover:scale-[1.02]">
+            <div className="text-4xl font-extrabold text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500">{conversations ? `${conversations.length}${hasMoreConversations ? '+' : ''}` : '–'}</div>
             <div className="text-[11px] md:text-xs text-neutral-500 font-bold mt-2 uppercase tracking-wider">Chat</div>
           </div>
         </div>
@@ -226,25 +233,25 @@ export default function Dashboard() {
 
           {/* TAB 1: I MIEI ANNUNCI */}
           {view === 'myListings' && (
-            <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100">
+            <div className="bg-white p-6 md:p-10 rounded-3xl shadow-xs border border-neutral-100">
               <h2 className="text-2xl font-extrabold text-neutral-900 mb-6 tracking-tight">I miei annunci</h2>
               {myListings.length === 0 ? (
                 <div className="text-center py-16 px-4 bg-neutral-50 rounded-3xl border border-dashed border-neutral-200">
                   <div className="text-5xl mb-4 opacity-50">📭</div>
                   <p className="text-neutral-500 font-medium mb-6">Non hai ancora pubblicato nessun annuncio.</p>
-                  {isLandlord && <button onClick={() => showView('createListing')} className="bg-white border border-neutral-200 hover:border-orange-300 text-neutral-900 px-6 py-3 rounded-full font-bold shadow-sm transition-all cursor-pointer">Crea il primo</button>}
+                  {isLandlord && <button onClick={() => showView('createListing')} className="bg-white border border-neutral-200 hover:border-orange-300 text-neutral-900 px-6 py-3 rounded-full font-bold shadow-xs transition-all cursor-pointer">Crea il primo</button>}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {myListings.map(l => {
                     const details = [formatBills(l.billsIncluded), formatAvailability(l.availableFrom)].filter(Boolean).join(' · ');
                     return (
-                      <div key={l.id} className="flex flex-col bg-white rounded-3xl border border-neutral-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden" data-testid="my-listing">
+                      <div key={l.id} className="flex flex-col bg-white rounded-3xl border border-neutral-100 shadow-xs hover:shadow-md transition-shadow overflow-hidden" data-testid="my-listing">
                         <div className="relative h-40 bg-neutral-100 flex items-center justify-center">
                           {l.coverUrl
                             ? <img src={l.coverUrl} alt="" className="w-full h-full object-cover" />
                             : <span className="text-sm font-bold text-neutral-400">📷 Nessuna foto</span>}
-                          <span className={`absolute top-3 left-3 px-3 py-1 rounded-full text-[11px] font-bold shadow-sm ${l.removed ? 'bg-rose-600 text-white' : l.isActive ? 'bg-white/90 text-green-700' : 'bg-neutral-900/80 text-white'}`}>
+                          <span className={`absolute top-3 left-3 px-3 py-1 rounded-full text-[11px] font-bold shadow-xs ${l.removed ? 'bg-rose-600 text-white' : l.isActive ? 'bg-white/90 text-green-700' : 'bg-neutral-900/80 text-white'}`}>
                             {l.removed ? 'Rimosso dalla moderazione' : l.isActive ? 'Pubblicato' : 'Disattivato'}
                           </span>
                         </div>
@@ -278,7 +285,7 @@ export default function Dashboard() {
 
           {/* MODIFICA ANNUNCIO: foto e dati */}
           {view === 'editListing' && (
-            <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100 flex flex-col gap-8">
+            <div className="bg-white p-6 md:p-10 rounded-3xl shadow-xs border border-neutral-100 flex flex-col gap-8">
               <div className="flex flex-wrap justify-between items-center gap-3">
                 <h2 className="text-2xl font-extrabold text-neutral-900 tracking-tight">Modifica annuncio</h2>
                 <div className="flex gap-3">
@@ -307,7 +314,7 @@ export default function Dashboard() {
 
           {/* TAB 2: MODIFICA PROFILO */}
           {view === 'editProfile' && (
-            <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100">
+            <div className="bg-white p-6 md:p-10 rounded-3xl shadow-xs border border-neutral-100">
               <h2 className="text-2xl font-extrabold text-neutral-900 mb-8 tracking-tight">Informazioni Personali</h2>
               <form onSubmit={handleSaveProfile} className="flex flex-col gap-6">
                 
@@ -319,7 +326,7 @@ export default function Dashboard() {
                       name="userType" 
                       value={form.userType}
                       onChange={e => setForm({...form, userType: e.target.value})}
-                      className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all"
+                      className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-hidden transition-all"
                     >
                       <option value="cerca">🔍 Cerco una stanza</option>
                       <option value="affitta">🏠 Offro una stanza</option>
@@ -334,7 +341,7 @@ export default function Dashboard() {
                         type="number" 
                         value={form.budgetMax || ''}
                         onChange={e => setForm({...form, budgetMax: e.target.value})}
-                        className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 
+                        className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-hidden transition-all" 
                       />
                     </div>
                   )}
@@ -347,7 +354,7 @@ export default function Dashboard() {
                       name="occupation" 
                       value={form.occupation}
                       onChange={e => setForm({...form, occupation: e.target.value})}
-                      className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all"
+                      className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-hidden transition-all"
                     >
                       <option value="">Non indicata</option>
                       {OCCUPATIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
@@ -359,7 +366,7 @@ export default function Dashboard() {
                       name="city" 
                       value={form.city}
                       onChange={e => setForm({...form, city: e.target.value})}
-                      className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 
+                      className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-hidden transition-all" 
                     >
                       <option value="">Non indicata</option>
                       {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -375,7 +382,7 @@ export default function Dashboard() {
                       title="Per usare RoomDate devi avere almeno 18 anni"
                       value={form.birthdate}
                       onChange={e => setForm({...form, birthdate: e.target.value})}
-                      className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all" 
+                      className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-2xl px-4 py-3.5 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-hidden transition-all" 
                     />
                   </div>
                 </div>
@@ -387,7 +394,7 @@ export default function Dashboard() {
                     value={form.bio}
                     onChange={e => setForm({...form, bio: e.target.value})}
                     rows="4" 
-                    className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-3xl px-5 py-4 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all resize-none"
+                    className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-3xl px-5 py-4 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-hidden transition-all resize-none"
                     placeholder="Racconta qualcosa di te..."
                   ></textarea>
                 </div>
@@ -405,7 +412,7 @@ export default function Dashboard() {
                       name="isPublic" 
                       checked={form.isPublic}
                       onChange={e => setForm({...form, isPublic: e.target.checked})}
-                      className="mt-0.5 w-5 h-5 text-orange-500 bg-white border-neutral-300 rounded focus:ring-orange-500 accent-orange-500 cursor-pointer" 
+                      className="mt-0.5 w-5 h-5 text-orange-500 bg-white border-neutral-300 rounded-sm focus:ring-orange-500 accent-orange-500 cursor-pointer" 
                     />
                     <span className="text-sm text-neutral-600 leading-relaxed font-medium">
                       Rendi il mio profilo pubblico. Acconsento alla visibilità sulla piattaforma e all'indicizzazione sui motori di ricerca ai fini del matching.
@@ -414,7 +421,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="mt-8 pt-8 border-t border-neutral-100 flex justify-end">
-                  <button type="submit" className="w-full md:w-auto bg-gradient-to-r from-orange-500 to-rose-500 hover:scale-[1.02] text-white px-10 py-4 rounded-full font-bold shadow-lg hover:shadow-orange-500/25 transition-all cursor-pointer">
+                  <button type="submit" className="w-full md:w-auto bg-linear-to-r from-orange-500 to-rose-500 hover:scale-[1.02] text-white px-10 py-4 rounded-full font-bold shadow-lg hover:shadow-orange-500/25 transition-all cursor-pointer">
                     Salva Modifiche
                   </button>
                 </div>
@@ -424,7 +431,7 @@ export default function Dashboard() {
 
           {/* TAB 3: CREA ANNUNCIO */}
           {view === 'createListing' && (
-            <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100">
+            <div className="bg-white p-6 md:p-10 rounded-3xl shadow-xs border border-neutral-100">
               <h2 className="text-2xl font-extrabold text-neutral-900 mb-2 tracking-tight">Inserisci una Stanza</h2>
               <p className="text-neutral-500 font-medium mb-8">Dopo la pubblicazione potrai aggiungere le foto.</p>
               <ListingForm submitLabel="Pubblica Annuncio" onSubmit={handleCreateListing} />

@@ -1,17 +1,14 @@
-import { Helmet } from 'react-helmet-async';
+import PageMeta from '../components/PageMeta';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function Privacy() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-[100dvh] bg-[#FAFAFA] font-sans text-neutral-900 py-12 px-6 selection:bg-orange-200">
-      <Helmet>
-        <title>Informativa sulla Privacy e Sicurezza | RoomDate</title>
-        <meta name="robots" content="index, follow" />
-      </Helmet>
+    <div className="min-h-dvh bg-[#FAFAFA] font-sans text-neutral-900 py-12 px-6 selection:bg-orange-200">
+      <PageMeta title="Informativa sulla Privacy e Sicurezza | RoomDate" />
 
-      <div className="max-w-3xl mx-auto bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-neutral-100 relative overflow-hidden">
+      <div className="max-w-3xl mx-auto bg-white p-8 md:p-12 rounded-3xl shadow-xs border border-neutral-100 relative overflow-hidden">
         
         {/* Sottile orb decorativo */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-orange-400/5 blur-[80px] rounded-full pointer-events-none"></div>
@@ -19,7 +16,7 @@ export default function Privacy() {
         {/* Bottone Indietro */}
         <button 
           onClick={() => navigate(-1)} 
-          className="mb-8 bg-neutral-50 border border-neutral-200 hover:bg-neutral-100 text-neutral-700 px-5 py-2.5 rounded-full text-sm font-bold transition-all cursor-pointer shadow-sm"
+          className="mb-8 bg-neutral-50 border border-neutral-200 hover:bg-neutral-100 text-neutral-700 px-5 py-2.5 rounded-full text-sm font-bold transition-all cursor-pointer shadow-xs"
         >
           ← Torna indietro
         </button>
@@ -64,7 +61,7 @@ export default function Privacy() {
               RoomDate utilizza solo strumenti tecnici necessari al funzionamento della piattaforma: un cookie di sessione (<code>__Host-roomdate_session</code>, valido fino a 30 giorni e 7 giorni dall&apos;ultimo utilizzo) per mantenere l&apos;accesso, e la memoria locale del browser (<code>localStorage</code> e IndexedDB) per conservare le chiavi di cifratura della chat, cancellate all&apos;uscita. Per questi strumenti non è richiesto il consenso.
             </p>
             <p>
-              RoomDate non utilizza cookie analitici, di profilazione o pubblicitari. Il sito carica i caratteri tipografici da Google Fonts e usa Pusher per la chat in tempo reale: questi servizi ricevono i dati tecnici della connessione, come l'indirizzo IP.
+              RoomDate non utilizza cookie analitici, di profilazione o pubblicitari. I caratteri tipografici sono ospitati sul sito stesso, senza richieste a servizi esterni. Per la chat in tempo reale il sito usa Pusher, che riceve i dati tecnici della connessione, come l&apos;indirizzo IP.
             </p>
           </section>
 

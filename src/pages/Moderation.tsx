@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import PageMeta from '../components/PageMeta';
 import { useAuth } from '../auth/AuthContext';
 import { useAdminReports, useResolveReport, useRestoreListing, useUnsuspendUser } from '../api/hooks';
 import { REPORT_REASONS } from '../api/options';
 import type { AdminReport, ModerationAction } from '../api/types';
+import { useConfirm } from '../components/ui/confirm';
 
 // Area di moderazione (modulo M3.3): segnalazioni da esaminare e decisioni prese. Le API
 // verificano da sé che chi chiama sia un amministratore.
@@ -29,13 +30,15 @@ function ReportCard({ report }: { report: AdminReport }) {
   const error = resolve.error ?? unsuspend.error ?? restore.error;
   const { target, listing } = report;
 
-  const act = (action: ModerationAction, question?: string) => {
-    if (question && !confirm(question)) return;
+  const confirm = useConfirm();
+
+  const act = async (action: ModerationAction, question?: { title: string; description: string; confirmLabel: string }) => {
+    if (question && !(await confirm({ ...question, tone: 'danger' }))) return;
     resolve.mutate({ id: report.id, action, note: note.trim() });
   };
 
   return (
-    <li data-testid="admin-report" className="bg-white rounded-3xl border border-neutral-100 shadow-sm p-6 flex flex-col gap-4">
+    <li data-testid="admin-report" className="bg-white rounded-3xl border border-neutral-100 shadow-xs p-6 flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="font-extrabold text-neutral-900">{reasonLabel(report.reason)}</span>
         <span className="text-xs font-bold text-neutral-500">{STATUS_LABELS[report.status]} · {dateTime.format(new Date(report.createdAt))}</span>
@@ -61,7 +64,7 @@ function ReportCard({ report }: { report: AdminReport }) {
         <dd className="text-neutral-900 font-medium">{report.reporter?.firstName ?? 'account eliminato'}</dd>
       </dl>
 
-      {report.details && <p className="text-neutral-700 font-medium whitespace-pre-wrap break-words">{report.details}</p>}
+      {report.details && <p className="text-neutral-700 font-medium whitespace-pre-wrap wrap-break-word">{report.details}</p>}
 
       {report.evidence.length > 0 && (
         <div className="bg-neutral-50 border border-neutral-100 rounded-2xl p-4 flex flex-col gap-2">
@@ -69,7 +72,7 @@ function ReportCard({ report }: { report: AdminReport }) {
             Messaggi ricevuti allegati da chi segnala (decifrati nel suo browser: il testo non è verificabile dal server)
           </p>
           {report.evidence.map((m, i) => (
-            <blockquote key={i} className="text-sm text-neutral-800 border-l-4 border-neutral-300 pl-3 whitespace-pre-wrap break-words">
+            <blockquote key={i} className="text-sm text-neutral-800 border-l-4 border-neutral-300 pl-3 whitespace-pre-wrap wrap-break-word">
               <span className="block text-[11px] font-bold text-neutral-400">{dateTime.format(new Date(m.sentAt))}</span>
               {m.text}
             </blockquote>
@@ -86,7 +89,7 @@ function ReportCard({ report }: { report: AdminReport }) {
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Nota sulla decisione (facoltativa, resta nell'archivio)"
-            className="w-full bg-white border border-neutral-200 rounded-2xl px-4 py-3 text-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none resize-none"
+            className="w-full bg-white border border-neutral-200 rounded-2xl px-4 py-3 text-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-hidden resize-none"
           />
           <div className="flex flex-wrap gap-2">
             <button type="button" disabled={resolve.isPending} onClick={() => act('dismiss')}
@@ -95,14 +98,22 @@ function ReportCard({ report }: { report: AdminReport }) {
             </button>
             {listing && !listing.removed && (
               <button type="button" disabled={resolve.isPending}
-                onClick={() => act('remove_listing', `Rimuovere l'annuncio "${listing.title}"? Lo vedrà solo il proprietario, che potrà solo eliminarlo.`)}
+                onClick={() => act('remove_listing', {
+                  title: `Rimuovere l'annuncio "${listing.title}"?`,
+                  description: 'Lo vedrà solo il proprietario, che potrà soltanto eliminarlo.',
+                  confirmLabel: 'Rimuovi annuncio',
+                })}
                 className="bg-orange-600 text-white px-5 py-2.5 rounded-full text-sm font-bold hover:bg-orange-700 cursor-pointer disabled:opacity-50">
                 Rimuovi annuncio
               </button>
             )}
             {!target.suspended && !target.isAdmin && (
               <button type="button" disabled={resolve.isPending}
-                onClick={() => act('suspend_user', `Sospendere l'account di ${target.firstName}? Verrà disconnesso, non potrà più accedere e sparirà da ricerche e annunci.`)}
+                onClick={() => act('suspend_user', {
+                  title: `Sospendere l'account di ${target.firstName}?`,
+                  description: 'Verrà disconnesso, non potrà più accedere e sparirà da ricerche e annunci.',
+                  confirmLabel: 'Sospendi account',
+                })}
                 className="bg-rose-600 text-white px-5 py-2.5 rounded-full text-sm font-bold hover:bg-rose-700 cursor-pointer disabled:opacity-50">
                 Sospendi account
               </button>
@@ -140,11 +151,8 @@ export default function Moderation() {
   const items = reports.data?.pages.flatMap((page) => page.items) ?? [];
 
   return (
-    <div className="min-h-[100dvh] bg-[#FAFAFA] font-sans">
-      <Helmet>
-        <title>Moderazione | RoomDate</title>
-        <meta name="robots" content="noindex, nofollow" />
-      </Helmet>
+    <div className="min-h-dvh bg-[#FAFAFA] font-sans">
+      <PageMeta title="Moderazione | RoomDate" noindex />
       <div className="max-w-3xl mx-auto px-4 py-10 md:py-16">
         <Link to="/impostazioni" className="text-sm font-bold text-neutral-500 hover:text-neutral-900">← Impostazioni</Link>
         <h1 className="text-3xl font-extrabold text-neutral-900 tracking-tight mt-4 mb-2">🛡️ Moderazione</h1>

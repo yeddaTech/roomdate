@@ -3,6 +3,7 @@ import { ApiError } from '../../api/client';
 import { MAX_LISTING_IMAGES } from '../../api/listings';
 import { useDeleteListingImage, useUploadListingPhoto } from '../../api/hooks';
 import type { ListingDetail } from '../../api/types';
+import { useConfirm } from '../ui/confirm';
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : 'Si è verificato un errore. Riprova.';
@@ -13,6 +14,7 @@ export default function ListingPhotos({ listing }: { listing: ListingDetail }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const upload = useUploadListingPhoto();
   const deleteImage = useDeleteListingImage();
+  const confirm = useConfirm();
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState('');
 
@@ -47,7 +49,7 @@ export default function ListingPhotos({ listing }: { listing: ListingDetail }) {
   };
 
   const handleDelete = async (imageId: number) => {
-    if (!window.confirm('Eliminare questa foto?')) return;
+    if (!(await confirm({ title: 'Eliminare questa foto?', confirmLabel: 'Elimina foto', tone: 'danger' }))) return;
     setError('');
     try {
       await deleteImage.mutateAsync({ listingId: listing.id, imageId });
@@ -67,7 +69,7 @@ export default function ListingPhotos({ listing }: { listing: ListingDetail }) {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {listing.images.map((image, index) => (
-          <div key={image.id} className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-neutral-100 border border-neutral-200 group">
+          <div key={image.id} className="relative aspect-4/3 rounded-2xl overflow-hidden bg-neutral-100 border border-neutral-200 group">
             <img src={image.url} alt={`Foto ${index + 1} dell'annuncio`} className="w-full h-full object-cover" />
             {index === 0 && <span className="absolute top-2 left-2 bg-white/90 text-neutral-900 text-[11px] font-bold px-2 py-1 rounded-full">Copertina</span>}
             <button
@@ -87,7 +89,7 @@ export default function ListingPhotos({ listing }: { listing: ListingDetail }) {
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={isBusy}
-            className="aspect-[4/3] rounded-2xl border-2 border-dashed border-neutral-300 hover:border-orange-400 text-neutral-500 hover:text-orange-500 font-bold text-sm flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+            className="aspect-4/3 rounded-2xl border-2 border-dashed border-neutral-300 hover:border-orange-400 text-neutral-500 hover:text-orange-500 font-bold text-sm flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
           >
             {progress ? (
               <span>Caricamento {Math.min(progress.done + 1, progress.total)} di {progress.total}...</span>

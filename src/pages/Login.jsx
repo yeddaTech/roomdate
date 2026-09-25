@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { toast } from 'sonner';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -38,7 +39,7 @@ export default function Login() {
         // Accesso e preparazione delle chiavi di cifratura della chat (AuthProvider)
         const { keysUnlocked } = await login(email, password);
         if (!keysUnlocked) {
-          alert('⚠️ Accesso effettuato, ma la chiave di sicurezza non è valida. Potresti non riuscire a leggere i messaggi.');
+          toast.warning('Accesso effettuato, ma la chiave dei messaggi non si è aperta: potresti non riuscire a leggerli.');
         }
 
         setIsSuccess(true);
@@ -47,7 +48,7 @@ export default function Login() {
           navigate(location.state?.from ?? '/', { replace: true });
         }, 1500);
       } catch (error) {
-        alert('❌ Errore di accesso: ' + error.message);
+        toast.error(error.message);
       } finally {
         setIsSubmitting(false);
       }
@@ -55,13 +56,13 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col font-sans bg-[#FAFAFA] selection:bg-orange-200">
+    <div className="min-h-dvh flex flex-col font-sans bg-[#FAFAFA] selection:bg-orange-200">
       
       {/* --- TOP NAV MINIMALE (GLASSMORPHISM) --- */}
-      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-sm border-b border-neutral-100 absolute top-0 w-full">
+      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-xs border-b border-neutral-100 absolute top-0 w-full">
         <div className="flex items-center gap-6">
           <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900 decoration-none">
-            Room<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">Date</span>
+            Room<span className="text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500">Date</span>
           </Link>
           <Link to="/" className="hidden md:flex text-sm text-neutral-500 hover:text-neutral-900 font-medium transition-colors">
             ← Torna alla home
@@ -70,7 +71,7 @@ export default function Login() {
         
         <div className="flex items-center gap-4">
           <span className="hidden md:inline text-sm text-neutral-500 font-medium">Non hai un account?</span>
-          <Link to="/registrati" className="bg-neutral-900 hover:bg-neutral-800 px-5 py-2 rounded-full text-sm font-bold text-white transition-colors shadow-sm">Registrati gratis</Link>
+          <Link to="/registrati" className="bg-neutral-900 hover:bg-neutral-800 px-5 py-2 rounded-full text-sm font-bold text-white transition-colors shadow-xs">Registrati gratis</Link>
         </div>
       </nav>
 
@@ -78,7 +79,7 @@ export default function Login() {
       <div className="flex-1 flex flex-col lg:flex-row w-full pt-16 md:pt-0">
         
         {/* LEFT COLUMN (Informativa - Nascosta su mobile) */}
-        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-orange-500 to-rose-500 p-16 flex-col justify-center relative overflow-hidden text-white">
+        <div className="hidden lg:flex lg:w-1/2 bg-linear-to-br from-orange-500 to-rose-500 p-16 flex-col justify-center relative overflow-hidden text-white">
           <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, white 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
           <div className="absolute top-1/4 -left-20 w-96 h-96 bg-white/20 blur-[100px] rounded-full pointer-events-none"></div>
           
@@ -100,9 +101,9 @@ export default function Login() {
         </div>
 
         {/* RIGHT COLUMN (Form di Login) */}
-        <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-6 md:p-12 relative">
+        <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-6 md:p-12 relative overflow-hidden">
           
-          {/* Effetto Orb in background */}
+          {/* Effetto Orb in background (tagliato dal contenitore: sul telefono è più largo dello schermo) */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-orange-400/10 blur-[80px] rounded-full pointer-events-none"></div>
 
           <div className="w-full max-w-md bg-white p-8 md:p-10 rounded-3xl shadow-lg border border-neutral-100 relative z-10 animate-fade-in-up">
@@ -111,7 +112,7 @@ export default function Login() {
 
             {/* Success Banner */}
             {isSuccess && (
-              <div className="bg-green-50 text-green-700 px-4 py-4 rounded-2xl mb-6 font-bold text-sm border border-green-200 flex items-center gap-3 shadow-sm">
+              <div className="bg-green-50 text-green-700 px-4 py-4 rounded-2xl mb-6 font-bold text-sm border border-green-200 flex items-center gap-3 shadow-xs">
                 <span className="text-lg">✅</span> Accesso effettuato! Reindirizzamento...
               </div>
             )}
@@ -129,7 +130,7 @@ export default function Login() {
                     setEmail(e.target.value);
                     if (errors.email) setErrors({ ...errors, email: false });
                   }}
-                  className={`w-full bg-neutral-50 border text-neutral-900 text-base md:text-sm rounded-2xl px-5 py-3.5 focus:outline-none transition-all ${errors.email ? 'border-red-500 focus:ring-2 focus:ring-red-100 bg-red-50/30' : 'border-neutral-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100'}`}
+                  className={`w-full bg-neutral-50 border text-neutral-900 text-base md:text-sm rounded-2xl px-5 py-3.5 focus:outline-hidden transition-all ${errors.email ? 'border-red-500 focus:ring-2 focus:ring-red-100 bg-red-50/30' : 'border-neutral-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100'}`}
                 />
                 {errors.email && <div className="text-red-500 text-xs mt-1 ml-1 font-bold">Inserisci un indirizzo email valido.</div>}
               </div>
@@ -148,7 +149,7 @@ export default function Login() {
                       setPassword(e.target.value);
                       if (errors.password) setErrors({ ...errors, password: false });
                     }}
-                    className={`w-full bg-neutral-50 border text-neutral-900 text-base md:text-sm rounded-2xl pl-5 pr-20 py-3.5 focus:outline-none transition-all ${errors.password ? 'border-red-500 focus:ring-2 focus:ring-red-100 bg-red-50/30' : 'border-neutral-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100'}`}
+                    className={`w-full bg-neutral-50 border text-neutral-900 text-base md:text-sm rounded-2xl pl-5 pr-20 py-3.5 focus:outline-hidden transition-all ${errors.password ? 'border-red-500 focus:ring-2 focus:ring-red-100 bg-red-50/30' : 'border-neutral-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100'}`}
                   />
                   <button 
                     type="button" 
@@ -164,7 +165,7 @@ export default function Login() {
               <button 
                 type="submit"
                 disabled={isSubmitting}
-                className={`w-full mt-4 text-white py-4 rounded-full font-bold transition-all shadow-md flex justify-center items-center ${isSubmitting ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed shadow-none' : 'bg-gradient-to-r from-orange-500 to-rose-500 hover:scale-[1.02] hover:shadow-orange-500/25 cursor-pointer'}`}
+                className={`w-full mt-4 text-white py-4 rounded-full font-bold transition-all shadow-md flex justify-center items-center ${isSubmitting ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed shadow-none' : 'bg-linear-to-r from-orange-500 to-rose-500 hover:scale-[1.02] hover:shadow-orange-500/25 cursor-pointer'}`}
               >
                 {isSubmitting ? 'Accesso in corso...' : 'Accedi al mio account'}
               </button>

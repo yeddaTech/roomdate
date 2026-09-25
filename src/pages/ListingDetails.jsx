@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { toast } from 'sonner';
+import PageMeta from '../components/PageMeta';
 import { useAuth } from '../auth/AuthContext';
 import { useListing, useStartChat } from '../api/hooks';
 import { formatAvailability, formatBills } from '../api/listings';
@@ -10,6 +11,7 @@ import ReportDialog from '../components/ReportDialog';
 export default function ListingDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
 
   const { data: listing, isPending: loading } = useListing(id);
@@ -36,8 +38,8 @@ export default function ListingDetails() {
   // 🛡️ ZERO-TRUST: Invia solo l'ID dell'annuncio
   const handleContact = async () => {
     if (!user) {
-      alert("Devi accedere o registrarti per contattare il proprietario!");
-      navigate('/accedi');
+      toast.info('Accedi o registrati per scrivere a chi pubblica l\'annuncio.');
+      navigate('/accedi', { state: { from: location.pathname } });
       return;
     }
 
@@ -45,13 +47,13 @@ export default function ListingDetails() {
       const conversationId = await startChat.mutateAsync({ listingId: listing.id });
       navigate('/chat', { state: { openChatId: conversationId } });
     } catch (err) {
-      alert("Errore nell'avvio della chat: " + err.message);
+      toast.error(err.message);
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-[100dvh] bg-[#FAFAFA] flex justify-center items-center font-sans">
+      <div className="min-h-dvh bg-[#FAFAFA] flex justify-center items-center font-sans">
         <div className="font-serif text-2xl font-bold text-orange-500 animate-pulse tracking-tight">Caricamento annuncio...</div>
       </div>
     );
@@ -59,7 +61,7 @@ export default function ListingDetails() {
 
   if (!listing) {
     return (
-      <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col justify-center items-center font-sans p-6 text-center">
+      <div className="min-h-dvh bg-[#FAFAFA] flex flex-col justify-center items-center font-sans p-6 text-center">
         <div className="text-6xl mb-4 opacity-50">🏜️</div>
         <h2 className="font-serif text-3xl font-extrabold text-neutral-900 mb-4 tracking-tight">Annuncio non trovato</h2>
         <p className="text-neutral-500 mb-8 font-medium">L'annuncio che stai cercando potrebbe essere stato rimosso o non è più disponibile.</p>
@@ -78,16 +80,13 @@ export default function ListingDetails() {
   ].filter(Boolean);
 
   return (
-    <div className="min-h-[100dvh] bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
-      <Helmet>
-        <title>{listing.title} a {listing.city} | RoomDate</title>
-        <meta name="description" content={`Stanza ${listing.roomType} in affitto a ${listing.city}${listing.zone ? `, zona ${listing.zone}` : ''}.`} />
-      </Helmet>
+    <div className="min-h-dvh bg-[#FAFAFA] pb-20 md:pb-12 font-sans selection:bg-orange-200">
+      <PageMeta title={`${listing.title} a ${listing.city} | RoomDate`} description={`Stanza ${listing.roomType} in affitto a ${listing.city}${listing.zone ? `, zona ${listing.zone}` : ''}.`} />
 
       {/* --- TOP NAV (GLASSMORPHISM) --- */}
-      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-sm border-b border-neutral-100 sticky top-0">
+      <nav className="shrink-0 z-50 bg-white/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shadow-xs border-b border-neutral-100 sticky top-0">
         <Link to="/" className="font-serif text-2xl font-bold tracking-tight text-neutral-900 decoration-none">
-          Room<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">Date</span>
+          Room<span className="text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500">Date</span>
         </Link>
         <div className="hidden md:flex gap-8 items-center text-sm font-medium text-neutral-500">
           <Link to="/" className="hover:text-neutral-900 transition-colors">Home</Link>
@@ -104,11 +103,11 @@ export default function ListingDetails() {
           ) : (
             <>
               <Link to="/accedi" className="text-neutral-600 hover:text-neutral-900 px-4 py-2 text-sm font-medium transition-colors">Accedi</Link>
-              <Link to="/registrati" className="bg-neutral-900 hover:bg-neutral-800 text-white px-5 py-2 rounded-full text-sm font-bold transition-colors shadow-sm">Registrati Gratis</Link>
+              <Link to="/registrati" className="bg-neutral-900 hover:bg-neutral-800 text-white px-5 py-2 rounded-full text-sm font-bold transition-colors shadow-xs">Registrati Gratis</Link>
             </>
           )}
         </div>
-        <button className="md:hidden flex flex-col gap-1.5 z-[1001] cursor-pointer" onClick={() => setIsMenuOpen(!isMenuOpen)}>          
+        <button className="md:hidden flex flex-col gap-1.5 z-1001 cursor-pointer" onClick={() => setIsMenuOpen(!isMenuOpen)}>          
           <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
           <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></div>
           <div className={`w-6 h-0.5 bg-neutral-900 transition-all duration-300 ${isMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
@@ -116,7 +115,7 @@ export default function ListingDetails() {
       </nav>
 
       {/* --- MOBILE SIDEBAR APP MENU --- */}
-      <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-[1000] p-8 pt-24 transform transition-transform duration-300 ease-in-out border-l border-neutral-100 ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed inset-y-0 right-0 w-72 bg-white shadow-2xl z-1000 p-8 pt-24 transform transition-transform duration-300 ease-in-out border-l border-neutral-100 ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex flex-col gap-6 text-lg font-medium text-neutral-600">
           <Link to="/" onClick={() => setIsMenuOpen(false)} className="hover:text-orange-500 transition-colors">🏠 Home</Link>
           <Link to="/ricerca" onClick={() => setIsMenuOpen(false)} className="text-orange-500 font-bold">🔍 Cerca</Link>
@@ -125,14 +124,14 @@ export default function ListingDetails() {
           {user ? (
             <button onClick={handleLogout} className="bg-neutral-900 text-white w-full py-3 rounded-2xl font-bold mt-4 hover:bg-neutral-800 transition-colors cursor-pointer">Esci</button>
           ) : (
-            <Link to="/accedi" className="bg-neutral-900 text-white text-center py-3 rounded-2xl font-bold mt-4 shadow-sm" onClick={() => setIsMenuOpen(false)}>Accedi</Link>
+            <Link to="/accedi" className="bg-neutral-900 text-white text-center py-3 rounded-2xl font-bold mt-4 shadow-xs" onClick={() => setIsMenuOpen(false)}>Accedi</Link>
           )}
         </div>
       </div>
-      {isMenuOpen && <div className="fixed inset-0 bg-neutral-900/20 backdrop-blur-sm z-[999] md:hidden transition-opacity" onClick={() => setIsMenuOpen(false)}></div>}
+      {isMenuOpen && <div className="fixed inset-0 bg-neutral-900/20 backdrop-blur-xs z-999 md:hidden transition-opacity" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* --- HERO (GRADIENTE VIBRANTE) --- */}
-      <section className="bg-gradient-to-br from-orange-500 to-rose-500 px-6 py-12 md:py-16 relative overflow-hidden text-white">
+      <section className="bg-linear-to-br from-orange-500 to-rose-500 px-6 py-12 md:py-16 relative overflow-hidden text-white">
         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, white 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
         <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/20 blur-[80px] rounded-full pointer-events-none"></div>
 
@@ -175,14 +174,14 @@ export default function ListingDetails() {
               <img src={listing.images[shownIndex].url} alt={`Foto ${shownIndex + 1} di ${imageCount}: ${listing.title}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
             </div>
           ) : (
-            <div className="w-full h-[240px] md:h-[300px] rounded-3xl bg-neutral-100 flex flex-col items-center justify-center gap-2 shadow-sm border border-neutral-200 text-neutral-400">
+            <div className="w-full h-[240px] md:h-[300px] rounded-3xl bg-neutral-100 flex flex-col items-center justify-center gap-2 shadow-xs border border-neutral-200 text-neutral-400">
               <span className="text-5xl">📷</span>
               <span className="font-bold text-sm">Nessuna foto caricata per questo annuncio</span>
             </div>
           )}
 
           {/* Dettagli Immobile */}
-          <div className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-neutral-100">
+          <div className="bg-white p-6 md:p-10 rounded-3xl shadow-xs border border-neutral-100">
             <h2 className="font-serif text-2xl md:text-3xl font-extrabold text-neutral-900 mb-6 tracking-tight">Descrizione immobile</h2>
             <p className="text-neutral-600 leading-relaxed text-lg whitespace-pre-line font-medium">{listing.description}</p>
             
@@ -210,8 +209,8 @@ export default function ListingDetails() {
               <div className="absolute top-0 right-0 w-32 h-32 bg-orange-400/10 blur-[50px] rounded-full pointer-events-none"></div>
 
               {/* Box Prezzo */}
-              <div className="bg-orange-50/50 p-6 rounded-3xl mb-8 border border-orange-100 shadow-sm relative z-10">
-                <div className="font-serif text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500 tracking-tight">
+              <div className="bg-orange-50/50 p-6 rounded-3xl mb-8 border border-orange-100 shadow-xs relative z-10">
+                <div className="font-serif text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500 tracking-tight">
                   €{listing.price}
                 </div>
                 <div className="text-sm font-bold text-neutral-500 mt-2 uppercase tracking-wider">al mese{listing.billsIncluded !== null && (listing.billsIncluded ? ', spese incluse' : ', spese escluse')}</div>
@@ -219,8 +218,8 @@ export default function ListingDetails() {
               
               {/* Profilo Host */}
               <div className="relative z-10">
-                <div className="w-24 h-24 mx-auto rounded-full flex items-center justify-center text-5xl mb-5 shadow-md bg-gradient-to-br from-orange-300 to-rose-400 transform transition-transform hover:scale-105 cursor-default">
-                  <span className="drop-shadow-sm text-white font-bold">{(listing.owner.firstName || '?').charAt(0).toUpperCase()}</span>
+                <div className="w-24 h-24 mx-auto rounded-full flex items-center justify-center text-5xl mb-5 shadow-md bg-linear-to-br from-orange-300 to-rose-400 transform transition-transform hover:scale-105 cursor-default">
+                  <span className="drop-shadow-xs text-white font-bold">{(listing.owner.firstName || '?').charAt(0).toUpperCase()}</span>
                 </div>
                 <h3 className="font-serif text-2xl font-extrabold text-neutral-900 mb-1">{listing.owner.firstName}</h3>
                 <p className="text-sm font-bold text-neutral-400 mb-8 uppercase tracking-wider">Host su RoomDate</p>
@@ -241,7 +240,7 @@ export default function ListingDetails() {
                 ) : (
                   <>
                     {/* Bottone Contatto */}
-                    <button onClick={handleContact} className="w-full bg-gradient-to-r from-orange-500 to-rose-500 text-white py-4.5 rounded-2xl font-bold shadow-lg hover:shadow-orange-500/25 hover:scale-[1.02] transition-all duration-300 text-lg flex items-center justify-center gap-2 cursor-pointer">
+                    <button onClick={handleContact} className="w-full bg-linear-to-r from-orange-500 to-rose-500 text-white py-4.5 rounded-2xl font-bold shadow-lg hover:shadow-orange-500/25 hover:scale-[1.02] transition-all duration-300 text-lg flex items-center justify-center gap-2 cursor-pointer">
                       <span className="text-xl">💬</span> Contatta in Chat
                     </button>
                     {user && (
@@ -255,7 +254,7 @@ export default function ListingDetails() {
             </div>
 
             {/* Banner Sicurezza */}
-            <div className="bg-neutral-50 border border-neutral-100 p-6 rounded-3xl text-center shadow-sm">
+            <div className="bg-neutral-50 border border-neutral-100 p-6 rounded-3xl text-center shadow-xs">
               <div className="text-2xl mb-2">🛡️</div>
               <h4 className="font-bold text-neutral-900 mb-2">Consigli di sicurezza</h4>
               <p className="text-xs text-neutral-500 font-medium leading-relaxed">Le chat sono cifrate end-to-end. Non inviare denaro prima di aver visitato la stanza e incontrato chi la affitta.</p>

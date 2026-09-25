@@ -3,7 +3,7 @@ import { AMENITIES, CITIES, isCity } from '../../api/options';
 import { ApiError } from '../../api/client';
 import type { ListingDetail, ListingInput, RoomType } from '../../api/types';
 
-const inputClass = 'w-full bg-neutral-50 border border-neutral-200 px-5 py-4 rounded-2xl text-neutral-900 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-none transition-all';
+const inputClass = 'w-full bg-neutral-50 border border-neutral-200 px-5 py-4 rounded-2xl text-neutral-900 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-hidden transition-all';
 
 // Valori del modulo come stringhe, così i campi restano controllati anche quando sono vuoti
 interface FormState {
@@ -158,7 +158,7 @@ export default function ListingForm({ listing, submitLabel, onSubmit }: Props) {
           {AMENITIES.map(({ key, label }) => (
             <label key={key} className="relative cursor-pointer group">
               <input type="checkbox" name="amenities" value={key} checked={form.amenities.includes(key)} onChange={() => toggleAmenity(key)} className="peer sr-only" />
-              <span className="block px-5 py-2.5 bg-white border border-neutral-200 rounded-full text-sm font-semibold text-neutral-500 peer-checked:bg-neutral-900 peer-checked:text-white peer-checked:border-neutral-900 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-300 transition-all shadow-sm group-hover:border-neutral-300">
+              <span className="block px-5 py-2.5 bg-white border border-neutral-200 rounded-full text-sm font-semibold text-neutral-500 peer-checked:bg-neutral-900 peer-checked:text-white peer-checked:border-neutral-900 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-300 transition-all shadow-xs group-hover:border-neutral-300">
                 {label}
               </span>
             </label>
