@@ -162,7 +162,7 @@ export default function DesignSystem() {
     <div className="bg-background text-foreground">
       <PageMeta title="Design system | RoomDate" noindex />
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 lg:grid-cols-2">
-        <section aria-label="Tema chiaro" className="flex flex-col gap-6">
+        <section aria-label="Tema chiaro" className="light flex flex-col gap-6 rounded-card bg-background p-4 text-foreground">
           <h1 className="font-display text-4xl font-bold">Design system</h1>
           <Showcase />
         </section>

@@ -61,17 +61,17 @@ export default function ListingPhotos({ listing }: { listing: ListingDetail }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap justify-between items-baseline gap-2">
-        <h3 className="text-lg font-extrabold text-neutral-900">Foto</h3>
-        <span className="text-sm text-neutral-500 font-medium">{listing.images.length} di {MAX_LISTING_IMAGES} · la prima è la copertina</span>
+        <h3 className="text-lg font-extrabold text-foreground">Foto</h3>
+        <span className="text-sm text-foreground-subtle font-medium">{listing.images.length} di {MAX_LISTING_IMAGES} · la prima è la copertina</span>
       </div>
 
-      {error && <div className="p-4 rounded-2xl font-bold bg-rose-50 text-rose-700 border border-rose-200 text-sm">⚠️ {error}</div>}
+      {error && <div className="p-4 rounded-2xl font-bold bg-danger-soft text-danger border border-danger/30 text-sm">⚠️ {error}</div>}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {listing.images.map((image, index) => (
-          <div key={image.id} className="relative aspect-4/3 rounded-2xl overflow-hidden bg-neutral-100 border border-neutral-200 group">
+          <div key={image.id} className="relative aspect-4/3 rounded-2xl overflow-hidden bg-surface-muted border border-line group">
             <img src={image.url} alt={`Foto ${index + 1} dell'annuncio`} className="w-full h-full object-cover" />
-            {index === 0 && <span className="absolute top-2 left-2 bg-white/90 text-neutral-900 text-[11px] font-bold px-2 py-1 rounded-full">Copertina</span>}
+            {index === 0 && <span className="absolute top-2 left-2 bg-surface/90 text-foreground text-[11px] font-bold px-2 py-1 rounded-full">Copertina</span>}
             <button
               type="button"
               onClick={() => handleDelete(image.id)}
@@ -89,7 +89,7 @@ export default function ListingPhotos({ listing }: { listing: ListingDetail }) {
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={isBusy}
-            className="aspect-4/3 rounded-2xl border-2 border-dashed border-neutral-300 hover:border-orange-400 text-neutral-500 hover:text-orange-500 font-bold text-sm flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+            className="aspect-4/3 rounded-2xl border-2 border-dashed border-control hover:border-primary text-foreground-subtle hover:text-primary font-bold text-sm flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
           >
             {progress ? (
               <span>Caricamento {Math.min(progress.done + 1, progress.total)} di {progress.total}...</span>
@@ -104,7 +104,7 @@ export default function ListingPhotos({ listing }: { listing: ListingDetail }) {
       </div>
 
       <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFiles} className="hidden" data-testid="listing-photo-input" />
-      <p className="text-xs text-neutral-400 font-medium">Le foto vengono ridimensionate e private dei dati di posizione prima del caricamento.</p>
+      <p className="text-xs text-foreground-subtle font-medium">Le foto vengono ridimensionate e private dei dati di posizione prima del caricamento.</p>
     </div>
   );
 }
