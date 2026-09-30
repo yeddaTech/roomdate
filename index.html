@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#fafaf9" />
+    <!-- Tema chiaro o scuro prima del primo disegno (file a parte: la CSP vieta gli script inline) -->
+    <script src="/theme.js"></script>
     
     <!-- SEO Standard Principale -->
     <title>Roomdate — Trova Coinquilini e Stanze in Affitto</title>
@@ -47,6 +49,11 @@
       <!-- INIZIO LOADER PRE-REACT -->
       <style>
         body { margin: 0; background-color: #FAFAFA; }
+        /* Stessi colori del tema scuro (src/index.css): public/theme.js mette .dark prima di questo punto */
+        .dark body { background-color: #1c1824; }
+        .dark .roomdate-spinner { border-color: #3f374b; border-top-color: #fb923c; }
+        .dark .roomdate-logo { color: #f4eee8; }
+        .dark .roomdate-logo span { color: #fb923c; }
         .roomdate-loader-container { 
           display: flex; flex-direction: column; align-items: center; justify-content: center; 
           height: 100vh; width: 100vw; font-family: system-ui, sans-serif; 

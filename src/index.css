@@ -11,19 +11,22 @@
     anello di focus almeno 3:1.
   - Spaziatura sulla griglia di 4px di Tailwind, tre raggi (control, card, pill = rounded-full)
     e due ombre (card, overlay).
-  - Il tema scuro si attiva con la classe .dark su <html>: i token sono pronti, e verrà acceso
-    quando tutte le pagine useranno i token (moduli M2.2-M2.7).
+  - Tema scuro "notte prugna": grafite tinta di viola caldo, non nero, che si sposa con il
+    gradiente arancio-rosa. Si attiva con la classe .dark su <html> (public/theme.js la mette prima
+    del primo disegno); la classe .light riporta al tema chiaro un pezzo di pagina (vetrina).
 */
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-:root {
+:root,
+.light {
   --background: #fafaf9;
   --surface: #ffffff;
   --surface-muted: #f5f5f4;
   --foreground: #1c1917;
   --foreground-muted: #57534e;
-  --foreground-subtle: #78716c;
+  /* Almeno 4.5:1 anche su surface-muted (le scritte "Nessuna foto", le schede non attive) */
+  --foreground-subtle: #736c67;
   /* Bordi decorativi (card, separatori) e bordi dei campi, che devono distinguersi (3:1) */
   --line: #e7e5e4;
   --control: #908a84;
@@ -48,33 +51,47 @@
   /* Stesso gradiente, più profondo: sotto il testo bianco (almeno 5.1:1 in ogni punto) */
   --brand-deep-from: #c2410c;
   --brand-deep-to: #be123c;
+  /* Colore delle ombre: al buio servono più scure per staccare le card dallo sfondo */
+  --shadow-tint: 28 25 23;
+  --shadow-strength: 1;
+  /* Piè di pagina: scuro in entrambi i temi, per chiudere la pagina */
+  --footer: #1c1917;
+  --footer-line: #292524;
+  color-scheme: light;
 }
 
 .dark {
-  --background: #0c0a09;
-  --surface: #1c1917;
-  --surface-muted: #292524;
-  --foreground: #f5f5f4;
-  --foreground-muted: #a8a29e;
-  --foreground-subtle: #938d88;
-  --line: #292524;
-  --control: #78716c;
-  --primary: #f97316;
-  --primary-hover: #fb923c;
-  --primary-foreground: #0c0a09;
-  --primary-soft: #431407;
-  --primary-soft-foreground: #fed7aa;
-  --danger: #dc2626;
-  --danger-hover: #ef4444;
-  --danger-foreground: #ffffff;
-  --danger-soft: #450a0a;
-  --danger-soft-foreground: #fecaca;
-  --success-soft: #052e16;
-  --success-soft-foreground: #bbf7d0;
-  --warning-soft: #451a03;
+  /* Notte prugna: scuro ma non nero (luminanza dello sfondo 0.010, tra il nero e il "Dim" di
+     Twitter). Tutte le coppie testo/sfondo verificate: almeno 4.5:1, bordi dei campi e focus 3:1. */
+  --background: #1c1824;
+  --surface: #26212f;
+  --surface-muted: #322b3c;
+  --foreground: #f4eee8;
+  --foreground-muted: #c3b9cc;
+  --foreground-subtle: #a397b1;
+  --line: #3f374b;
+  --control: #8a7f99;
+  /* Al buio le azioni sono arancio chiaro con il testo scuro: il bianco sull'arancio non arriva a 3:1 */
+  --primary: #fb923c;
+  --primary-hover: #fdba74;
+  --primary-foreground: #1c1824;
+  --primary-soft: #3d2622;
+  --primary-soft-foreground: #fdba74;
+  --danger: #f87171;
+  --danger-hover: #fca5a5;
+  --danger-foreground: #1c1824;
+  --danger-soft: #3e1f2a;
+  --danger-soft-foreground: #fecdd3;
+  --success-soft: #1b3329;
+  --success-soft-foreground: #a7f3d0;
+  --warning-soft: #3a2d18;
   --warning-soft-foreground: #fde68a;
-  --focus: #fb923c;
-  --overlay: rgb(0 0 0 / 0.6);
+  --focus: #fdba74;
+  --overlay: rgb(12 9 16 / 0.65);
+  --shadow-tint: 8 6 12;
+  --shadow-strength: 3;
+  --footer: #141019;
+  --footer-line: #2a2433;
   color-scheme: dark;
 }
 
@@ -103,6 +120,8 @@
   --color-warning-soft-foreground: var(--warning-soft-foreground);
   --color-focus: var(--focus);
   --color-overlay: var(--overlay);
+  --color-footer: var(--footer);
+  --color-footer-line: var(--footer-line);
 }
 
 @theme {
@@ -115,8 +134,8 @@
   --radius-control: 1rem;
   --radius-card: 1.5rem;
 
-  --shadow-card: 0 1px 2px rgb(28 25 23 / 0.05), 0 1px 3px rgb(28 25 23 / 0.08);
-  --shadow-overlay: 0 16px 40px -12px rgb(28 25 23 / 0.35);
+  --shadow-card: 0 1px 2px rgb(var(--shadow-tint) / calc(0.05 * var(--shadow-strength))), 0 1px 3px rgb(var(--shadow-tint) / calc(0.08 * var(--shadow-strength)));
+  --shadow-overlay: 0 16px 40px -12px rgb(var(--shadow-tint) / calc(0.35 * var(--shadow-strength)));
 
   /* Animazioni brevi (150-250ms); con "riduci movimento" si spengono (vedi in fondo) */
   --animate-fade-in: fade-in 200ms ease-out;
@@ -171,15 +190,16 @@
 
 @layer base {
   /*
-    Compatibilità con Tailwind v3, per le pagine non ancora ridisegnate: bordi grigi chiari
-    predefiniti (in v4 sono del colore del testo), mano sui pulsanti, placeholder grigi.
+    Compatibilità con Tailwind v3, per le pagine non ancora ridisegnate: bordi chiari
+    predefiniti (in v4 sono del colore del testo), mano sui pulsanti, placeholder tenui. Colori dai
+    token, così seguono il tema.
   */
   *,
   ::after,
   ::before,
   ::backdrop,
   ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
+    border-color: var(--line, currentcolor);
   }
 
   button:not(:disabled),
@@ -189,7 +209,7 @@
 
   input::placeholder,
   textarea::placeholder {
-    color: var(--color-gray-400);
+    color: var(--foreground-subtle);
   }
 
   body {
@@ -197,6 +217,13 @@
     color: var(--foreground);
     font-family: var(--font-sans);
   }
+}
+
+/* Cambio di tema: tutti i colori cambiano insieme, senza le transizioni dei singoli elementi */
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

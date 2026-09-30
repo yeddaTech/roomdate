@@ -1,19 +1,21 @@
 import { Link } from 'react-router-dom';
 import { cn } from '../ui/cn';
 import Logo from './Logo';
+import ThemeSelect from './ThemeSelect';
 
-// Piè di pagina delle pagine pubbliche: scuro in entrambi i temi, per chiudere la pagina.
-const linkClass = 'rounded-sm text-sm text-stone-300 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400';
+// Piè di pagina delle pagine pubbliche: scuro in entrambi i temi (token footer), per chiudere la pagina.
+const linkClass = 'rounded-sm text-sm text-stone-300 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus';
 
 export default function SiteFooter({ className }: { className?: string }) {
   return (
-    <footer className={cn('bg-stone-900 text-stone-300', className)}>
+    <footer className={cn('bg-footer text-stone-300', className)}>
       <div className="mx-auto grid max-w-7xl gap-10 px-6 py-14 md:grid-cols-4">
         <div className="md:col-span-2">
           <Logo onDark />
           <p className="mt-4 max-w-sm text-sm leading-relaxed">
             Stanze in affitto e coinquilini, con contatto diretto tra utenti e chat cifrata end-to-end.
           </p>
+          <ThemeSelect onDark className="mt-8 max-w-xs" />
         </div>
         <nav aria-label="Esplora">
           <h2 className="mb-4 text-sm font-bold text-white">Esplora</h2>
@@ -31,7 +33,7 @@ export default function SiteFooter({ className }: { className?: string }) {
           </ul>
         </nav>
       </div>
-      <div className="border-t border-stone-800">
+      <div className="border-t border-footer-line">
         <p className="mx-auto max-w-7xl px-6 py-6 text-sm text-stone-400">© {new Date().getFullYear()} RoomDate</p>
       </div>
     </footer>

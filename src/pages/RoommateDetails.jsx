@@ -62,7 +62,7 @@ export default function RoommateDetails() {
   if (loading) {
     return (
       <div className="min-h-[50vh] flex justify-center items-center font-sans">
-        <div className="font-serif text-2xl font-bold text-orange-500 animate-pulse tracking-tight">Caricamento profilo...</div>
+        <div className="font-serif text-2xl font-bold text-primary animate-pulse tracking-tight">Caricamento profilo...</div>
       </div>
     );
   }
@@ -71,15 +71,15 @@ export default function RoommateDetails() {
     return (
       <div className="min-h-[50vh] flex flex-col justify-center items-center font-sans p-6 text-center">
         <div className="text-6xl mb-4 opacity-50">👤</div>
-        <h2 className="font-serif text-3xl font-extrabold text-neutral-900 mb-4 tracking-tight">Profilo non trovato</h2>
-        <p className="text-neutral-500 mb-8 font-medium">L'utente che stai cercando potrebbe aver rimosso il profilo o non è disponibile.</p>
-        <button onClick={() => navigate('/ricerca')} className="bg-neutral-900 hover:bg-neutral-800 text-white px-8 py-3.5 rounded-full font-bold shadow-md transition-all cursor-pointer">Torna alla Ricerca</button>
+        <h2 className="font-serif text-3xl font-extrabold text-foreground mb-4 tracking-tight">Profilo non trovato</h2>
+        <p className="text-foreground-subtle mb-8 font-medium">L'utente che stai cercando potrebbe aver rimosso il profilo o non è disponibile.</p>
+        <button onClick={() => navigate('/ricerca')} className="bg-foreground hover:bg-foreground/85 text-background px-8 py-3.5 rounded-full font-bold shadow-md transition-all cursor-pointer">Torna alla Ricerca</button>
       </div>
     );
   }
 
   return (
-    <div className="bg-[#FAFAFA] pb-12 font-sans selection:bg-orange-200">
+    <div className="bg-background pb-12 font-sans selection:bg-primary/25">
       <PageMeta title={`${roommate.firstName} | RoomDate`} />
 
 
@@ -89,7 +89,7 @@ export default function RoommateDetails() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/20 blur-[80px] rounded-full pointer-events-none"></div>
 
         <div className="max-w-4xl mx-auto flex flex-col items-center text-center gap-4 relative z-10 animate-fade-in-up">
-          <div className="w-32 h-32 rounded-full flex items-center justify-center text-6xl shadow-xl bg-white text-neutral-900 border-4 border-white/20">
+          <div className="w-32 h-32 rounded-full flex items-center justify-center text-6xl shadow-xl bg-surface text-foreground border-4 border-white/20">
             <span className="drop-shadow-xs">{(roommate.firstName || 'U').charAt(0).toUpperCase()}</span>
           </div>
           <div>
@@ -108,31 +108,31 @@ export default function RoommateDetails() {
         
         {/* COLONNA SINISTRA: BIO E DETTAGLI */}
         <div className="w-full lg:w-2/3 flex flex-col gap-6">
-          <div className="bg-white p-8 rounded-3xl shadow-xs border border-neutral-100">
-            <h2 className="font-serif text-2xl font-extrabold text-neutral-900 mb-4 tracking-tight">Chi sono</h2>
-            <p className="text-neutral-600 leading-relaxed text-lg whitespace-pre-line font-medium">
+          <div className="bg-surface p-8 rounded-3xl shadow-xs border border-line">
+            <h2 className="font-serif text-2xl font-extrabold text-foreground mb-4 tracking-tight">Chi sono</h2>
+            <p className="text-foreground-muted leading-relaxed text-lg whitespace-pre-line font-medium">
               {roommate.bio || "Questo utente non ha ancora inserito una descrizione."}
             </p>
           </div>
 
-          <div className="bg-white p-8 rounded-3xl shadow-xs border border-neutral-100">
-            <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-6 tracking-tight">Stile di vita</h2>
+          <div className="bg-surface p-8 rounded-3xl shadow-xs border border-line">
+            <h2 className="font-serif text-xl font-extrabold text-foreground mb-6 tracking-tight">Stile di vita</h2>
             <div className="flex flex-wrap gap-2.5">
               {roommate.lifestyleTags.length > 0 ? (
-                <LifestyleTags tags={roommate.lifestyleTags} className="bg-orange-50 border border-orange-100 text-orange-600 px-4 py-2 rounded-full font-bold text-sm shadow-xs" />
+                <LifestyleTags tags={roommate.lifestyleTags} className="bg-primary-soft border border-primary/20 text-primary px-4 py-2 rounded-full font-bold text-sm shadow-xs" />
               ) : (
-                <span className="text-neutral-400 font-medium italic">Nessuna abitudine indicata.</span>
+                <span className="text-foreground-subtle font-medium italic">Nessuna abitudine indicata.</span>
               )}
             </div>
           </div>
 
           {roommate.compatibility ? (
-            <div className="bg-white p-8 rounded-3xl shadow-xs border border-neutral-100" data-testid="compatibility">
+            <div className="bg-surface p-8 rounded-3xl shadow-xs border border-line" data-testid="compatibility">
               <CompatibilityList compatibility={roommate.compatibility} />
             </div>
           ) : !user && (
-            <div className="bg-white p-8 rounded-3xl shadow-xs border border-neutral-100 text-neutral-500 font-medium">
-              <Link to="/accedi" className="text-orange-500 font-bold hover:text-orange-600">Accedi</Link> per vedere cosa avete in comune.
+            <div className="bg-surface p-8 rounded-3xl shadow-xs border border-line text-foreground-subtle font-medium">
+              <Link to="/accedi" className="text-primary font-bold hover:text-primary">Accedi</Link> per vedere cosa avete in comune.
             </div>
           )}
         </div>
@@ -140,29 +140,29 @@ export default function RoommateDetails() {
         {/* COLONNA DESTRA: INFORMAZIONI E CONTATTO */}
         <aside className="w-full lg:w-1/3">
           <div className="sticky top-28 flex flex-col gap-6 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-            <div className="bg-white p-8 rounded-3xl shadow-xl border border-neutral-100 relative overflow-hidden">
+            <div className="bg-surface p-8 rounded-3xl shadow-xl border border-line relative overflow-hidden">
               
               <div className="absolute top-0 right-0 w-32 h-32 bg-orange-400/10 blur-[50px] rounded-full pointer-events-none"></div>
 
               <div className="flex flex-col gap-4 mb-8 relative z-10">
                 {roommate.userType === 'cerca' && (
-                  <div className="flex justify-between items-center border-b border-neutral-100 pb-4">
-                    <span className="text-neutral-500 font-bold text-sm uppercase tracking-wider">Budget max</span>
-                    <span className="font-extrabold text-neutral-900 text-lg">{roommate.budgetMax ? `€${roommate.budgetMax}/mese` : 'Non indicato'}</span>
+                  <div className="flex justify-between items-center border-b border-line pb-4">
+                    <span className="text-foreground-subtle font-bold text-sm uppercase tracking-wider">Budget max</span>
+                    <span className="font-extrabold text-foreground text-lg">{roommate.budgetMax ? `€${roommate.budgetMax}/mese` : 'Non indicato'}</span>
                   </div>
                 )}
-                <div className="flex justify-between items-center border-b border-neutral-100 pb-4">
-                  <span className="text-neutral-500 font-bold text-sm uppercase tracking-wider">Età</span>
-                  <span className="font-extrabold text-neutral-900">{formatAge(roommate.age) ?? 'Non indicata'}</span>
+                <div className="flex justify-between items-center border-b border-line pb-4">
+                  <span className="text-foreground-subtle font-bold text-sm uppercase tracking-wider">Età</span>
+                  <span className="font-extrabold text-foreground">{formatAge(roommate.age) ?? 'Non indicata'}</span>
                 </div>
-                <div className="flex justify-between items-center border-b border-neutral-100 pb-4">
-                  <span className="text-neutral-500 font-bold text-sm uppercase tracking-wider">Occupazione</span>
-                  <span className="font-extrabold text-neutral-900">{occupationLabel(roommate.occupation) ?? 'Non indicata'}</span>
+                <div className="flex justify-between items-center border-b border-line pb-4">
+                  <span className="text-foreground-subtle font-bold text-sm uppercase tracking-wider">Occupazione</span>
+                  <span className="font-extrabold text-foreground">{occupationLabel(roommate.occupation) ?? 'Non indicata'}</span>
                 </div>
               </div>
 
               {user?.id === roommate.id ? (
-                <Link to="/dashboard" className="w-full block text-center bg-neutral-900 text-white py-4 rounded-2xl font-bold hover:bg-neutral-800 transition-colors relative z-10">
+                <Link to="/dashboard" className="w-full block text-center bg-foreground text-background py-4 rounded-2xl font-bold hover:bg-foreground/85 transition-colors relative z-10">
                   Questo è il tuo profilo: modificalo
                 </Link>
               ) : (
@@ -172,10 +172,10 @@ export default function RoommateDetails() {
               )}
               {user && user.id !== roommate.id && (
                 <div className="flex justify-center gap-6 mt-5 relative z-10">
-                  <button type="button" onClick={() => setReporting(true)} className="text-sm font-bold text-neutral-500 hover:text-rose-600 transition-colors cursor-pointer">
+                  <button type="button" onClick={() => setReporting(true)} className="text-sm font-bold text-foreground-subtle hover:text-danger transition-colors cursor-pointer">
                     🚩 Segnala
                   </button>
-                  <button type="button" onClick={handleBlock} disabled={blockUser.isPending} className="text-sm font-bold text-neutral-500 hover:text-rose-600 transition-colors cursor-pointer">
+                  <button type="button" onClick={handleBlock} disabled={blockUser.isPending} className="text-sm font-bold text-foreground-subtle hover:text-danger transition-colors cursor-pointer">
                     🚫 Blocca
                   </button>
                 </div>

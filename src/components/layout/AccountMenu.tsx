@@ -4,6 +4,7 @@ import { ChevronDown, LogOut, Settings, ShieldCheck, User } from 'lucide-react';
 import type { SessionUser } from '../../api/types';
 import Avatar from '../ui/Avatar';
 import { cn, focusRing } from '../ui/cn';
+import ThemeSelect from './ThemeSelect';
 
 // Menu dell'account su desktop, come "disclosure" (pulsante con aria-expanded che mostra un elenco
 // di link): è lo schema indicato per i menu di navigazione, al posto di role="menu" che i lettori
@@ -85,6 +86,8 @@ export default function AccountMenu({ user, onSignOut }: { user: SessionUser; on
           <MenuLink to="/impostazioni" icon={<Settings />}>Impostazioni</MenuLink>
           {user.isAdmin && <MenuLink to="/moderazione" icon={<ShieldCheck />}>Moderazione</MenuLink>}
         </ul>
+        <div className="my-1.5 h-px bg-line" />
+        <ThemeSelect className="px-3 pb-2 pt-1" />
         <div className="my-1.5 h-px bg-line" />
         <button type="button" onClick={onSignOut} className={itemClasses}><LogOut /> Esci</button>
       </div>

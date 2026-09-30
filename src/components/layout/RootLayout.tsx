@@ -3,6 +3,7 @@ import { Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
 import { AuthProvider } from '../../auth/AuthProvider';
 import ConfirmProvider from '../ui/ConfirmProvider';
 import Toaster from '../ui/Toaster';
+import { ThemeProvider } from '../../theme/ThemeProvider';
 
 /**
  * Cambiando pagina il focus va al contenuto (id "contenuto" in ogni layout), così chi usa un
@@ -24,17 +25,19 @@ function FocusOnNavigate() {
   return null;
 }
 
-/** Radice dell'app: sessione, conferme, notifiche e comportamento comune a tutte le pagine. */
+/** Radice dell'app: tema, sessione, conferme, notifiche e comportamento comune a tutte le pagine. */
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <ConfirmProvider>
-        <Outlet />
-        <Toaster />
-        {/* Indietro e avanti tornano al punto in cui si era; una pagina nuova parte dall'alto */}
-        <ScrollRestoration />
-        <FocusOnNavigate />
-      </ConfirmProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <ConfirmProvider>
+          <Outlet />
+          <Toaster />
+          {/* Indietro e avanti tornano al punto in cui si era; una pagina nuova parte dall'alto */}
+          <ScrollRestoration />
+          <FocusOnNavigate />
+        </ConfirmProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
