@@ -133,9 +133,9 @@ The interface is built on tokens and a small set of accessible components. Every
 
   The legal pages use the public layout, because they need the same navigation. A route's `handle` tweaks its layout: `{ fullHeight: true }` makes the chat fill the screen without page scroll, and `{ authSwitch }` sets the header link on the auth pages.
 * **One header** (`SiteHeader`) replaces the nine copies each page used to carry, each with different links.
-  * **Desktop:** Cerca, Chat with an unread badge, Come funziona, and an account menu. The account menu is a disclosure, not `role="menu"`: a button with `aria-expanded` and a list of links. It closes with Esc (focus back on the button), an outside click, tabbing out, or a page change.
+  * **Desktop:** Cerca, Preferiti (signed-in users), Chat with an unread badge, Come funziona, and an account menu. The account menu is a disclosure, not `role="menu"`: a button with `aria-expanded` and a list of links. It closes with Esc (focus back on the button), an outside click, tabbing out, or a page change.
   * **Phone:** a side panel holds the rest. Its code (Radix Dialog) is fetched when the browser is idle, not with the page.
-* **Bottom tab bar on phones** (`MobileTabBar`): Home, Cerca, Chat, Profilo/Accedi.
+* **Bottom tab bar on phones** (`MobileTabBar`): Home, Cerca, Preferiti, Chat, Profilo/Accedi.
   * Content above it gets bottom padding (`tabBarPadding`), so the bar never covers a button.
   * A page can hide the bar with `useHideTabBar(true)`. The chat does this while a conversation is open, to leave room for messages and the keyboard.
   * The bar is absent on auth pages.
@@ -168,6 +168,26 @@ The interface is built on tokens and a small set of accessible components. Every
   * `Checkbox`: a native checkbox with its error text linked.
 
   `bg-brand-deep` is the brand gradient for panels with white text: `bg-brand` with white text is below 3:1.
+
+### Search, home and favorites (module M2.4)
+
+* **Favorites:** migration `00012` adds `saved_listings`, keyed by (user, listing). Deleting either the account or the listing cascades to it.
+  * `PUT` / `DELETE /api/v1/me/saved-listings/{id}` save and remove a listing. Both can be repeated safely.
+  * Only listings the user can see can be saved.
+  * `GET /api/v1/me/saved-listings?cursor=` lists them, most recently saved first, with the same visibility rules as search: inactive, removed or blocked listings, and those of suspended owners, are hidden. They stay saved, though, and come back if they become visible again.
+  * Every listing in lists and in the detail carries `saved`, which is `false` without a session. The data export includes the favorites.
+* **Cities:** `GET /api/v1/listings/cities` returns the cities that have visible listings, with their counts, busiest first. The home page uses it, so it never shows a city with no rooms.
+* **Search** (`/ricerca`): the URL is still the only source of the filters.
+  * Desktop has a filter column; phones have a "Filtri" button, showing how many filters are active, that opens a bottom sheet. Both use the same form (`SearchFilters`), and changes apply at once.
+  * On phones, active filters also show as chips that remove themselves when tapped. Sorting is in the results bar.
+  * The next page loads when you get near the end of the list (`LoadMore`, IntersectionObserver), and a button stays for keyboard users.
+  * If a later page fails, the results already shown stay on screen, with a "Riprova" button.
+* **Cards:** `ListingCard` has the photo, price, place and features, plus a heart (`SaveButton`, `aria-pressed`, with the listing title in its name). The whole card links to the detail through the title link, stretched over the card.
+  * The first cards load their photo at once, the rest lazily.
+  * Tapping the heart updates every cached list and the detail straight away, and rolls back if the server refuses.
+  * Without a session the heart leads to the login page and then back.
+  * `RoommateCard` is the card for the "Coinquilini" tab.
+* **Favorites page** (`/preferiti`, in the bottom bar and in the header for signed-in users). Removing a listing there offers "Annulla".
 
 ### Tests
 

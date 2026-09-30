@@ -85,17 +85,16 @@ func main() {
 	ownerDSN := dsn
 	dsn, direct := devenv.DirectNeonDSN(dsn)
 	host, dbname := devenv.DescribeDSN(dsn)
-	log.Printf("Database: %s / %s", host, dbname)
+	role := devenv.DSNUser(dsn)
+	if role == "" {
+		role = "non indicato"
+	}
+	log.Printf("Database: %s / %s, ruolo %s", host, dbname, role)
 	if direct {
 		log.Print("Uso la connessione diretta: tolto \"-pooler\" dall'host")
 	}
 	if *expectedHost != "" && !strings.HasPrefix(host, *expectedHost) {
 		log.Fatalf("DATABASE_URL non punta al database atteso (%s): nessuna operazione eseguita.", *expectedHost)
-	}
-
-	if writeCommands[command] && !devenv.IsLocalHost(host) && !*yes &&
-		!confirm(fmt.Sprintf("Eseguire \"%s\" su questo database NON locale? Prima crea un branch di backup su Neon.", command)) {
-		log.Fatal("Operazione annullata")
 	}
 
 	conn, err := db.OpenSQL(dsn)
@@ -105,6 +104,23 @@ func main() {
 	defer conn.Close()
 	if err := conn.Ping(); err != nil {
 		log.Fatalf("Database non raggiungibile: %v", err)
+	}
+
+	// Migrazioni e grant-app servono al ruolo proprietario: meglio saperlo prima della conferma
+	if command != "grant-admin" && command != "revoke-admin" {
+		var notMigrator *db.NotMigratorError
+		if err := db.CheckCanMigrate(context.Background(), conn); errors.As(err, &notMigrator) {
+			log.Fatalf("Il ruolo %s non può modificare il database: è quello dell'app (la stringa di Vercel). "+
+				"Per le migrazioni serve la stringa del proprietario: Neon → Connect → branch production → ruolo neondb_owner. "+
+				"Nessuna operazione eseguita.", notMigrator.Role)
+		} else if err != nil {
+			log.Fatalf("%v", err)
+		}
+	}
+
+	if writeCommands[command] && !devenv.IsLocalHost(host) && !*yes &&
+		!confirm(fmt.Sprintf("Eseguire \"%s\" su questo database NON locale? Prima crea un branch di backup su Neon.", command)) {
+		log.Fatal("Operazione annullata")
 	}
 
 	switch command {

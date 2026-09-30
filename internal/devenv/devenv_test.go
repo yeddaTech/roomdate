@@ -3,6 +3,7 @@ package devenv
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -104,5 +105,19 @@ func TestAppNeonDSN(t *testing.T) {
 	}
 	if _, ok := AppNeonDSN("host=ep-x.neon.tech dbname=neondb", "app", "y"); ok {
 		t.Error("una stringa chiave=valore non si converte")
+	}
+}
+
+func TestDSNUserNeverReturnsThePassword(t *testing.T) {
+	for dsn, want := range map[string]string{
+		"postgresql://roomdate_app:segreto@ep-x.eu-central-1.aws.neon.tech/neondb?sslmode=require": "roomdate_app",
+		"postgres://neondb_owner:segreto@ep-x.neon.tech/neondb":                                    "neondb_owner",
+		"postgres://ep-x.neon.tech/neondb":                                                         "",
+		"host=/tmp/sock port=5432 user=u password=segreto dbname=roomdate":                         "u",
+		"host=/tmp/sock dbname=roomdate":                                                           "",
+	} {
+		if got := DSNUser(dsn); got != want || strings.Contains(got, "segreto") {
+			t.Errorf("DSNUser(%q) = %q, atteso %q", dsn, got, want)
+		}
 	}
 }

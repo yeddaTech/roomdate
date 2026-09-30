@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, LogIn, MessageCircle, Search, User } from 'lucide-react';
+import { Heart, Home, LogIn, MessageCircle, Search, User } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useUnreadCount } from '../../api/hooks';
 import { cn, focusRing } from '../ui/cn';
@@ -42,9 +42,10 @@ export default function MobileTabBar() {
       aria-label="Navigazione principale"
       className="fixed inset-x-0 bottom-0 z-[1000] border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
     >
-      <ul className="mx-auto grid max-w-md grid-cols-4 px-[env(safe-area-inset-left)]">
+      <ul className="mx-auto grid max-w-md grid-cols-5 px-[env(safe-area-inset-left)]">
         <li><TabLink to="/" end icon={<Home />} label="Home" /></li>
         <li><TabLink to="/ricerca" icon={<Search />} label="Cerca" /></li>
+        <li><TabLink to="/preferiti" icon={<Heart />} label="Preferiti" /></li>
         <li><TabLink to="/chat" icon={<MessageCircle />} label="Chat" badge={unread} /></li>
         <li>
           {user

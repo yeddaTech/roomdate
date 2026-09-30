@@ -13,6 +13,9 @@ export const queryKeys = {
   listingsSearch: (filters: string) => ['listings', 'search', filters] as const,
   listing: (id: string) => ['listings', 'detail', id] as const,
   myListings: ['listings', 'mine'] as const,
+  // Sotto "listings": salvare un annuncio aggiorna insieme elenchi, dettaglio e preferiti
+  savedListings: ['listings', 'saved'] as const,
+  listingCities: ['listings', 'cities'] as const,
   conversations: ['conversations'] as const,
   // Sotto "conversations": ogni aggiornamento delle conversazioni aggiorna anche il badge
   unread: ['conversations', 'unread'] as const,

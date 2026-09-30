@@ -1,13 +1,16 @@
 // Hook per leggere e modificare i dati: le pagine usano questi, non le chiamate API dirette.
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { getUnreadCount, listConversations, listMessages, markConversationRead, sendMessage, startChat } from './chat';
 import {
   createListing,
   deleteListing,
   deleteListingImage,
   getListing,
+  listCities,
   listListings,
   listMyListings,
+  listSavedListings,
+  setListingSaved,
   setListingActive,
   updateListing,
   uploadListingPhoto,
@@ -94,6 +97,55 @@ export function useListings(filters: ListingFilters, { enabled = true } = {}) {
     initialPageParam: '',
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled,
+  });
+}
+
+/** Le città con annunci, per la home. */
+export function useListingCities() {
+  return useQuery({ queryKey: queryKeys.listingCities, queryFn: listCities, staleTime: 5 * 60_000 });
+}
+
+/** I preferiti, a pagine, dal salvato più di recente. */
+export function useSavedListings({ enabled = true } = {}) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.savedListings,
+    queryFn: ({ pageParam }) => listSavedListings({ cursor: pageParam }),
+    initialPageParam: '',
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled,
+  });
+}
+
+/** Aggiorna "saved" dell'annuncio in qualunque forma sia in cache: pagine, elenchi o dettaglio. */
+function withSaved(data: unknown, id: number, saved: boolean): unknown {
+  if (!data || typeof data !== 'object') return data;
+  if (Array.isArray(data)) return data.map((item) => withSaved(item, id, saved));
+  const record = data as Record<string, unknown>;
+  if ('pages' in record && Array.isArray(record.pages)) return { ...record, pages: record.pages.map((p) => withSaved(p, id, saved)) };
+  if ('items' in record && Array.isArray(record.items)) return { ...record, items: record.items.map((i) => withSaved(i, id, saved)) };
+  if (record.id === id && 'saved' in record) return { ...record, saved };
+  return data;
+}
+
+/**
+ * Salva o toglie un annuncio dai preferiti. Il cuore cambia subito in ogni elenco e nel
+ * dettaglio; se il server risponde con un errore torna com'era.
+ */
+export function useSetListingSaved() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, saved }: { id: number; saved: boolean }) => setListingSaved(id, saved),
+    onMutate: async ({ id, saved }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.listings });
+      const previous = queryClient.getQueriesData({ queryKey: queryKeys.listings });
+      queryClient.setQueriesData({ queryKey: queryKeys.listings }, (data: unknown) => withSaved(data, id, saved));
+      return { previous };
+    },
+    onError: (_error, _vars, context) => {
+      for (const [key, data] of context?.previous ?? []) queryClient.setQueryData(key as QueryKey, data);
+    },
+    // L'elenco dei preferiti cambia composizione: si ricarica da server
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.savedListings }),
   });
 }
 

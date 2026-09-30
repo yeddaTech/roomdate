@@ -96,6 +96,11 @@ func New(d Deps) (http.Handler, error) {
 	mux.Handle("/api/v1/listings/{id}/images", httpx.Methods(methods{http.MethodPost: listingsHandler.ConfirmUpload}))
 	mux.Handle("/api/v1/listings/{id}/images/{imageId}", httpx.Methods(methods{http.MethodDelete: listingsHandler.DeleteImage}))
 	mux.Handle("/api/v1/me/listings", httpx.Methods(methods{http.MethodGet: listingsHandler.Mine}))
+	mux.Handle("/api/v1/listings/cities", httpx.Methods(methods{http.MethodGet: listingsHandler.Cities}))
+	mux.Handle("/api/v1/me/saved-listings", httpx.Methods(methods{http.MethodGet: listingsHandler.Saved}))
+	mux.Handle("/api/v1/me/saved-listings/{id}", httpx.Methods(methods{
+		http.MethodPut: listingsHandler.Save, http.MethodDelete: listingsHandler.Unsave,
+	}))
 	mux.Handle("/api/v1/me/sessions", httpx.Methods(methods{
 		http.MethodGet: usersHandler.MySessions, http.MethodDelete: usersHandler.RevokeOtherSessions,
 	}))

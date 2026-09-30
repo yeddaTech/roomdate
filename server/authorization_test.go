@@ -51,6 +51,7 @@ func TestEveryEndpointChecksAccess(t *testing.T) {
 		"GET /api/v1/users/{id}":              {path: "/api/v1/users/" + f.anna.ID},
 		"GET /api/v1/listings":                {path: "/api/v1/listings"},
 		"GET /api/v1/listings/{id}":           {path: listing},
+		"GET /api/v1/listings/cities":         {path: "/api/v1/listings/cities"},
 
 		"POST /api/v1/auth/password": {path: "/api/v1/auth/password", body: map[string]any{}, anonymous: 401},
 		"POST /api/v1/auth/kdf":      {path: "/api/v1/auth/kdf", body: map[string]any{}, anonymous: 401},
@@ -84,6 +85,10 @@ func TestEveryEndpointChecksAccess(t *testing.T) {
 		"POST /api/v1/conversations/{id}/messages": {path: chat + "/messages", body: message, anonymous: 401, intruder: 403},
 		"POST /api/v1/conversations/{id}/read":     {path: chat + "/read", anonymous: 401, intruder: 403},
 		"GET /api/v1/me/unread":                    {path: "/api/v1/me/unread", anonymous: 401},
+		// I preferiti sono sempre quelli di chi ha la sessione: non c'è la risorsa di un altro da toccare
+		"GET /api/v1/me/saved-listings":         {path: "/api/v1/me/saved-listings", anonymous: 401},
+		"PUT /api/v1/me/saved-listings/{id}":    {path: "/api/v1/me/saved-listings/" + itoa(f.listingID), anonymous: 401},
+		"DELETE /api/v1/me/saved-listings/{id}": {path: "/api/v1/me/saved-listings/" + itoa(f.listingID), anonymous: 401},
 		"POST /api/v1/realtime/auth": {path: "/api/v1/realtime/auth", anonymous: 401, intruder: 403,
 			body: map[string]string{"socketId": "1.2", "channelName": realtime.ConversationChannel(f.directChat)}},
 

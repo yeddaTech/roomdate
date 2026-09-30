@@ -7,6 +7,7 @@ import { useListing, useStartChat } from '../api/hooks';
 import { formatAvailability, formatBills } from '../api/listings';
 import { amenityLabel } from '../api/options';
 import ReportDialog from '../components/ReportDialog';
+import SaveButton from '../components/listings/SaveButton';
 
 export default function ListingDetails() {
   const { id } = useParams();
@@ -191,6 +192,7 @@ export default function ListingDetails() {
                     <button onClick={handleContact} className="w-full bg-linear-to-r from-orange-500 to-rose-500 text-white py-4.5 rounded-2xl font-bold shadow-lg hover:shadow-orange-500/25 hover:scale-[1.02] transition-all duration-300 text-lg flex items-center justify-center gap-2 cursor-pointer">
                       <span className="text-xl">💬</span> Contatta in Chat
                     </button>
+                    <SaveButton listing={listing} variant="full" className="mt-3" />
                     {user && (
                       <button type="button" onClick={() => setReporting(true)} className="mt-5 text-sm font-bold text-foreground-subtle hover:text-danger transition-colors cursor-pointer">
                         🚩 Segnala annuncio

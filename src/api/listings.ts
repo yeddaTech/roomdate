@@ -1,6 +1,6 @@
 import { ApiError, request } from './client';
 import { prepareImage } from './photos';
-import type { ListingDetail, ListingFilters, ListingImage, ListingInput, ListingsPage, ListingSummary, PendingUpload } from './types';
+import type { CityCount, ListingDetail, ListingFilters, ListingImage, ListingInput, ListingsPage, ListingSummary, PendingUpload } from './types';
 
 export const MAX_LISTING_IMAGES = 8;
 
@@ -31,6 +31,22 @@ export function listListings(filters: ListingFilters = {}, { cursor = '', limit 
   }
   const query = params.toString();
   return request<ListingsPage>(`/api/v1/listings${query ? `?${query}` : ''}`);
+}
+
+/** Le città con annunci, dalla più ricca: le mostra la home. */
+export async function listCities(): Promise<CityCount[]> {
+  const { items } = await request<{ items: CityCount[] }>('/api/v1/listings/cities');
+  return items;
+}
+
+/** Una pagina dei preferiti, dal salvato più di recente. */
+export function listSavedListings({ cursor = '' } = {}): Promise<ListingsPage> {
+  return request<ListingsPage>(`/api/v1/me/saved-listings${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`);
+}
+
+/** Salva o toglie un annuncio dai preferiti (entrambe le operazioni si possono ripetere). */
+export function setListingSaved(id: number, saved: boolean): Promise<void> {
+  return request<void>(`/api/v1/me/saved-listings/${id}`, { method: saved ? 'PUT' : 'DELETE' });
 }
 
 export function listMyListings(): Promise<ListingSummary[]> {

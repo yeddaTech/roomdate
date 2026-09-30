@@ -121,3 +121,20 @@ func unquote(v string) string {
 	}
 	return v
 }
+
+// DSNUser restituisce il ruolo di una stringa di connessione Postgres (mai la password), o "" se
+// non è indicato.
+func DSNUser(dsn string) string {
+	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+		if u, err := url.Parse(dsn); err == nil && u.User != nil {
+			return u.User.Username()
+		}
+		return ""
+	}
+	for _, field := range strings.Fields(dsn) {
+		if k, v, ok := strings.Cut(field, "="); ok && k == "user" {
+			return v
+		}
+	}
+	return ""
+}

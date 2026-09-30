@@ -153,6 +153,14 @@ export interface ListingSummary {
   removed: boolean;
   /** Prima foto dell'annuncio, o null se non ne ha. */
   coverUrl: string | null;
+  /** Tra i preferiti di chi guarda (sempre false senza sessione). */
+  saved: boolean;
+}
+
+/** Una città con il numero di annunci visibili, per la home. */
+export interface CityCount {
+  city: string;
+  count: number;
 }
 
 /** Ordinamenti dell'elenco degli annunci, come li accetta il server. */

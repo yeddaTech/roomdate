@@ -42,6 +42,7 @@ export default function Privacy() {
               <li>Dati di registrazione (nome, cognome, email, data di nascita). La password non viene inviata ai nostri server: il browser ne ricava una chiave d&apos;accesso, di cui conserviamo solo l&apos;hash.</li>
               <li>Dati del profilo (città, occupazione, budget, presentazione, abitudini di vita). Se il profilo è pubblico sono visibili agli altri utenti insieme al nome; cognome, email e data di nascita restano privati (agli altri utenti mostriamo solo gli anni compiuti).</li>
               <li>Informazioni sugli annunci inseriti (titolo, città, zona, tipo di stanza, prezzo, descrizione).</li>
+              <li>Gli annunci che salvi nei preferiti, con la data in cui li hai salvati. Li vedi solo tu.</li>
               <li>I messaggi della chat, conservati sul server in forma cifrata end-to-end, e le chiavi di cifratura dell&apos;utente. La chiave privata è a sua volta cifrata con una chiave che il browser ricava dalla password e che non riceviamo mai: non possiamo leggere i messaggi.</li>
               <li>Se crei una chiave di recupero: un&apos;impronta che ci permette di riconoscerla e una copia della chiave privata cifrata con la chiave stessa. La chiave di recupero non ci viene mai inviata.</li>
               <li>Un registro di sicurezza con accessi, tentativi falliti, cambi di password ed eliminazioni di account, conservato per 90 giorni. Email e indirizzo IP vi compaiono solo come impronte non reversibili, che servono a rallentare chi tenta di indovinare le password.</li>
@@ -95,7 +96,7 @@ export default function Privacy() {
           <section>
             <h2 className="font-serif text-xl font-extrabold text-foreground mb-3">7. Per Quanto Tempo Conserviamo i Dati</h2>
             <ul className="list-disc pl-5 flex flex-col gap-2 mb-4 text-foreground-muted">
-              <li>Profilo, annunci con le foto, chiavi di cifratura e blocchi: finché non elimini l&apos;account o quei contenuti. Le foto caricate ma mai aggiunte a un annuncio vengono cancellate dopo un giorno.</li>
+              <li>Profilo, annunci con le foto, preferiti, chiavi di cifratura e blocchi: finché non elimini l&apos;account o quei contenuti (un preferito sparisce anche quando il suo annuncio viene eliminato). Le foto caricate ma mai aggiunte a un annuncio vengono cancellate dopo un giorno.</li>
               <li>Sessioni di accesso: al massimo 30 giorni, o 7 giorni dall&apos;ultimo utilizzo.</li>
               <li>Registro di sicurezza: 90 giorni.</li>
               <li>Segnalazioni: finché sono aperte e poi 180 giorni dalla decisione, insieme ai messaggi allegati. Quelle ricevute da un account eliminato vengono cancellate con l&apos;account; quelle inviate restano ai moderatori, senza il nome di chi le ha inviate.</li>

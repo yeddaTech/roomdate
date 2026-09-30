@@ -196,3 +196,55 @@ func (h *Handler) DeleteImage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// Saved gestisce GET /api/v1/me/saved-listings?cursor=&limit=.
+func (h *Handler) Saved(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.requireSession(w, r)
+	if !ok {
+		return
+	}
+	query := r.URL.Query()
+	result, err := h.svc.Saved(r.Context(), session.UserID, query.Get("cursor"), query.Get("limit"))
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, result)
+}
+
+// Save gestisce PUT /api/v1/me/saved-listings/{id}.
+func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.requireSession(w, r)
+	if !ok {
+		return
+	}
+	if err := h.svc.Save(r.Context(), session.UserID, r.PathValue("id")); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// Unsave gestisce DELETE /api/v1/me/saved-listings/{id}.
+func (h *Handler) Unsave(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.requireSession(w, r)
+	if !ok {
+		return
+	}
+	if err := h.svc.Unsave(r.Context(), session.UserID, r.PathValue("id")); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// Cities gestisce GET /api/v1/listings/cities: le città con annunci, per la home.
+func (h *Handler) Cities(w http.ResponseWriter, r *http.Request) {
+	session, _ := h.sessions.FromRequest(r.Context(), r)
+	cities, err := h.svc.Cities(r.Context(), session.UserID)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"items": cities})
+}
