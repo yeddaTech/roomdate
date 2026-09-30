@@ -24,6 +24,7 @@ type Export struct {
 	Sessions      []ExportSession       `json:"sessions"`
 	Security      []ExportEvent         `json:"securityEvents"`
 	Blocks        []ExportBlock         `json:"blocks"`
+	SavedListings []ExportSavedListing  `json:"savedListings"`
 	Reports       []ExportReport        `json:"reports"`
 	ReportsAbout  []ExportReportAboutMe `json:"reportsAboutMe"`
 }
@@ -76,6 +77,14 @@ type ExportBlock struct {
 	UserID    string    `json:"userId"`
 	FirstName string    `json:"firstName"`
 	CreatedAt time.Time `json:"createdAt"`
+}
+
+// ExportSavedListing è un annuncio tra i preferiti, anche se oggi non è più visibile.
+type ExportSavedListing struct {
+	ListingID int       `json:"listingId"`
+	Title     string    `json:"title"`
+	City      string    `json:"city"`
+	SavedAt   time.Time `json:"savedAt"`
 }
 
 // ExportReport è una segnalazione inviata dall'utente, con i messaggi che vi ha allegato.
@@ -200,6 +209,17 @@ func (s *Store) Export(ctx context.Context, userID string, photoURL func(string)
 	}
 
 	rows, err = tx.Query(ctx, `
+        SELECT sl.listing_id, l.title, l.city, sl.created_at
+        FROM roomdate_app.saved_listings sl JOIN roomdate_app.listings l ON l.id = sl.listing_id
+        WHERE sl.user_id = $1 ORDER BY sl.created_at, sl.listing_id`, userID)
+	if err != nil {
+		return Export{}, err
+	}
+	if e.SavedListings, err = pgx.CollectRows(rows, pgx.RowToStructByPos[ExportSavedListing]); err != nil {
+		return Export{}, fmt.Errorf("preferiti: %w", err)
+	}
+
+	rows, err = tx.Query(ctx, `
         SELECT id, target_user_id::text, listing_id, reason, details, evidence, status, created_at, resolved_at
         FROM roomdate_app.reports WHERE reporter_id = $1 ORDER BY id`, userID)
 	if err != nil {
@@ -278,6 +298,9 @@ func newExportResponse(e Export) ExportResponse {
 	}
 	if out.Blocks == nil {
 		out.Blocks = []ExportBlock{}
+	}
+	if out.SavedListings == nil {
+		out.SavedListings = []ExportSavedListing{}
 	}
 	if out.ReportsAbout == nil {
 		out.ReportsAbout = []ExportReportAboutMe{}

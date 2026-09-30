@@ -161,6 +161,34 @@ func SetupAppRole(ctx context.Context, conn *sql.DB, role string) (password stri
 	return password, nil
 }
 
+// NotMigratorError indica che il ruolo collegato non può fare le migrazioni.
+type NotMigratorError struct{ Role string }
+
+func (e *NotMigratorError) Error() string {
+	return fmt.Sprintf("il ruolo %s non può modificare lo schema roomdate_app", e.Role)
+}
+
+// CheckCanMigrate verifica, prima di qualunque modifica, che il ruolo collegato possa fare le
+// migrazioni: deve poter creare oggetti nello schema dell'app (o, se lo schema non c'è ancora, nel
+// database). Il ruolo dell'app, quello della stringa su Vercel dal modulo M3.6, non può: goose
+// fallirebbe con "permission denied" dopo la conferma.
+func CheckCanMigrate(ctx context.Context, conn *sql.DB) error {
+	var role string
+	var canCreate bool
+	err := conn.QueryRowContext(ctx, `
+        SELECT current_user,
+               CASE WHEN EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'roomdate_app')
+                    THEN has_schema_privilege('roomdate_app', 'CREATE')
+                    ELSE has_database_privilege(current_database(), 'CREATE') END`).Scan(&role, &canCreate)
+	if err != nil {
+		return fmt.Errorf("verifica dei permessi: %w", err)
+	}
+	if !canCreate {
+		return &NotMigratorError{Role: role}
+	}
+	return nil
+}
+
 // Migrate esegue un comando di goose (up, down, status...) con le migrazioni incluse nel binario.
 func Migrate(ctx context.Context, conn *sql.DB, command string, args ...string) error {
 	goose.SetBaseFS(Migrations)

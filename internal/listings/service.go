@@ -149,6 +149,8 @@ type Summary struct {
 	// Removed è vero se la moderazione ha rimosso l'annuncio: lo vede solo il proprietario.
 	Removed  bool    `json:"removed"`
 	CoverURL *string `json:"coverUrl"`
+	// Saved: l'annuncio è tra i preferiti di chi guarda (sempre falso senza sessione).
+	Saved bool `json:"saved"`
 }
 
 // Owner è il proprietario dell'annuncio, come lo vedono gli altri utenti.
@@ -178,6 +180,7 @@ func (s *Service) summary(r Row) Summary {
 		BillsIncluded: r.BillsIncluded,
 		IsActive:      r.IsActive,
 		Removed:       r.Removed,
+		Saved:         r.Saved,
 	}
 	if r.AvailableFrom != nil {
 		date := r.AvailableFrom.Format(time.DateOnly)
@@ -341,6 +344,11 @@ func (s *Service) Get(ctx context.Context, viewerID, rawID string) (Detail, erro
 	images, err := s.store.Images(ctx, id)
 	if err != nil {
 		return Detail{}, fmt.Errorf("lettura foto: %w", err)
+	}
+	if viewerID != "" {
+		if r.Saved, err = s.store.IsSaved(ctx, viewerID, id); err != nil {
+			return Detail{}, fmt.Errorf("lettura preferiti: %w", err)
+		}
 	}
 	detail := Detail{
 		Summary:     s.summary(r),
@@ -626,4 +634,108 @@ func randomName() string {
 	b := make([]byte, 16)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// Save aggiunge l'annuncio ai preferiti. Si possono salvare solo gli annunci che si vedono.
+func (s *Service) Save(ctx context.Context, userID, rawID string) error {
+	id, ok := validate.PositiveID(rawID)
+	if !ok {
+		return errNotFound
+	}
+	r, err := s.store.Get(ctx, id)
+	if db.IsNoRows(err) {
+		return errNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("lettura annuncio: %w", err)
+	}
+	if r.OwnerID != userID {
+		visible, err := s.visible(ctx, userID, r)
+		if err != nil {
+			return err
+		}
+		if !visible {
+			return errNotFound
+		}
+	}
+	if err := s.store.Save(ctx, userID, id); err != nil {
+		return fmt.Errorf("salvataggio preferito: %w", err)
+	}
+	return nil
+}
+
+// Unsave toglie l'annuncio dai preferiti; togliere un annuncio che non c'è non è un errore.
+func (s *Service) Unsave(ctx context.Context, userID, rawID string) error {
+	id, ok := validate.PositiveID(rawID)
+	if !ok {
+		return errNotFound
+	}
+	if err := s.store.Unsave(ctx, userID, id); err != nil {
+		return fmt.Errorf("rimozione preferito: %w", err)
+	}
+	return nil
+}
+
+// Saved restituisce una pagina dei preferiti, dal salvato più di recente.
+func (s *Service) Saved(ctx context.Context, userID, cursor, rawLimit string) (Page, error) {
+	limit := defaultLimit
+	var after *SavedCursor
+	var v validate.Validator
+	if rawLimit != "" {
+		n, err := strconv.Atoi(rawLimit)
+		v.Check(err == nil && validate.Between(n, 1, maxLimit), "limit", fmt.Sprintf("Il numero di annunci per pagina deve essere tra 1 e %d", maxLimit))
+		limit = n
+	}
+	if cursor != "" {
+		c, ok := decodeSavedCursor(cursor)
+		v.Check(ok, "cursor", "Pagina non valida: ricarica l'elenco")
+		after = &c
+	}
+	if err := v.Err(); err != nil {
+		return Page{}, err
+	}
+
+	rows, err := s.store.SavedListings(ctx, userID, after, limit+1)
+	if err != nil {
+		return Page{}, fmt.Errorf("elenco preferiti: %w", err)
+	}
+	result := Page{Items: []Summary{}}
+	if len(rows) > limit {
+		rows = rows[:limit]
+		last := rows[limit-1]
+		next := page.Encode(last.SavedAt.UTC().Format(time.RFC3339Nano), strconv.Itoa(last.ID))
+		result.NextCursor = &next
+	}
+	for _, r := range rows {
+		result.Items = append(result.Items, s.summary(r.Row))
+	}
+	return result, nil
+}
+
+func decodeSavedCursor(cursor string) (SavedCursor, bool) {
+	fields, ok := page.Decode(cursor, 2)
+	if !ok {
+		return SavedCursor{}, false
+	}
+	savedAt, err := time.Parse(time.RFC3339Nano, fields[0])
+	id, validID := validate.PositiveID(fields[1])
+	if err != nil || !validID {
+		return SavedCursor{}, false
+	}
+	return SavedCursor{SavedAt: savedAt, ListingID: id}, true
+}
+
+// maxCities è quante città mostra la home.
+const maxCities = 12
+
+// Cities restituisce le città con annunci visibili a chi guarda, dalla più ricca di annunci.
+func (s *Service) Cities(ctx context.Context, viewerID string) ([]CityCount, error) {
+	cities, err := s.store.Cities(ctx, viewerID, maxCities)
+	if err != nil {
+		return nil, fmt.Errorf("città con annunci: %w", err)
+	}
+	if cities == nil {
+		cities = []CityCount{}
+	}
+	return cities, nil
 }

@@ -24,6 +24,7 @@ const Terms = lazy(() => import('./pages/Terms'));
 const Guide = lazy(() => import('./pages/Guide'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Moderation = lazy(() => import('./pages/Moderation'));
+const Favorites = lazy(() => import('./pages/Favorites'));
 // Vetrina dei componenti del design system: solo in sviluppo, non finisce nel sito pubblicato
 const DesignSystem = import.meta.env.DEV ? lazy(() => import('./pages/DesignSystem')) : null;
 
@@ -62,6 +63,7 @@ const router = createBrowserRouter([
             { path: 'chat', element: <Chatpage />, handle: { fullHeight: true } },
             { path: 'impostazioni', element: <Impostazioni /> },
             { path: 'moderazione', element: <Moderation /> },
+            { path: 'preferiti', element: <Favorites /> },
           ],
         }],
       },
