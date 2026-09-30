@@ -64,6 +64,9 @@ func TestAccountDeletionRemovesPersonalData(t *testing.T) {
 	expect(t, app.block(f.carla.Cookie, f.anna.ID), http.StatusNoContent, "")
 	expect(t, app.report(f.anna.Cookie, map[string]any{"userId": f.marco.ID}), http.StatusCreated, "")
 	expect(t, app.report(f.carla.Cookie, map[string]any{"userId": f.anna.ID}), http.StatusCreated, "")
+	if code := app.saveListing(f.anna.Cookie, f.listingID); code != http.StatusNoContent {
+		t.Fatalf("salvataggio: %d", code)
+	}
 
 	count := func(query string, args ...any) int {
 		t.Helper()
@@ -83,6 +86,7 @@ func TestAccountDeletionRemovesPersonalData(t *testing.T) {
 		"account":                     count(`SELECT count(*) FROM roomdate_app.users WHERE id = $1`, f.anna.ID),
 		"sessioni":                    count(`SELECT count(*) FROM roomdate_app.sessions WHERE user_id = $1`, f.anna.ID),
 		"blocchi":                     count(`SELECT count(*) FROM roomdate_app.user_blocks`),
+		"preferiti":                   count(`SELECT count(*) FROM roomdate_app.saved_listings WHERE user_id = $1`, f.anna.ID),
 		"segnalazioni ricevute":       count(`SELECT count(*) FROM roomdate_app.reports WHERE target_user_id = $1`, f.anna.ID),
 		"eventi collegati all'utente": count(`SELECT count(*) FROM roomdate_app.security_events WHERE user_id = $1`, f.anna.ID),
 		// La conversazione tra Anna e Carla non ha più partecipanti: sparisce con i messaggi
@@ -171,6 +175,23 @@ func TestExport(t *testing.T) {
 	// Le segnalazioni ricevute non dicono chi le ha fatte né cosa ha scritto
 	if len(export.ReportsAboutMe) != 1 || export.ReportsAboutMe[0]["reason"] != "spam" {
 		t.Errorf("segnalazioni ricevute = %+v", export.ReportsAboutMe)
+	}
+	// Chi non ha preferiti ha un elenco vuoto; Anna, che salva l'annuncio di Marco, lo ritrova
+	expect(t, rec, http.StatusOK, `"savedListings":[]`)
+	if code := app.saveListing(f.anna.Cookie, f.listingID); code != http.StatusNoContent {
+		t.Fatalf("salvataggio: %d", code)
+	}
+	var annaExport struct {
+		SavedListings []struct {
+			ListingID int
+			Title     string
+			SavedAt   *time.Time
+		}
+	}
+	decode(t, app.do(http.MethodGet, "/api/v1/me/export", nil, withSession(f.anna.Cookie)), &annaExport)
+	if len(annaExport.SavedListings) != 1 || annaExport.SavedListings[0].ListingID != f.listingID ||
+		annaExport.SavedListings[0].Title == "" || annaExport.SavedListings[0].SavedAt == nil {
+		t.Errorf("preferiti di Anna = %+v", annaExport.SavedListings)
 	}
 
 	// Niente segreti né dati personali di altri utenti

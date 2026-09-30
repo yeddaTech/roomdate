@@ -439,8 +439,8 @@ export default function Impostazioni() {
             📦 I tuoi dati
           </h3>
           <p className="text-foreground-subtle text-sm font-medium mb-6">
-            Scarica in un file tutti i dati che RoomDate conserva su di te: profilo, annunci, conversazioni, dispositivi,
-            blocchi e segnalazioni. I messaggi li decifra il tuo browser: sul server sono solo in forma cifrata.
+            Scarica in un file tutti i dati che RoomDate conserva su di te: profilo, annunci, preferiti, conversazioni,
+            dispositivi, blocchi e segnalazioni. I messaggi li decifra il tuo browser: sul server sono solo in forma cifrata.
           </p>
           <button
             onClick={handleExport}
@@ -457,8 +457,8 @@ export default function Impostazioni() {
             ⚠️ Zona Pericolosa
           </h3>
           <p className="text-danger text-sm mb-8 leading-relaxed max-w-2xl font-medium">
-            Eliminando l&apos;account cancelli definitivamente profilo, annunci con le foto, dispositivi collegati, blocchi e
-            segnalazioni ricevute. I messaggi che hai inviato restano, cifrati e senza il tuo nome, nelle conversazioni
+            Eliminando l&apos;account cancelli definitivamente profilo, annunci con le foto, preferiti, dispositivi collegati,
+            blocchi e segnalazioni ricevute. I messaggi che hai inviato restano, cifrati e senza il tuo nome, nelle conversazioni
             degli altri partecipanti, come accade con un messaggio già consegnato. Prima puoi scaricare una copia dei tuoi dati.
           </p>
           {isDeleting ? (

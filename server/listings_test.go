@@ -48,6 +48,7 @@ type listingDetail struct {
 	}
 	Owner   struct{ FirstName string }
 	IsOwner bool
+	Saved   bool
 }
 
 // createListing pubblica un annuncio valido e ne restituisce l'ID.

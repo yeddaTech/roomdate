@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { BookOpen, Menu, MessageCircle, Search } from 'lucide-react';
+import { BookOpen, Heart, Menu, MessageCircle, Search } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useUnreadCount } from '../../api/hooks';
 import { buttonClasses } from '../ui/buttonClasses';
@@ -88,6 +88,7 @@ export default function SiteHeader() {
 
         <nav aria-label="Navigazione principale" className="hidden items-center gap-1 md:flex">
           <HeaderLink to="/ricerca" icon={<Search />}>Cerca</HeaderLink>
+          {user && <HeaderLink to="/preferiti" icon={<Heart />}>Preferiti</HeaderLink>}
           <HeaderLink to="/chat" icon={<MessageCircle />} badge={unread}>Chat</HeaderLink>
           <HeaderLink to="/guida" icon={<BookOpen />}>Come funziona</HeaderLink>
         </nav>

@@ -179,3 +179,23 @@ func TestDatabaseConstraints(t *testing.T) {
 		}
 	}
 }
+
+// Lo strumento delle migrazioni riconosce il ruolo dell'app prima di chiedere conferma: con quel
+// ruolo goose fallirebbe a metà con "permission denied" (successo in produzione il 2026-09-30).
+func TestCheckCanMigrate(t *testing.T) {
+	if appPool == nil {
+		t.Skip("TEST_DATABASE_URL non impostata")
+	}
+	ctx := context.Background()
+	owner := stdlib.OpenDB(*testPool.Config().ConnConfig.Copy())
+	defer owner.Close()
+	if err := db.CheckCanMigrate(ctx, owner); err != nil {
+		t.Errorf("il proprietario deve poter migrare: %v", err)
+	}
+	app := stdlib.OpenDB(*appPool.Config().ConnConfig.Copy())
+	defer app.Close()
+	var notMigrator *db.NotMigratorError
+	if err := db.CheckCanMigrate(ctx, app); !errors.As(err, &notMigrator) || notMigrator.Role != appPool.Config().ConnConfig.User {
+		t.Errorf("il ruolo dell'app non deve poter migrare: %v", err)
+	}
+}

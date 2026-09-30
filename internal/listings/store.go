@@ -94,6 +94,8 @@ type Row struct {
 	CreatedAt *time.Time
 	// CoverKey è la chiave della prima foto, se c'è (negli elenchi).
 	CoverKey *string
+	// Saved: chi guarda ha l'annuncio tra i preferiti (negli elenchi; sempre falso senza sessione).
+	Saved bool
 }
 
 // Nel database di produzione user_id, room_type e created_at possono essere NULL.
@@ -103,16 +105,24 @@ const rowColumns = `l.id, COALESCE(l.user_id::text, ''), COALESCE(u.first_name, 
     l.removed_at IS NOT NULL, COALESCE(u.suspended_at IS NOT NULL, false), l.created_at,
     (SELECT i.storage_key FROM roomdate_app.listing_images i WHERE i.listing_id = l.id ORDER BY i.position, i.id LIMIT 1)`
 
-func scanRow(row pgx.Row) (Row, error) {
+// savedColumn dice se l'annuncio è tra i preferiti dell'utente nel parametro viewer (vuoto: nessuno).
+func savedColumn(viewer string) string {
+	return `EXISTS (SELECT 1 FROM roomdate_app.saved_listings s
+        WHERE s.listing_id = l.id AND s.user_id = NULLIF(` + viewer + `, '')::uuid)`
+}
+
+// scanRow legge le colonne di rowColumns, poi quella dei preferiti e le eventuali altre in extra.
+func scanRow(row pgx.Row, extra ...any) (Row, error) {
 	var r Row
-	err := row.Scan(&r.ID, &r.OwnerID, &r.OwnerFirstName, &r.Title, &r.City, &r.Zone, &r.RoomType, &r.Price, &r.Description,
-		&r.Amenities, &r.BillsIncluded, &r.AvailableFrom, &r.IsActive, &r.Removed, &r.OwnerSuspended, &r.CreatedAt, &r.CoverKey)
+	dest := []any{&r.ID, &r.OwnerID, &r.OwnerFirstName, &r.Title, &r.City, &r.Zone, &r.RoomType, &r.Price, &r.Description,
+		&r.Amenities, &r.BillsIncluded, &r.AvailableFrom, &r.IsActive, &r.Removed, &r.OwnerSuspended, &r.CreatedAt, &r.CoverKey, &r.Saved}
+	err := row.Scan(append(dest, extra...)...)
 	return r, err
 }
 
 func (s *Store) Get(ctx context.Context, id int) (Row, error) {
 	return scanRow(s.db.QueryRow(ctx, `
-        SELECT `+rowColumns+`
+        SELECT `+rowColumns+`, false
         FROM roomdate_app.listings l
         LEFT JOIN roomdate_app.users u ON l.user_id = u.id
         WHERE l.id = $1`, id))
@@ -196,13 +206,10 @@ func (s *Store) Active(ctx context.Context, q ListQuery) ([]Row, error) {
 	}
 	key, id := cursorFields(q.Sort, q.After)
 	return s.list(ctx, `
-        SELECT `+rowColumns+`
+        SELECT `+rowColumns+`, `+savedColumn("$8")+`
         FROM roomdate_app.listings l
         LEFT JOIN roomdate_app.users u ON l.user_id = u.id
-        WHERE l.is_active
-          AND l.removed_at IS NULL
-          AND u.suspended_at IS NULL
-          AND `+moderation.NotBlockedSQL("$8", "l.user_id")+`
+        WHERE `+visibleToViewer("$8")+`
           AND ($1 = '' OR l.city = $1)
           AND ($2 = 0 OR l.price <= $2)
           AND ($3 = '' OR l.room_type = $3)
@@ -216,7 +223,7 @@ func (s *Store) Active(ctx context.Context, q ListQuery) ([]Row, error) {
 // ByOwner restituisce tutti gli annunci di un utente, anche quelli disattivati, dal più recente.
 func (s *Store) ByOwner(ctx context.Context, ownerID string) ([]Row, error) {
 	return s.list(ctx, `
-        SELECT `+rowColumns+`
+        SELECT `+rowColumns+`, false
         FROM roomdate_app.listings l
         LEFT JOIN roomdate_app.users u ON l.user_id = u.id
         WHERE l.user_id = $1
@@ -345,4 +352,105 @@ func imageKeys(ctx context.Context, q interface {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, pgx.RowTo[string])
+}
+
+// visibleToViewer sono le condizioni per cui chi guarda (parametro viewer) vede un annuncio negli
+// elenchi: attivo, non rimosso, di un account non sospeso e senza blocchi tra i due.
+func visibleToViewer(viewer string) string {
+	return `l.is_active
+          AND l.removed_at IS NULL
+          AND u.suspended_at IS NULL
+          AND ` + moderation.NotBlockedSQL(viewer, "l.user_id")
+}
+
+// Save aggiunge l'annuncio ai preferiti dell'utente; se c'è già non cambia nulla.
+func (s *Store) Save(ctx context.Context, userID string, listingID int) error {
+	_, err := s.db.Exec(ctx, `
+        INSERT INTO roomdate_app.saved_listings (user_id, listing_id) VALUES ($1, $2)
+        ON CONFLICT (user_id, listing_id) DO NOTHING`, userID, listingID)
+	return err
+}
+
+// Unsave toglie l'annuncio dai preferiti dell'utente; se non c'era non cambia nulla.
+func (s *Store) Unsave(ctx context.Context, userID string, listingID int) error {
+	_, err := s.db.Exec(ctx, `DELETE FROM roomdate_app.saved_listings WHERE user_id = $1 AND listing_id = $2`, userID, listingID)
+	return err
+}
+
+// IsSaved indica se l'annuncio è tra i preferiti dell'utente.
+func (s *Store) IsSaved(ctx context.Context, userID string, listingID int) (bool, error) {
+	var saved bool
+	err := s.db.QueryRow(ctx, `
+        SELECT EXISTS (SELECT 1 FROM roomdate_app.saved_listings WHERE user_id = $1 AND listing_id = $2)`,
+		userID, listingID).Scan(&saved)
+	return saved, err
+}
+
+// SavedCursor è la posizione di un preferito nell'elenco: quando è stato salvato e l'annuncio.
+type SavedCursor struct {
+	SavedAt   time.Time
+	ListingID int
+}
+
+// SavedRow è un annuncio tra i preferiti, con il momento in cui è stato salvato.
+type SavedRow struct {
+	Row
+	SavedAt time.Time
+}
+
+// SavedListings restituisce una pagina dei preferiti dell'utente, dal più recente. Gli annunci che
+// non vedrebbe nella ricerca (disattivati, rimossi, di un account sospeso o bloccato) non compaiono,
+// ma restano salvati: se tornano visibili riappaiono.
+func (s *Store) SavedListings(ctx context.Context, userID string, after *SavedCursor, limit int) ([]SavedRow, error) {
+	var afterTime *time.Time
+	afterID := 0
+	if after != nil {
+		afterTime, afterID = &after.SavedAt, after.ListingID
+	}
+	rows, err := s.db.Query(ctx, `
+        SELECT `+rowColumns+`, true, sl.created_at
+        FROM roomdate_app.saved_listings sl
+        JOIN roomdate_app.listings l ON l.id = sl.listing_id
+        LEFT JOIN roomdate_app.users u ON l.user_id = u.id
+        WHERE sl.user_id = $1
+          AND `+visibleToViewer("$1::text")+`
+          AND ($2::timestamptz IS NULL OR (sl.created_at, sl.listing_id) < ($2::timestamptz, $3))
+        ORDER BY sl.created_at DESC, sl.listing_id DESC
+        LIMIT $4`, userID, afterTime, afterID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []SavedRow
+	for rows.Next() {
+		var saved SavedRow
+		saved.Row, err = scanRow(rows, &saved.SavedAt)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, saved)
+	}
+	return result, rows.Err()
+}
+
+// CityCount è il numero di annunci visibili in una città.
+type CityCount struct {
+	City  string `json:"city"`
+	Count int    `json:"count"`
+}
+
+// Cities restituisce le città con almeno un annuncio visibile a chi guarda, dalla più ricca.
+func (s *Store) Cities(ctx context.Context, viewerID string, limit int) ([]CityCount, error) {
+	rows, err := s.db.Query(ctx, `
+        SELECT l.city, count(*)::int
+        FROM roomdate_app.listings l
+        LEFT JOIN roomdate_app.users u ON l.user_id = u.id
+        WHERE `+visibleToViewer("$1")+`
+        GROUP BY l.city
+        ORDER BY count(*) DESC, l.city
+        LIMIT $2`, viewerID, limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[CityCount])
 }
