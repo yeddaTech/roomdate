@@ -238,8 +238,10 @@ type Profile struct {
 	Suspended bool `json:"-"`
 }
 
-// ageColumn calcola l'età in anni compiuti, così la data di nascita non esce dal database.
-const ageColumn = `EXTRACT(YEAR FROM age(CURRENT_DATE, birthdate))::int`
+// ageColumn calcola l'età in anni compiuti, così la data di nascita non esce dal database. Il giorno
+// è quello italiano, come per l'età minima (validate.AgeAtLeast): CURRENT_DATE dipenderebbe dal fuso
+// della sessione, UTC su Neon.
+const ageColumn = `EXTRACT(YEAR FROM age((now() AT TIME ZONE 'Europe/Rome')::date, birthdate))::int`
 
 func (s *Store) Profile(ctx context.Context, id string) (Profile, error) {
 	var p Profile
