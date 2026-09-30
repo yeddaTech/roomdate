@@ -21,8 +21,9 @@ import type { OutgoingMessage } from './chat';
 import type { ListingFilters, ListingInput, ModerationAction, SessionUser } from './types';
 import { getMyProfile, getPublicProfile, listRoommates, listSessions, revokeOtherSessions, revokeSession, updateMyProfile } from './users';
 
-export function useMyProfile() {
-  return useQuery({ queryKey: queryKeys.myProfile, queryFn: getMyProfile });
+/** Il proprio profilo. Solo con una sessione: senza, /api/v1/me risponde 401 (sessione assente). */
+export function useMyProfile({ enabled = true } = {}) {
+  return useQuery({ queryKey: queryKeys.myProfile, queryFn: getMyProfile, enabled });
 }
 
 export function useUpdateMyProfile() {
