@@ -1,60 +1,51 @@
+import type { ReactNode } from 'react';
+import { MapPin, TriangleAlert, Wallet } from 'lucide-react';
 import { lifestyleTag } from '../../api/options';
 import type { Compatibility } from '../../api/types';
+import { cn } from '../ui/cn';
 
-/** Voci di compatibilità in testo; la voce "warning" segnala una differenza da considerare. */
-function compatibilityItems(c: Compatibility): { text: string; warning?: boolean }[] {
-  const items: { text: string; warning?: boolean }[] = [];
-  if (c.sameCity) items.push({ text: '📍 Stessa città' });
-  if (c.similarBudget) items.push({ text: '💶 Budget simile' });
+interface Item {
+  key: string;
+  content: ReactNode;
+  warning?: boolean;
+}
+
+/** Voci di compatibilità; la voce "warning" segnala una differenza da considerare. */
+function compatibilityItems(c: Compatibility): Item[] {
+  const items: Item[] = [];
+  if (c.sameCity) items.push({ key: 'citta', content: <><MapPin aria-hidden="true" /> Stessa città</> });
+  if (c.similarBudget) items.push({ key: 'budget', content: <><Wallet aria-hidden="true" /> Budget simile</> });
   for (const key of c.sharedTags) {
     const tag = lifestyleTag(key);
-    if (tag) items.push({ text: `${tag.emoji} ${tag.label}` });
+    if (tag) items.push({ key, content: <><span aria-hidden="true">{tag.emoji}</span> {tag.label}</> });
   }
-  if (c.smokingMismatch) items.push({ text: '⚠️ Abitudini diverse sul fumo', warning: true });
+  if (c.smokingMismatch) items.push({ key: 'fumo', content: <><TriangleAlert aria-hidden="true" /> Abitudini diverse sul fumo</>, warning: true });
   return items;
 }
 
-interface Props {
-  compatibility: Compatibility;
-  /** Versione ridotta per le schede dell'elenco: niente titolo né spiegazione. */
-  compact?: boolean;
-}
-
 /**
- * Cosa hanno in comune l'utente e un altro profilo. Il server confronta città, budget
- * (differenza entro 100 €) e abitudini indicate da entrambi: non esiste un punteggio.
+ * Cosa hanno in comune l'utente e un altro profilo, in breve per le schede dell'elenco. La
+ * spiegazione voce per voce è nel profilo (CompatibilityDetails).
  */
-export default function CompatibilityList({ compatibility, compact = false }: Props) {
+export default function CompatibilityList({ compatibility }: { compatibility: Compatibility }) {
   const items = compatibilityItems(compatibility);
-  const chips = items.map((item) => (
-    <span
-      key={item.text}
-      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${item.warning ? 'bg-warning-soft text-warning-soft-foreground border-warning-soft-foreground/20' : 'bg-success-soft text-success-soft-foreground border-success-soft-foreground/20'}`}
-    >
-      {item.text}
-    </span>
-  ));
-
-  if (compact) {
-    return items.length > 0 ? (
-      <div>
-        <div className="text-center text-[10px] font-bold uppercase tracking-wider text-foreground-subtle mb-1.5" aria-hidden="true">In comune con te</div>
-        <div className="flex flex-wrap justify-center gap-1.5" aria-label="In comune con te">{chips}</div>
-      </div>
-    ) : null;
-  }
-
+  if (items.length === 0) return null;
   return (
-    <div>
-      <h2 className="font-serif text-xl font-extrabold text-foreground mb-2 tracking-tight">In comune con te</h2>
-      <p className="text-sm text-foreground-subtle font-medium mb-4">
-        Confronto tra città, budget (differenza entro 100 €) e abitudini indicate in entrambi i profili.
-      </p>
-      {items.length > 0 ? (
-        <div className="flex flex-wrap gap-2">{chips}</div>
-      ) : (
-        <p className="text-foreground-subtle font-medium italic">Nessun elemento in comune tra quelli indicati.</p>
-      )}
+    <div className="flex flex-col gap-1.5">
+      <p className="text-xs font-bold text-foreground-muted" aria-hidden="true">In comune con te</p>
+      <ul className="flex flex-wrap gap-1.5" aria-label="In comune con te">
+        {items.map((item) => (
+          <li
+            key={item.key}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold [&_svg]:size-3.5',
+              item.warning ? 'bg-warning-soft text-warning-soft-foreground' : 'bg-success-soft text-success-soft-foreground',
+            )}
+          >
+            {item.content}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

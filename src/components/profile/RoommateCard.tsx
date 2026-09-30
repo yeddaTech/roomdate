@@ -51,7 +51,7 @@ export default function RoommateCard({ roommate, onContact, contacting = false }
         </p>
       )}
 
-      {roommate.compatibility && <CompatibilityList compatibility={roommate.compatibility} compact />}
+      {roommate.compatibility && <CompatibilityList compatibility={roommate.compatibility} />}
 
       <div className="mt-auto grid grid-cols-2 gap-2 pt-1">
         <Link to={`/coinquilino/${roommate.id}`} className={buttonClasses({ variant: 'secondary' })} aria-label={`Profilo di ${name}`}>
