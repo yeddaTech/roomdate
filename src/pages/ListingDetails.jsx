@@ -48,7 +48,7 @@ export default function ListingDetails() {
   if (loading) {
     return (
       <div className="min-h-[50vh] flex justify-center items-center font-sans">
-        <div className="font-serif text-2xl font-bold text-orange-500 animate-pulse tracking-tight">Caricamento annuncio...</div>
+        <div className="font-serif text-2xl font-bold text-primary animate-pulse tracking-tight">Caricamento annuncio...</div>
       </div>
     );
   }
@@ -57,9 +57,9 @@ export default function ListingDetails() {
     return (
       <div className="min-h-[50vh] flex flex-col justify-center items-center font-sans p-6 text-center">
         <div className="text-6xl mb-4 opacity-50">🏜️</div>
-        <h2 className="font-serif text-3xl font-extrabold text-neutral-900 mb-4 tracking-tight">Annuncio non trovato</h2>
-        <p className="text-neutral-500 mb-8 font-medium">L'annuncio che stai cercando potrebbe essere stato rimosso o non è più disponibile.</p>
-        <button onClick={() => navigate('/ricerca')} className="bg-neutral-900 hover:bg-neutral-800 text-white px-8 py-3.5 rounded-full font-bold shadow-md transition-all cursor-pointer">Torna alla Ricerca</button>
+        <h2 className="font-serif text-3xl font-extrabold text-foreground mb-4 tracking-tight">Annuncio non trovato</h2>
+        <p className="text-foreground-subtle mb-8 font-medium">L'annuncio che stai cercando potrebbe essere stato rimosso o non è più disponibile.</p>
+        <button onClick={() => navigate('/ricerca')} className="bg-foreground hover:bg-foreground/85 text-background px-8 py-3.5 rounded-full font-bold shadow-md transition-all cursor-pointer">Torna alla Ricerca</button>
       </div>
     );
   }
@@ -74,7 +74,7 @@ export default function ListingDetails() {
   ].filter(Boolean);
 
   return (
-    <div className="bg-[#FAFAFA] pb-12 font-sans selection:bg-orange-200">
+    <div className="bg-background pb-12 font-sans selection:bg-primary/25">
       <PageMeta title={`${listing.title} a ${listing.city} | RoomDate`} description={`Stanza ${listing.roomType} in affitto a ${listing.city}${listing.zone ? `, zona ${listing.zone}` : ''}.`} />
 
 
@@ -107,11 +107,11 @@ export default function ListingDetails() {
           
           {/* Galleria Immagini */}
           {hasImages ? (
-            <div className="relative w-full h-[300px] md:h-[450px] rounded-3xl overflow-hidden shadow-lg group bg-neutral-100 border border-neutral-200">
+            <div className="relative w-full h-[300px] md:h-[450px] rounded-3xl overflow-hidden shadow-lg group bg-surface-muted border border-line">
               {listing.images.length > 1 && (
                 <>
-                  <button onClick={prevImage} className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/80 backdrop-blur-md hover:bg-white text-neutral-900 rounded-full shadow-lg font-bold transition-all opacity-0 group-hover:opacity-100 cursor-pointer flex items-center justify-center text-lg z-10">❮</button>
-                  <button onClick={nextImage} className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/80 backdrop-blur-md hover:bg-white text-neutral-900 rounded-full shadow-lg font-bold transition-all opacity-0 group-hover:opacity-100 cursor-pointer flex items-center justify-center text-lg z-10">❯</button>
+                  <button onClick={prevImage} className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-surface/80 backdrop-blur-md hover:bg-surface text-foreground rounded-full shadow-lg font-bold transition-all opacity-0 group-hover:opacity-100 cursor-pointer flex items-center justify-center text-lg z-10">❮</button>
+                  <button onClick={nextImage} className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-surface/80 backdrop-blur-md hover:bg-surface text-foreground rounded-full shadow-lg font-bold transition-all opacity-0 group-hover:opacity-100 cursor-pointer flex items-center justify-center text-lg z-10">❯</button>
                   
                   {/* Contatore immagini */}
                   <div className="absolute bottom-4 right-4 bg-neutral-900/70 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 rounded-full z-10">
@@ -122,24 +122,24 @@ export default function ListingDetails() {
               <img src={listing.images[shownIndex].url} alt={`Foto ${shownIndex + 1} di ${imageCount}: ${listing.title}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
             </div>
           ) : (
-            <div className="w-full h-[240px] md:h-[300px] rounded-3xl bg-neutral-100 flex flex-col items-center justify-center gap-2 shadow-xs border border-neutral-200 text-neutral-400">
+            <div className="w-full h-[240px] md:h-[300px] rounded-3xl bg-surface-muted flex flex-col items-center justify-center gap-2 shadow-xs border border-line text-foreground-subtle">
               <span className="text-5xl">📷</span>
               <span className="font-bold text-sm">Nessuna foto caricata per questo annuncio</span>
             </div>
           )}
 
           {/* Dettagli Immobile */}
-          <div className="bg-white p-6 md:p-10 rounded-3xl shadow-xs border border-neutral-100">
-            <h2 className="font-serif text-2xl md:text-3xl font-extrabold text-neutral-900 mb-6 tracking-tight">Descrizione immobile</h2>
-            <p className="text-neutral-600 leading-relaxed text-lg whitespace-pre-line font-medium">{listing.description}</p>
+          <div className="bg-surface p-6 md:p-10 rounded-3xl shadow-xs border border-line">
+            <h2 className="font-serif text-2xl md:text-3xl font-extrabold text-foreground mb-6 tracking-tight">Descrizione immobile</h2>
+            <p className="text-foreground-muted leading-relaxed text-lg whitespace-pre-line font-medium">{listing.description}</p>
             
             {listing.amenities.length > 0 && (
-              <div className="border-t border-neutral-100 pt-8 mt-8">
-                <h3 className="font-serif text-2xl font-extrabold text-neutral-900 mb-6 tracking-tight">Cosa offre</h3>
+              <div className="border-t border-line pt-8 mt-8">
+                <h3 className="font-serif text-2xl font-extrabold text-foreground mb-6 tracking-tight">Cosa offre</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {listing.amenities.map(a => (
-                    <div key={a} className="flex items-center gap-3 text-neutral-700 font-bold bg-neutral-50 border border-neutral-100 px-5 py-3.5 rounded-2xl">
-                      <span className="text-orange-500 text-lg">✦</span> {amenityLabel(a)}
+                    <div key={a} className="flex items-center gap-3 text-foreground-muted font-bold bg-background border border-line px-5 py-3.5 rounded-2xl">
+                      <span className="text-primary text-lg">✦</span> {amenityLabel(a)}
                     </div>
                   ))}
                 </div>
@@ -152,16 +152,16 @@ export default function ListingDetails() {
         <aside className="w-full lg:w-1/3">
           <div className="sticky top-28 flex flex-col gap-6 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             
-            <div className="bg-white p-8 rounded-3xl shadow-xl border border-neutral-100 text-center relative overflow-hidden">
+            <div className="bg-surface p-8 rounded-3xl shadow-xl border border-line text-center relative overflow-hidden">
               {/* Orb decorativo interno */}
               <div className="absolute top-0 right-0 w-32 h-32 bg-orange-400/10 blur-[50px] rounded-full pointer-events-none"></div>
 
               {/* Box Prezzo */}
-              <div className="bg-orange-50/50 p-6 rounded-3xl mb-8 border border-orange-100 shadow-xs relative z-10">
+              <div className="bg-primary-soft/50 p-6 rounded-3xl mb-8 border border-primary/20 shadow-xs relative z-10">
                 <div className="font-serif text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-linear-to-r from-orange-500 to-rose-500 tracking-tight">
                   €{listing.price}
                 </div>
-                <div className="text-sm font-bold text-neutral-500 mt-2 uppercase tracking-wider">al mese{listing.billsIncluded !== null && (listing.billsIncluded ? ', spese incluse' : ', spese escluse')}</div>
+                <div className="text-sm font-bold text-foreground-subtle mt-2 uppercase tracking-wider">al mese{listing.billsIncluded !== null && (listing.billsIncluded ? ', spese incluse' : ', spese escluse')}</div>
               </div>
               
               {/* Profilo Host */}
@@ -169,19 +169,19 @@ export default function ListingDetails() {
                 <div className="w-24 h-24 mx-auto rounded-full flex items-center justify-center text-5xl mb-5 shadow-md bg-linear-to-br from-orange-300 to-rose-400 transform transition-transform hover:scale-105 cursor-default">
                   <span className="drop-shadow-xs text-white font-bold">{(listing.owner.firstName || '?').charAt(0).toUpperCase()}</span>
                 </div>
-                <h3 className="font-serif text-2xl font-extrabold text-neutral-900 mb-1">{listing.owner.firstName}</h3>
-                <p className="text-sm font-bold text-neutral-400 mb-8 uppercase tracking-wider">Host su RoomDate</p>
+                <h3 className="font-serif text-2xl font-extrabold text-foreground mb-1">{listing.owner.firstName}</h3>
+                <p className="text-sm font-bold text-foreground-subtle mb-8 uppercase tracking-wider">Host su RoomDate</p>
                 
                 {listing.isOwner && listing.removed ? (
-                  <p className="text-sm font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-2xl p-3" data-testid="listing-removed">
+                  <p className="text-sm font-medium text-danger bg-danger-soft border border-danger/30 rounded-2xl p-3" data-testid="listing-removed">
                     Questo annuncio è stato rimosso dalla moderazione perché viola i Termini di utilizzo: lo vedi solo tu e puoi solo eliminarlo dalla tua area personale.
                   </p>
                 ) : listing.isOwner ? (
                   <>
                     {!listing.isActive && (
-                      <p className="mb-4 text-sm font-medium text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-2xl p-3">Questo annuncio è disattivato: lo vedi solo tu.</p>
+                      <p className="mb-4 text-sm font-medium text-foreground-muted bg-background border border-line rounded-2xl p-3">Questo annuncio è disattivato: lo vedi solo tu.</p>
                     )}
-                    <button onClick={() => navigate('/dashboard', { state: { editListingId: listing.id } })} className="w-full bg-neutral-900 text-white py-4.5 rounded-2xl font-bold shadow-lg hover:bg-neutral-800 transition-all duration-300 text-lg flex items-center justify-center gap-2 cursor-pointer">
+                    <button onClick={() => navigate('/dashboard', { state: { editListingId: listing.id } })} className="w-full bg-foreground text-background py-4.5 rounded-2xl font-bold shadow-lg hover:bg-foreground/85 transition-all duration-300 text-lg flex items-center justify-center gap-2 cursor-pointer">
                       ✏️ Modifica annuncio
                     </button>
                   </>
@@ -192,7 +192,7 @@ export default function ListingDetails() {
                       <span className="text-xl">💬</span> Contatta in Chat
                     </button>
                     {user && (
-                      <button type="button" onClick={() => setReporting(true)} className="mt-5 text-sm font-bold text-neutral-500 hover:text-rose-600 transition-colors cursor-pointer">
+                      <button type="button" onClick={() => setReporting(true)} className="mt-5 text-sm font-bold text-foreground-subtle hover:text-danger transition-colors cursor-pointer">
                         🚩 Segnala annuncio
                       </button>
                     )}
@@ -202,10 +202,10 @@ export default function ListingDetails() {
             </div>
 
             {/* Banner Sicurezza */}
-            <div className="bg-neutral-50 border border-neutral-100 p-6 rounded-3xl text-center shadow-xs">
+            <div className="bg-background border border-line p-6 rounded-3xl text-center shadow-xs">
               <div className="text-2xl mb-2">🛡️</div>
-              <h4 className="font-bold text-neutral-900 mb-2">Consigli di sicurezza</h4>
-              <p className="text-xs text-neutral-500 font-medium leading-relaxed">Le chat sono cifrate end-to-end. Non inviare denaro prima di aver visitato la stanza e incontrato chi la affitta.</p>
+              <h4 className="font-bold text-foreground mb-2">Consigli di sicurezza</h4>
+              <p className="text-xs text-foreground-subtle font-medium leading-relaxed">Le chat sono cifrate end-to-end. Non inviare denaro prima di aver visitato la stanza e incontrato chi la affitta.</p>
             </div>
 
           </div>

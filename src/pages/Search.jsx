@@ -100,25 +100,25 @@ export default function Search() {
   };
 
   return (
-    <div className="bg-[#FAFAFA] font-sans selection:bg-orange-200">
+    <div className="bg-background font-sans selection:bg-primary/25">
       <PageMeta title="Ricerca | RoomDate" />
       
 
       {/* --- HERO / FILTRI --- */}
-      <div className="bg-white border-b border-neutral-100 px-6 py-12 flex justify-center relative overflow-hidden">
+      <div className="bg-surface border-b border-line px-6 py-12 flex justify-center relative overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-orange-400/10 blur-[100px] rounded-full pointer-events-none"></div>
         
         <div className="w-full max-w-3xl relative z-10 text-center">
           
-          <div className="flex gap-2 bg-neutral-100 p-1.5 rounded-2xl mb-8 max-w-md mx-auto shadow-inner">
+          <div className="flex gap-2 bg-surface-muted p-1.5 rounded-2xl mb-8 max-w-md mx-auto shadow-inner">
             <button 
-              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${currentIntent === 'stanza' ? 'bg-white text-neutral-900 shadow-xs' : 'text-neutral-500 hover:text-neutral-900'}`} 
+              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${currentIntent === 'stanza' ? 'bg-surface text-foreground shadow-xs' : 'text-foreground-subtle hover:text-foreground'}`} 
               onClick={() => setFilters({ intent: 'stanza' })}
             >
               🔍 Cerca Stanza
             </button>
             <button 
-              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${currentIntent === 'coinquilino' ? 'bg-white text-neutral-900 shadow-xs' : 'text-neutral-500 hover:text-neutral-900'}`} 
+              className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${currentIntent === 'coinquilino' ? 'bg-surface text-foreground shadow-xs' : 'text-foreground-subtle hover:text-foreground'}`} 
               onClick={() => setFilters({ intent: 'coinquilino', tipo: '', spese: '', ordina: '' })}
             >
               👥 Cerca Coinquilini
@@ -129,7 +129,7 @@ export default function Search() {
             <select 
               name="citta"
               aria-label="Città"
-              className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 text-base rounded-2xl px-5 py-4 focus:outline-hidden focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium cursor-pointer"
+              className="w-full bg-background border border-line text-foreground text-base rounded-2xl px-5 py-4 focus:outline-hidden focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium cursor-pointer"
               value={currentCity} 
               onChange={(e) => setFilters({ citta: e.target.value })}
             >
@@ -144,7 +144,7 @@ export default function Search() {
               max={MAX_BUDGET}
               aria-label={currentIntent === 'stanza' ? 'Budget massimo al mese' : 'Budget minimo del coinquilino'}
               placeholder={currentIntent === 'stanza' ? "💶 Budget max (€/mese)" : "💶 Budget del coinquilino da (€)"} 
-              className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 text-base rounded-2xl px-5 py-4 focus:outline-hidden focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium placeholder:text-neutral-400"
+              className="w-full bg-background border border-line text-foreground text-base rounded-2xl px-5 py-4 focus:outline-hidden focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium placeholder:text-foreground-subtle"
               value={budgetInput}
               onChange={(e) => setBudgetInput(e.target.value)}
             />
@@ -152,17 +152,17 @@ export default function Search() {
 
           {currentIntent === 'stanza' && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
-              <select name="tipo" aria-label="Tipo di stanza" className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 text-base rounded-2xl px-5 py-4 focus:outline-hidden focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium cursor-pointer" value={currentRoomType} onChange={(e) => setFilters({ tipo: e.target.value })}>
+              <select name="tipo" aria-label="Tipo di stanza" className="w-full bg-background border border-line text-foreground text-base rounded-2xl px-5 py-4 focus:outline-hidden focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium cursor-pointer" value={currentRoomType} onChange={(e) => setFilters({ tipo: e.target.value })}>
                 <option value="">🏠 Singola o doppia</option>
                 <option value="singola">Solo singole</option>
                 <option value="doppia">Solo doppie</option>
               </select>
-              <select name="spese" aria-label="Spese" className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 text-base rounded-2xl px-5 py-4 focus:outline-hidden focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium cursor-pointer" value={currentBills} onChange={(e) => setFilters({ spese: e.target.value })}>
+              <select name="spese" aria-label="Spese" className="w-full bg-background border border-line text-foreground text-base rounded-2xl px-5 py-4 focus:outline-hidden focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium cursor-pointer" value={currentBills} onChange={(e) => setFilters({ spese: e.target.value })}>
                 <option value="">💡 Spese: indifferente</option>
                 <option value="true">Solo con spese incluse</option>
                 <option value="false">Solo con spese escluse</option>
               </select>
-              <select name="ordina" aria-label="Ordinamento" className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 text-base rounded-2xl px-5 py-4 focus:outline-hidden focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium cursor-pointer" value={currentSort} onChange={(e) => setFilters({ ordina: e.target.value })}>
+              <select name="ordina" aria-label="Ordinamento" className="w-full bg-background border border-line text-foreground text-base rounded-2xl px-5 py-4 focus:outline-hidden focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium cursor-pointer" value={currentSort} onChange={(e) => setFilters({ ordina: e.target.value })}>
                 <option value="recenti">↕️ Più recenti</option>
                 <option value="prezzo">Prezzo crescente</option>
                 <option value="prezzo-desc">Prezzo decrescente</option>
@@ -175,39 +175,39 @@ export default function Search() {
       {/* --- RISULTATI --- */}
       <div className="max-w-7xl mx-auto px-6 py-12 animate-fade-in-up">
         <div>
-          <h1 className="font-serif text-3xl md:text-5xl text-neutral-900 mb-3 tracking-tight font-extrabold">
+          <h1 className="font-serif text-3xl md:text-5xl text-foreground mb-3 tracking-tight font-extrabold">
             {currentIntent === 'coinquilino' ? 'Coinquilini disponibili' : 'Stanze in affitto'}
           </h1>
-          <p className="text-neutral-500 mb-10 font-medium text-lg">
-            {activeQuery.hasNextPage ? 'Mostrati' : 'Trovati'} <span className="font-bold text-orange-500">{results.length}</span> risultati {currentCity && `a ${currentCity}`}
+          <p className="text-foreground-subtle mb-10 font-medium text-lg">
+            {activeQuery.hasNextPage ? 'Mostrati' : 'Trovati'} <span className="font-bold text-primary">{results.length}</span> risultati {currentCity && `a ${currentCity}`}
           </p>
 
           {activeQuery.isError ? (
-            <div className="bg-white rounded-3xl border border-rose-200 p-16 text-center shadow-xs">
-              <h3 className="font-serif text-2xl text-neutral-900 mb-3 font-extrabold">Impossibile caricare i risultati</h3>
-              <p className="text-neutral-500 mb-8 font-medium">{activeQuery.error.message}</p>
-              <button className="bg-neutral-900 text-white px-8 py-3.5 rounded-full font-bold cursor-pointer" onClick={() => activeQuery.refetch()}>Riprova</button>
+            <div className="bg-surface rounded-3xl border border-danger/30 p-16 text-center shadow-xs">
+              <h3 className="font-serif text-2xl text-foreground mb-3 font-extrabold">Impossibile caricare i risultati</h3>
+              <p className="text-foreground-subtle mb-8 font-medium">{activeQuery.error.message}</p>
+              <button className="bg-foreground text-background px-8 py-3.5 rounded-full font-bold cursor-pointer" onClick={() => activeQuery.refetch()}>Riprova</button>
             </div>
           ) : loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {[1, 2, 3, 4, 5, 6].map((n) => (
-                <div key={n} className="bg-white rounded-3xl shadow-xs border border-neutral-100 flex flex-col h-full min-h-[380px]">
-                  <div className="h-48 w-full bg-neutral-100 animate-pulse rounded-t-3xl"></div>
+                <div key={n} className="bg-surface rounded-3xl shadow-xs border border-line flex flex-col h-full min-h-[380px]">
+                  <div className="h-48 w-full bg-surface-muted animate-pulse rounded-t-3xl"></div>
                   <div className="p-6 flex flex-col gap-4 grow">
-                    <div className="h-6 w-3/4 bg-neutral-100 animate-pulse rounded-md"></div>
-                    <div className="h-4 w-1/2 bg-neutral-100 animate-pulse rounded-md"></div>
-                    <div className="h-12 w-full bg-neutral-100 animate-pulse rounded-2xl mt-auto"></div>
+                    <div className="h-6 w-3/4 bg-surface-muted animate-pulse rounded-md"></div>
+                    <div className="h-4 w-1/2 bg-surface-muted animate-pulse rounded-md"></div>
+                    <div className="h-12 w-full bg-surface-muted animate-pulse rounded-2xl mt-auto"></div>
                   </div>
                 </div>
               ))}
             </div>
           ) : results.length === 0 ? (
-            <div className="bg-white rounded-3xl border border-dashed border-neutral-200 p-16 text-center shadow-xs">
+            <div className="bg-surface rounded-3xl border border-dashed border-line p-16 text-center shadow-xs">
               <span className="text-6xl block mb-6 opacity-50">🏜️</span>
-              <h3 className="font-serif text-2xl text-neutral-900 mb-3 font-extrabold">Nessun risultato trovato</h3>
-              <p className="text-neutral-500 mb-8 font-medium">Non ci sono {currentIntent === 'coinquilino' ? 'profili in cerca' : 'stanze'} che corrispondono ai tuoi criteri.</p>
+              <h3 className="font-serif text-2xl text-foreground mb-3 font-extrabold">Nessun risultato trovato</h3>
+              <p className="text-foreground-subtle mb-8 font-medium">Non ci sono {currentIntent === 'coinquilino' ? 'profili in cerca' : 'stanze'} che corrispondono ai tuoi criteri.</p>
               <button 
-                className="bg-white border border-neutral-200 hover:border-orange-300 text-neutral-900 px-8 py-3.5 rounded-full font-bold transition-all shadow-xs cursor-pointer"
+                className="bg-surface border border-line hover:border-primary/50 text-foreground px-8 py-3.5 rounded-full font-bold transition-all shadow-xs cursor-pointer"
                 onClick={() => setFilters({ citta: '', budget: '', tipo: '', spese: '' })}
               >
                 Azzera Filtri
@@ -219,26 +219,26 @@ export default function Search() {
               {results.map(item => {
                 if (currentIntent === 'stanza') {
                   return (
-                    <div key={item.id} className="w-full bg-white rounded-3xl shadow-xs border border-neutral-100 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-orange-100 cursor-pointer overflow-hidden group">
-                      <div className="h-52 flex items-center justify-center relative overflow-hidden bg-neutral-100">
+                    <div key={item.id} className="w-full bg-surface rounded-3xl shadow-xs border border-line flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-primary/20 cursor-pointer overflow-hidden group">
+                      <div className="h-52 flex items-center justify-center relative overflow-hidden bg-surface-muted">
                         {item.coverUrl
                           ? <img src={item.coverUrl} alt="" loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                          : <span className="text-sm font-bold text-neutral-400">📷 Nessuna foto</span>}
-                        <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-2xl shadow-xs">
-                          <span className="font-extrabold text-lg text-orange-500">€{item.price}</span><span className="text-[11px] text-neutral-500 font-bold">/mese</span>
+                          : <span className="text-sm font-bold text-foreground-subtle">📷 Nessuna foto</span>}
+                        <div className="absolute bottom-4 right-4 bg-surface/95 backdrop-blur-md px-4 py-1.5 rounded-2xl shadow-xs">
+                          <span className="font-extrabold text-lg text-primary">€{item.price}</span><span className="text-[11px] text-foreground-subtle font-bold">/mese</span>
                         </div>
                       </div>
-                      <div className="p-6 flex flex-col grow bg-white relative z-10">
-                        <h3 className="font-bold text-lg text-neutral-900 leading-tight mb-2 truncate" title={item.title}>{item.title}</h3>
-                        <p className="text-sm text-neutral-500 mb-5 font-medium truncate">
+                      <div className="p-6 flex flex-col grow bg-surface relative z-10">
+                        <h3 className="font-bold text-lg text-foreground leading-tight mb-2 truncate" title={item.title}>{item.title}</h3>
+                        <p className="text-sm text-foreground-subtle mb-5 font-medium truncate">
                           📍 {item.zone ? `${item.zone}, ${item.city}` : item.city}
                         </p>
                         <div className="flex flex-wrap gap-2 mb-6">
-                          {[item.roomType, formatBills(item.billsIncluded), formatAvailability(item.availableFrom)].filter(Boolean).map(t => <span key={t} className="bg-neutral-50 border border-neutral-100 text-neutral-600 px-2.5 py-1 rounded-lg text-[11px] font-bold">{t}</span>)}
+                          {[item.roomType, formatBills(item.billsIncluded), formatAvailability(item.availableFrom)].filter(Boolean).map(t => <span key={t} className="bg-background border border-line text-foreground-muted px-2.5 py-1 rounded-lg text-[11px] font-bold">{t}</span>)}
                         </div>
                         <Link 
                             to={`/dettagli/${item.id}`} 
-                            className="mt-auto block text-center bg-white border border-neutral-200 text-neutral-600 py-3 rounded-2xl font-bold transition-colors group-hover:bg-neutral-900 group-hover:border-neutral-900 group-hover:text-white"
+                            className="mt-auto block text-center bg-surface border border-line text-foreground-muted py-3 rounded-2xl font-bold transition-colors group-hover:bg-foreground group-hover:border-foreground group-hover:text-background"
                           >
                           Vedi dettagli
                         </Link>                      
@@ -248,24 +248,24 @@ export default function Search() {
                 } else {
                   const details = [formatAge(item.age), occupationLabel(item.occupation) ?? 'Occupazione non indicata'].filter(Boolean).join(' · ');
                   return (
-                    <div key={item.id} data-testid="roommate-card" className="w-full bg-white rounded-3xl shadow-xs border border-neutral-100 p-6 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-orange-100 group relative overflow-hidden">
+                    <div key={item.id} data-testid="roommate-card" className="w-full bg-surface rounded-3xl shadow-xs border border-line p-6 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-primary/20 group relative overflow-hidden">
                       <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-400/10 rounded-full blur-2xl"></div>
                       
                       <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold text-white mx-auto mb-4 shadow-xs relative z-10 bg-linear-to-br from-orange-400 to-rose-500 transition-transform duration-500 group-hover:scale-110">
                         {(item.firstName || '?').charAt(0).toUpperCase()}
                       </div>
-                      <div className="text-center font-bold text-neutral-900 text-lg relative z-10 truncate">{item.firstName || 'Utente'}</div>
-                      <div className="text-center text-xs text-neutral-500 mb-1 font-bold uppercase tracking-wider relative z-10">{details}</div>
-                      {item.city && <div className="text-center text-xs text-neutral-500 mb-4 font-medium relative z-10">📍 {item.city}</div>}
+                      <div className="text-center font-bold text-foreground text-lg relative z-10 truncate">{item.firstName || 'Utente'}</div>
+                      <div className="text-center text-xs text-foreground-subtle mb-1 font-bold uppercase tracking-wider relative z-10">{details}</div>
+                      {item.city && <div className="text-center text-xs text-foreground-subtle mb-4 font-medium relative z-10">📍 {item.city}</div>}
                       
-                      <div className="bg-neutral-50 p-4 rounded-2xl text-sm text-neutral-600 italic text-center mb-5 leading-relaxed relative z-10 border border-neutral-100 line-clamp-3">{item.bio ? `"${item.bio}"` : 'Nessuna presentazione'}</div>
+                      <div className="bg-background p-4 rounded-2xl text-sm text-foreground-muted italic text-center mb-5 leading-relaxed relative z-10 border border-line line-clamp-3">{item.bio ? `"${item.bio}"` : 'Nessuna presentazione'}</div>
                       
                       <div className="flex flex-wrap justify-center gap-1.5 mb-5 relative z-10">
-                        <LifestyleTags tags={item.lifestyleTags} limit={4} className="bg-orange-50 text-orange-600 border border-orange-100 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider" />
+                        <LifestyleTags tags={item.lifestyleTags} limit={4} className="bg-primary-soft text-primary border border-primary/20 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider" />
                       </div>
 
                       {item.budgetMax > 0 && (
-                        <div className="text-center text-sm font-extrabold text-orange-500 mb-5 relative z-10 bg-white border border-neutral-100 py-2 rounded-xl shadow-xs">
+                        <div className="text-center text-sm font-extrabold text-primary mb-5 relative z-10 bg-surface border border-line py-2 rounded-xl shadow-xs">
                            Budget max: €{item.budgetMax}
                         </div>
                       )}
@@ -279,13 +279,13 @@ export default function Search() {
                       <div className="flex flex-col gap-2 relative z-10 mt-auto">
                         <Link 
                           to={`/coinquilino/${item.id}`} 
-                          className="w-full block text-center bg-white border border-neutral-200 text-neutral-600 py-3 rounded-2xl font-bold transition-all hover:bg-neutral-50"
+                          className="w-full block text-center bg-surface border border-line text-foreground-muted py-3 rounded-2xl font-bold transition-all hover:bg-background"
                         >
                           Profilo completo
                         </Link>
                         <button 
                           onClick={() => handleDirectContact(item.id)} 
-                          className="w-full bg-neutral-900 text-white py-3 rounded-2xl font-bold transition-all hover:bg-neutral-800 shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                          className="w-full bg-foreground text-background py-3 rounded-2xl font-bold transition-all hover:bg-foreground/85 shadow-md flex items-center justify-center gap-2 cursor-pointer"
                         >
                           <span className="text-lg">💬</span> Contatta
                         </button>   
@@ -302,7 +302,7 @@ export default function Search() {
               <button
                 onClick={() => activeQuery.fetchNextPage()}
                 disabled={activeQuery.isFetchingNextPage}
-                className="bg-white border border-neutral-200 hover:border-orange-300 text-neutral-900 px-8 py-3.5 rounded-full font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                className="bg-surface border border-line hover:border-primary/50 text-foreground px-8 py-3.5 rounded-full font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
               >
                 {activeQuery.isFetchingNextPage ? 'Caricamento...' : (currentIntent === 'coinquilino' ? 'Carica altri profili' : 'Carica altri annunci')}
               </button>

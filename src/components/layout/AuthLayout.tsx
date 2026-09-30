@@ -6,6 +6,7 @@ import { cn, focusRing } from '../ui/cn';
 import type { RouteHandle } from './layoutContext';
 import Logo from './Logo';
 import SkipLink from './SkipLink';
+import ThemeToggle from './ThemeToggle';
 
 /**
  * Accesso, registrazione e recupero: solo il marchio e una via d'uscita, niente che distragga dal
@@ -27,12 +28,15 @@ export default function AuthLayout() {
               <ArrowLeft className="size-4" aria-hidden="true" /> Torna al sito
             </Link>
           </div>
-          {authSwitch && (
-            <p className="text-sm text-foreground-muted">
-              <span className="hidden sm:inline">{authSwitch.text} </span>
-              <Link to={authSwitch.to} state={state} className={cn('rounded-sm font-bold text-primary hover:text-primary-hover', focusRing)}>{authSwitch.label}</Link>
-            </p>
-          )}
+          <div className="flex items-center gap-2">
+            {authSwitch && (
+              <p className="text-sm text-foreground-muted">
+                <span className="hidden sm:inline">{authSwitch.text} </span>
+                <Link to={authSwitch.to} state={state} className={cn('rounded-sm font-bold text-primary hover:text-primary-hover', focusRing)}>{authSwitch.label}</Link>
+              </p>
+            )}
+            <ThemeToggle />
+          </div>
         </div>
       </header>
       <main id="contenuto" tabIndex={-1} className="flex flex-1 flex-col outline-none pb-[env(safe-area-inset-bottom)]">

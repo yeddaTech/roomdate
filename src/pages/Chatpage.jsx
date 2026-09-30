@@ -327,7 +327,7 @@ export default function ChatPage() {
   ];
 
   return (
-    <div className="flex flex-col h-full w-full max-w-[100vw] bg-white font-sans overflow-hidden selection:bg-orange-200">
+    <div className="flex flex-col h-full w-full max-w-[100vw] bg-surface font-sans overflow-hidden selection:bg-primary/25">
       <PageMeta title="Area Privata | RoomDate" noindex />
 
       {/* STILI PER L'ANIMAZIONE DEI 3 PUNTINI E SCROLLBAR */}
@@ -379,44 +379,44 @@ export default function ChatPage() {
       
 
       {/* ── LAYOUT CHAT CONTAINER ── */}
-      <div className="flex-1 min-h-0 flex overflow-hidden relative w-full bg-white">
+      <div className="flex-1 min-h-0 flex overflow-hidden relative w-full bg-surface">
 
         {/* ── SIDEBAR LISTA CHAT ── */}
-        <aside className={`${mobileView === 'chat' ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[380px] bg-white border-r border-neutral-100 flex-col h-full shrink-0 z-10`}>
-          <div className="p-5 border-b border-neutral-100 shrink-0 bg-white">
-            <h2 className="text-2xl text-neutral-900 font-extrabold mb-4 tracking-tight">Messaggi</h2>
+        <aside className={`${mobileView === 'chat' ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[380px] bg-surface border-r border-line flex-col h-full shrink-0 z-10`}>
+          <div className="p-5 border-b border-line shrink-0 bg-surface">
+            <h2 className="text-2xl text-foreground font-extrabold mb-4 tracking-tight">Messaggi</h2>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400">🔍</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground-subtle">🔍</span>
               <input
                 type="text"
                 placeholder="Cerca conversazioni..."
-                className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 text-base md:text-sm rounded-2xl pl-11 pr-4 py-3 focus:outline-hidden focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all placeholder:text-neutral-400"
+                className="w-full bg-background border border-line text-foreground text-base md:text-sm rounded-2xl pl-11 pr-4 py-3 focus:outline-hidden focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-foreground-subtle"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar bg-white">
+          <div className="flex-1 overflow-y-auto custom-scrollbar bg-surface">
             {conversationsQuery.isPending ? (
               [1, 2, 3, 4, 5].map((n) => (
-                <div key={n} className="flex gap-4 p-5 border-b border-neutral-50 pointer-events-none">
-                  <div className="w-14 h-14 bg-neutral-100 animate-pulse rounded-full shrink-0"></div>
+                <div key={n} className="flex gap-4 p-5 border-b border-line pointer-events-none">
+                  <div className="w-14 h-14 bg-surface-muted animate-pulse rounded-full shrink-0"></div>
                   <div className="flex flex-col gap-2 w-full justify-center">
-                    <div className="h-4 w-3/5 bg-neutral-100 animate-pulse rounded-md"></div>
-                    <div className="h-3 w-2/5 bg-neutral-100 animate-pulse rounded-md"></div>
+                    <div className="h-4 w-3/5 bg-surface-muted animate-pulse rounded-md"></div>
+                    <div className="h-3 w-2/5 bg-surface-muted animate-pulse rounded-md"></div>
                   </div>
                 </div>
               ))
             ) : conversationsQuery.isError ? (
               <div className="p-10 text-center flex flex-col items-center gap-4">
-                <p className="font-medium text-neutral-500">{conversationsQuery.error.message}</p>
-                <button onClick={() => conversationsQuery.refetch()} className="bg-neutral-900 text-white px-6 py-3 rounded-2xl font-bold cursor-pointer">Riprova</button>
+                <p className="font-medium text-foreground-subtle">{conversationsQuery.error.message}</p>
+                <button onClick={() => conversationsQuery.refetch()} className="bg-foreground text-background px-6 py-3 rounded-2xl font-bold cursor-pointer">Riprova</button>
               </div>
             ) : filteredConvs.length === 0 ? (
-              <div className="p-12 text-center flex flex-col items-center justify-center h-full text-neutral-400">
+              <div className="p-12 text-center flex flex-col items-center justify-center h-full text-foreground-subtle">
                 <div className="text-6xl mb-4 opacity-50">📭</div>
-                <p className="font-medium text-neutral-500">Nessuna conversazione trovata.</p>
+                <p className="font-medium text-foreground-subtle">Nessuna conversazione trovata.</p>
               </div>
             ) : (
               <>
@@ -426,33 +426,33 @@ export default function ChatPage() {
                     <div
                       key={conversation.id}
                       data-testid="conversation"
-                      className={`flex gap-4 p-5 cursor-pointer transition-all border-b border-neutral-50/50 ${isActive ? 'bg-orange-50/50 relative' : 'hover:bg-neutral-50'}`}
+                      className={`flex gap-4 p-5 cursor-pointer transition-all border-b border-line/50 ${isActive ? 'bg-primary-soft/50 relative' : 'hover:bg-background'}`}
                       onClick={() => handleSelectConv(conversation)}
                     >
-                      {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500 rounded-r-md"></div>}
+                      {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-md"></div>}
                       <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white shrink-0 shadow-xs bg-linear-to-br from-orange-400 to-rose-500">
                         <span className="drop-shadow-xs">{initial(nameOf(conversation))}</span>
                       </div>
                       <div className="flex flex-col justify-center overflow-hidden w-full">
                         <div className="flex justify-between items-center gap-2">
-                          <div className="font-bold text-neutral-900 text-[15px] truncate">{nameOf(conversation)}</div>
+                          <div className="font-bold text-foreground text-[15px] truncate">{nameOf(conversation)}</div>
                           <div className="flex items-center gap-2 shrink-0">
                             {conversation.lastMessage && (
-                              <span className="text-[11px] text-neutral-400 font-medium">{shortDateLabel(conversation.lastMessage.createdAt)}</span>
+                              <span className="text-[11px] text-foreground-subtle font-medium">{shortDateLabel(conversation.lastMessage.createdAt)}</span>
                             )}
                             {conversation.unreadCount > 0 && (
-                              <span data-testid="unread-badge" className="bg-orange-500 text-white text-[11px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">
+                              <span data-testid="unread-badge" className="bg-primary text-primary-foreground text-[11px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">
                                 {conversation.unreadCount}
                               </span>
                             )}
                           </div>
                         </div>
                         {conversation.listing && (
-                          <div className="text-[10px] text-orange-600 font-extrabold mb-0.5 truncate uppercase tracking-wider">
+                          <div className="text-[10px] text-primary font-extrabold mb-0.5 truncate uppercase tracking-wider">
                             🏠 {conversation.listing.title}
                           </div>
                         )}
-                        <div className={`text-sm truncate mt-0.5 ${conversation.unreadCount > 0 ? 'text-neutral-900 font-semibold' : 'text-neutral-500'}`}>
+                        <div className={`text-sm truncate mt-0.5 ${conversation.unreadCount > 0 ? 'text-foreground font-semibold' : 'text-foreground-subtle'}`}>
                           {typingIn === conversation.id ? (
                             <div className="flex gap-0.5 items-center mt-1">
                               <span className="typing-dot-sidebar"></span>
@@ -471,7 +471,7 @@ export default function ChatPage() {
                   <button
                     onClick={() => conversationsQuery.fetchNextPage()}
                     disabled={conversationsQuery.isFetchingNextPage}
-                    className="w-full py-4 text-sm font-bold text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer"
+                    className="w-full py-4 text-sm font-bold text-foreground-subtle hover:text-foreground transition-colors cursor-pointer"
                   >
                     {conversationsQuery.isFetchingNextPage ? 'Caricamento...' : 'Carica altre conversazioni'}
                   </button>
@@ -482,36 +482,36 @@ export default function ChatPage() {
         </aside>
 
         {/* ── CHAT MAIN AREA ── */}
-        <section aria-label="Conversazione" className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 min-w-0 flex-col h-full bg-[#FAFAFA] w-full max-w-full relative`}>
+        <section aria-label="Conversazione" className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 min-w-0 flex-col h-full bg-background w-full max-w-full relative`}>
           {!activeConv ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-[#FAFAFA]">
-              <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-xs mb-6 border border-neutral-100">
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-background">
+              <div className="w-24 h-24 bg-surface rounded-full flex items-center justify-center shadow-xs mb-6 border border-line">
                 <span className="text-4xl opacity-50">💬</span>
               </div>
-              <h3 className="text-2xl text-neutral-900 mb-2 font-extrabold tracking-tight">I tuoi messaggi</h3>
-              <p className="text-neutral-500 font-medium max-w-xs">Seleziona una conversazione dalla barra laterale per iniziare a chattare.</p>
+              <h3 className="text-2xl text-foreground mb-2 font-extrabold tracking-tight">I tuoi messaggi</h3>
+              <p className="text-foreground-subtle font-medium max-w-xs">Seleziona una conversazione dalla barra laterale per iniziare a chattare.</p>
             </div>
           ) : (
             <>
               {/* Header Chat Attiva */}
-              <div className="bg-white/90 backdrop-blur-md px-4 md:px-6 py-4 border-b border-neutral-100 flex items-center gap-4 shrink-0 shadow-xs z-10 w-full">
-                <button className="md:hidden text-2xl text-neutral-500 hover:text-neutral-900 px-2 cursor-pointer transition-colors" onClick={() => setMobileView('list')}>←</button>
+              <div className="bg-surface/90 backdrop-blur-md px-4 md:px-6 py-4 border-b border-line flex items-center gap-4 shrink-0 shadow-xs z-10 w-full">
+                <button className="md:hidden text-2xl text-foreground-subtle hover:text-foreground px-2 cursor-pointer transition-colors" onClick={() => setMobileView('list')}>←</button>
                 <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-xs shrink-0 bg-linear-to-br from-orange-400 to-rose-500">
                   <span className="drop-shadow-xs">{initial(nameOf(activeConv))}</span>
                 </div>
                 <div className="overflow-hidden flex-1 min-w-0">
-                  <h3 className="font-bold text-neutral-900 leading-tight truncate text-lg">{nameOf(activeConv)}</h3>
-                  <p className="text-xs text-neutral-500 font-medium truncate h-4 mt-0.5">
+                  <h3 className="font-bold text-foreground leading-tight truncate text-lg">{nameOf(activeConv)}</h3>
+                  <p className="text-xs text-foreground-subtle font-medium truncate h-4 mt-0.5">
                     {activeConv.listing ? `🏠 ${activeConv.listing.title} · €${activeConv.listing.price}/mese` : 'Chat diretta'}
                   </p>
                 </div>
                 {activeConv.other && (
                   <div className="flex items-center gap-1 shrink-0">
-                    <button type="button" onClick={() => setReporting(true)} className="text-sm font-bold text-neutral-500 hover:text-rose-600 px-3 py-2 rounded-full hover:bg-neutral-50 transition-colors cursor-pointer">
+                    <button type="button" onClick={() => setReporting(true)} className="text-sm font-bold text-foreground-subtle hover:text-danger px-3 py-2 rounded-full hover:bg-background transition-colors cursor-pointer">
                       🚩 <span className="hidden sm:inline">Segnala</span>
                     </button>
                     {activeConv.blocked !== 'by_other' && (
-                      <button type="button" onClick={handleBlockToggle} disabled={blockUser.isPending || unblockUser.isPending} className="text-sm font-bold text-neutral-500 hover:text-rose-600 px-3 py-2 rounded-full hover:bg-neutral-50 transition-colors cursor-pointer">
+                      <button type="button" onClick={handleBlockToggle} disabled={blockUser.isPending || unblockUser.isPending} className="text-sm font-bold text-foreground-subtle hover:text-danger px-3 py-2 rounded-full hover:bg-background transition-colors cursor-pointer">
                         {activeConv.blocked === 'by_me' ? '✅' : '🚫'} <span className="hidden sm:inline">{activeConv.blocked === 'by_me' ? 'Sblocca' : 'Blocca'}</span>
                       </button>
                     )}
@@ -520,19 +520,19 @@ export default function ChatPage() {
               </div>
 
               {/* Area Messaggi */}
-              <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 flex flex-col gap-6 w-full custom-scrollbar bg-[#FAFAFA]">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 flex flex-col gap-6 w-full custom-scrollbar bg-background">
                 {messagesQuery.hasNextPage && (
                   <button
                     onClick={() => messagesQuery.fetchNextPage()}
                     disabled={messagesQuery.isFetchingNextPage}
-                    className="self-center bg-white border border-neutral-200 text-neutral-600 text-sm font-bold px-5 py-2.5 rounded-full hover:bg-neutral-50 transition-colors cursor-pointer shadow-xs"
+                    className="self-center bg-surface border border-line text-foreground-muted text-sm font-bold px-5 py-2.5 rounded-full hover:bg-background transition-colors cursor-pointer shadow-xs"
                   >
                     {messagesQuery.isFetchingNextPage ? 'Caricamento...' : 'Carica messaggi precedenti'}
                   </button>
                 )}
 
                 {visibleMessages.length === 0 ? (
-                  <div className="text-center p-6 text-neutral-500 text-sm font-medium bg-white rounded-3xl border border-neutral-100 shadow-xs self-center my-auto">
+                  <div className="text-center p-6 text-foreground-subtle text-sm font-medium bg-surface rounded-3xl border border-line shadow-xs self-center my-auto">
                     👋 Invia il primo messaggio a {nameOf(activeConv)} per iniziare!
                   </div>
                 ) : (
@@ -543,7 +543,7 @@ export default function ChatPage() {
                     return (
                       <div key={message.id} className="flex flex-col gap-6 w-full min-w-0">
                         {newDay && (
-                          <div className="self-center bg-white border border-neutral-100 text-neutral-500 text-[11px] font-bold px-4 py-1.5 rounded-full shadow-xs">
+                          <div className="self-center bg-surface border border-line text-foreground-subtle text-[11px] font-bold px-4 py-1.5 rounded-full shadow-xs">
                             {dayLabel(message.createdAt)}
                           </div>
                         )}
@@ -556,19 +556,19 @@ export default function ChatPage() {
                           <div className={`flex flex-col min-w-0 ${isMine ? 'items-end' : 'items-start'} max-w-[85%] md:max-w-[70%]`}>
                             <div className={`px-5 py-3.5 text-[15px] shadow-xs wrap-break-word whitespace-pre-wrap w-full leading-relaxed ${
                               isMine
-                                ? `bg-neutral-900 text-white rounded-3xl rounded-br-sm ${message.isFailed ? 'ring-2 ring-rose-300' : ''}`
-                                : 'bg-white border border-neutral-100 text-neutral-800 rounded-3xl rounded-bl-sm'
+                                ? `bg-foreground text-background rounded-3xl rounded-br-sm ${message.isFailed ? 'ring-2 ring-danger/40' : ''}`
+                                : 'bg-surface border border-line text-foreground rounded-3xl rounded-bl-sm'
                             }`}>
                               {message.text}
                             </div>
                             {message.isFailed ? (
-                              <span className="text-[11px] text-rose-500 mt-1.5 px-1 font-bold flex gap-2 items-center">
+                              <span className="text-[11px] text-danger mt-1.5 px-1 font-bold flex gap-2 items-center">
                                 Non inviato
                                 <button onClick={() => handleRetry(message)} className="underline cursor-pointer">Riprova</button>
-                                <button onClick={() => handleDiscard(message)} className="underline cursor-pointer text-neutral-400">Elimina</button>
+                                <button onClick={() => handleDiscard(message)} className="underline cursor-pointer text-foreground-subtle">Elimina</button>
                               </span>
                             ) : (
-                              <span data-testid="message-time" className="text-[11px] text-neutral-400 mt-1.5 px-1 font-medium">
+                              <span data-testid="message-time" className="text-[11px] text-foreground-subtle mt-1.5 px-1 font-medium">
                                 {timeLabel(message.createdAt)}{message.isPending && ' • Inviando...'}
                               </span>
                             )}
@@ -584,7 +584,7 @@ export default function ChatPage() {
                     <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-xs opacity-60 relative bottom-1 bg-linear-to-br from-orange-400 to-rose-500">
                       {initial(nameOf(activeConv))}
                     </div>
-                    <div className="bg-white border border-neutral-100 px-5 py-4 rounded-3xl rounded-bl-sm shadow-xs flex gap-1.5 items-center h-[42px]">
+                    <div className="bg-surface border border-line px-5 py-4 rounded-3xl rounded-bl-sm shadow-xs flex gap-1.5 items-center h-[42px]">
                       <span className="typing-dot"></span>
                       <span className="typing-dot"></span>
                       <span className="typing-dot"></span>
@@ -595,7 +595,7 @@ export default function ChatPage() {
               </div>
 
               {!canWrite && (
-                <div data-testid="conversation-closed" className="shrink-0 bg-white border-t border-neutral-100 p-5 md:px-6 text-center text-sm font-medium text-neutral-600">
+                <div data-testid="conversation-closed" className="shrink-0 bg-surface border-t border-line p-5 md:px-6 text-center text-sm font-medium text-foreground-muted">
                   {activeConv.other?.unavailable
                     ? 'Questo account non è più disponibile: non puoi inviargli messaggi.'
                     : activeConv.blocked === 'by_me'
@@ -606,11 +606,11 @@ export default function ChatPage() {
 
               {canWrite && (<>
               {/* Quick Replies */}
-              <div className="shrink-0 bg-white border-t border-neutral-100 p-3 md:px-6 md:py-4 overflow-x-auto flex gap-2 w-full custom-scrollbar">
+              <div className="shrink-0 bg-surface border-t border-line p-3 md:px-6 md:py-4 overflow-x-auto flex gap-2 w-full custom-scrollbar">
                 {QUICK_REPLIES.map((reply) => (
                   <button
                     key={reply}
-                    className="shrink-0 bg-white border border-neutral-200 text-neutral-600 text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-neutral-50 hover:border-orange-300 hover:text-orange-600 transition-all cursor-pointer whitespace-nowrap shadow-xs"
+                    className="shrink-0 bg-surface border border-line text-foreground-muted text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-background hover:border-primary/50 hover:text-primary transition-all cursor-pointer whitespace-nowrap shadow-xs"
                     onClick={() => handleQuickReply(reply)}
                   >
                     {reply}
@@ -619,10 +619,10 @@ export default function ChatPage() {
               </div>
 
               {/* Input Area */}
-              <div className="shrink-0 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 md:pb-6 flex items-end gap-3 w-full border-t border-neutral-50">
+              <div className="shrink-0 bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 md:pb-6 flex items-end gap-3 w-full border-t border-line">
                 <textarea
                   ref={textareaRef}
-                  className="flex-1 bg-neutral-50 border border-neutral-200 text-neutral-900 text-base rounded-3xl px-5 py-3.5 focus:outline-hidden focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all resize-none max-h-[140px] w-full placeholder:text-neutral-400 custom-scrollbar"
+                  className="flex-1 bg-background border border-line text-foreground text-base rounded-3xl px-5 py-3.5 focus:outline-hidden focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all resize-none max-h-[140px] w-full placeholder:text-foreground-subtle custom-scrollbar"
                   placeholder="Scrivi un messaggio..."
                   value={inputText}
                   onChange={handleTextareaChange}
@@ -630,7 +630,7 @@ export default function ChatPage() {
                   rows={1}
                 />
                 <button
-                  className={`shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-white font-bold transition-all duration-200 ${!inputText.trim() ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed shadow-none' : 'bg-linear-to-r from-orange-500 to-rose-500 hover:scale-[1.05] shadow-lg hover:shadow-orange-500/25 cursor-pointer'}`}
+                  className={`shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-white font-bold transition-all duration-200 ${!inputText.trim() ? 'bg-line text-foreground-subtle cursor-not-allowed shadow-none' : 'bg-linear-to-r from-orange-500 to-rose-500 hover:scale-[1.05] shadow-lg hover:shadow-orange-500/25 cursor-pointer'}`}
                   onClick={handleSend}
                   disabled={!inputText.trim()}
                   aria-label="Invia messaggio"
@@ -660,13 +660,13 @@ export default function ChatPage() {
 
         {/* 🔐 OVERLAY SBLOCCO CRITTOGRAFIA */}
         {isLocked && (
-          <div className="absolute inset-0 z-1100 bg-white/60 backdrop-blur-xl flex items-center justify-center p-4">
-            <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl max-w-sm w-full text-center border border-neutral-100 animate-fade-in-up">
-              <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl shadow-inner">
+          <div className="absolute inset-0 z-1100 bg-surface/60 backdrop-blur-xl flex items-center justify-center p-4">
+            <div className="bg-surface p-8 md:p-10 rounded-3xl shadow-2xl max-w-sm w-full text-center border border-line animate-fade-in-up">
+              <div className="w-20 h-20 bg-primary-soft rounded-full flex items-center justify-center mx-auto mb-6 text-4xl shadow-inner">
                 🔐
               </div>
-              <h3 className="text-2xl font-extrabold text-neutral-900 mb-3 tracking-tight">Chat Protetta</h3>
-              <p className="text-sm text-neutral-500 mb-8 leading-relaxed font-medium">
+              <h3 className="text-2xl font-extrabold text-foreground mb-3 tracking-tight">Chat Protetta</h3>
+              <p className="text-sm text-foreground-subtle mb-8 leading-relaxed font-medium">
                 La tua privacy è al sicuro con crittografia end-to-end. Inserisci la password per sbloccare i messaggi.
               </p>
               
@@ -676,14 +676,14 @@ export default function ChatPage() {
                   placeholder="La tua password"
                   value={unlockPassword}
                   onChange={(e) => setUnlockPassword(e.target.value)}
-                  className="w-full bg-neutral-50 border text-center text-neutral-900 rounded-2xl px-5 py-4 focus:outline-hidden focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all font-medium"
+                  className="w-full bg-background border text-center text-foreground rounded-2xl px-5 py-4 focus:outline-hidden focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"
                 />
-                {unlockError && <div className="text-rose-500 text-xs font-bold -mt-2">{unlockError}</div>}
+                {unlockError && <div className="text-danger text-xs font-bold -mt-2">{unlockError}</div>}
                 
                 <button
                   type="submit"
                   disabled={!unlockPassword || isUnlocking}
-                  className="w-full bg-neutral-900 text-white py-4 rounded-2xl font-bold hover:bg-neutral-800 transition-colors shadow-lg disabled:bg-neutral-300 disabled:shadow-none cursor-pointer mt-2"
+                  className="w-full bg-foreground text-background py-4 rounded-2xl font-bold hover:bg-foreground/85 transition-colors shadow-lg disabled:bg-control disabled:shadow-none cursor-pointer mt-2"
                 >
                   {isUnlocking ? 'Sblocco in corso...' : 'Sblocca Messaggi'}
                 </button>

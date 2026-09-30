@@ -7,6 +7,7 @@ import { buttonClasses } from '../ui/buttonClasses';
 import { cn, focusRing } from '../ui/cn';
 import AccountMenu from './AccountMenu';
 import Logo from './Logo';
+import ThemeToggle from './ThemeToggle';
 import { unreadLabel } from './unread';
 
 type MobileMenuPanelComponent = typeof import('./MobileMenuPanel').default;
@@ -91,28 +92,31 @@ export default function SiteHeader() {
           <HeaderLink to="/guida" icon={<BookOpen />}>Come funziona</HeaderLink>
         </nav>
 
-        <div className="hidden items-center gap-2 md:flex">
-          {user ? (
-            <AccountMenu user={user} onSignOut={signOut} />
-          ) : (
-            <>
-              <Link to="/accedi" className={buttonClasses({ variant: 'ghost', size: 'sm' })}>Accedi</Link>
-              <Link to="/registrati" className={buttonClasses({ size: 'sm' })}>Registrati</Link>
-            </>
-          )}
-        </div>
+        <div className="ml-auto flex items-center gap-1 md:ml-0 md:gap-2">
+          <ThemeToggle />
+          <div className="hidden items-center gap-2 md:flex">
+            {user ? (
+              <AccountMenu user={user} onSignOut={signOut} />
+            ) : (
+              <>
+                <Link to="/accedi" className={buttonClasses({ variant: 'ghost', size: 'sm' })}>Accedi</Link>
+                <Link to="/registrati" className={buttonClasses({ size: 'sm' })}>Registrati</Link>
+              </>
+            )}
+          </div>
 
-        <button
-          ref={menuButton}
-          type="button"
-          aria-label="Apri il menu"
-          aria-haspopup="dialog"
-          aria-expanded={menuOpen}
-          onClick={openMobileMenu}
-          className={cn('inline-flex size-11 items-center justify-center rounded-full text-foreground hover:bg-surface-muted md:hidden', focusRing)}
-        >
-          <Menu className="size-6" />
-        </button>
+          <button
+            ref={menuButton}
+            type="button"
+            aria-label="Apri il menu"
+            aria-haspopup="dialog"
+            aria-expanded={menuOpen}
+            onClick={openMobileMenu}
+            className={cn('inline-flex size-11 items-center justify-center rounded-full text-foreground hover:bg-surface-muted md:hidden', focusRing)}
+          >
+            <Menu className="size-6" />
+          </button>
+        </div>
         {MobileMenuPanel && (
           <MobileMenuPanel user={user} open={menuOpen} onOpenChange={setMenuOpen} onSignOut={signOut} trigger={menuButton} />
         )}

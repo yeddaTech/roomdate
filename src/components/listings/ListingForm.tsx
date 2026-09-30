@@ -3,7 +3,7 @@ import { AMENITIES, CITIES, isCity } from '../../api/options';
 import { ApiError } from '../../api/client';
 import type { ListingDetail, ListingInput, RoomType } from '../../api/types';
 
-const inputClass = 'w-full bg-neutral-50 border border-neutral-200 px-5 py-4 rounded-2xl text-neutral-900 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 focus:outline-hidden transition-all';
+const inputClass = 'w-full bg-background border border-line px-5 py-4 rounded-2xl text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-hidden transition-all';
 
 // Valori del modulo come stringhe, così i campi restano controllati anche quando sono vuoti
 interface FormState {
@@ -39,7 +39,7 @@ function formFromListing(listing: ListingDetail): FormState {
 }
 
 function FieldError({ message }: { message?: string }) {
-  return message ? <div className="text-red-500 text-xs mt-1 ml-1 font-bold">{message}</div> : null;
+  return message ? <div className="text-danger text-xs mt-1 ml-1 font-bold">{message}</div> : null;
 }
 
 /**
@@ -104,7 +104,7 @@ export default function ListingForm({ listing, submitLabel, onSubmit }: Props) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6" noValidate>
       {generalError && (
-        <div className="p-4 rounded-2xl font-bold bg-rose-50 text-rose-700 border border-rose-200">⚠️ {generalError}</div>
+        <div className="p-4 rounded-2xl font-bold bg-danger-soft text-danger border border-danger/30">⚠️ {generalError}</div>
       )}
 
       <div>
@@ -145,7 +145,7 @@ export default function ListingForm({ listing, submitLabel, onSubmit }: Props) {
         </div>
         <div>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold text-neutral-500 ml-1">Disponibile dal (facoltativo)</span>
+            <span className="text-xs font-bold text-foreground-subtle ml-1">Disponibile dal (facoltativo)</span>
             <input name="availableFrom" type="date" value={form.availableFrom} onChange={set('availableFrom')} className={inputClass} />
           </label>
           <FieldError message={errors.availableFrom} />
@@ -153,12 +153,12 @@ export default function ListingForm({ listing, submitLabel, onSubmit }: Props) {
       </div>
 
       <div className="flex flex-col gap-3">
-        <span className="text-sm font-bold text-neutral-900">Servizi</span>
+        <span className="text-sm font-bold text-foreground">Servizi</span>
         <div className="flex flex-wrap gap-3">
           {AMENITIES.map(({ key, label }) => (
             <label key={key} className="relative cursor-pointer group">
               <input type="checkbox" name="amenities" value={key} checked={form.amenities.includes(key)} onChange={() => toggleAmenity(key)} className="peer sr-only" />
-              <span className="block px-5 py-2.5 bg-white border border-neutral-200 rounded-full text-sm font-semibold text-neutral-500 peer-checked:bg-neutral-900 peer-checked:text-white peer-checked:border-neutral-900 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-300 transition-all shadow-xs group-hover:border-neutral-300">
+              <span className="block px-5 py-2.5 bg-surface border border-line rounded-full text-sm font-semibold text-foreground-subtle peer-checked:bg-foreground peer-checked:text-background peer-checked:border-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-focus transition-all shadow-xs group-hover:border-control">
                 {label}
               </span>
             </label>
@@ -172,8 +172,8 @@ export default function ListingForm({ listing, submitLabel, onSubmit }: Props) {
         <FieldError message={errors.description} />
       </div>
 
-      <div className="mt-4 pt-8 border-t border-neutral-100 flex justify-end">
-        <button type="submit" disabled={isSubmitting} className={`w-full md:w-auto px-10 py-4 rounded-full font-bold transition-all shadow-md ${isSubmitting ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed shadow-none' : 'bg-neutral-900 text-white hover:bg-neutral-800 cursor-pointer'}`}>
+      <div className="mt-4 pt-8 border-t border-line flex justify-end">
+        <button type="submit" disabled={isSubmitting} className={`w-full md:w-auto px-10 py-4 rounded-full font-bold transition-all shadow-md ${isSubmitting ? 'bg-control text-foreground-subtle cursor-not-allowed shadow-none' : 'bg-foreground text-background hover:bg-foreground/85 cursor-pointer'}`}>
           {isSubmitting ? 'Salvataggio in corso...' : submitLabel}
         </button>
       </div>

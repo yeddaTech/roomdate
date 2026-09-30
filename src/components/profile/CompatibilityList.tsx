@@ -29,7 +29,7 @@ export default function CompatibilityList({ compatibility, compact = false }: Pr
   const chips = items.map((item) => (
     <span
       key={item.text}
-      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${item.warning ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-green-50 text-green-800 border-green-200'}`}
+      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${item.warning ? 'bg-warning-soft text-warning-soft-foreground border-warning-soft-foreground/20' : 'bg-success-soft text-success-soft-foreground border-success-soft-foreground/20'}`}
     >
       {item.text}
     </span>
@@ -38,7 +38,7 @@ export default function CompatibilityList({ compatibility, compact = false }: Pr
   if (compact) {
     return items.length > 0 ? (
       <div>
-        <div className="text-center text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5" aria-hidden="true">In comune con te</div>
+        <div className="text-center text-[10px] font-bold uppercase tracking-wider text-foreground-subtle mb-1.5" aria-hidden="true">In comune con te</div>
         <div className="flex flex-wrap justify-center gap-1.5" aria-label="In comune con te">{chips}</div>
       </div>
     ) : null;
@@ -46,14 +46,14 @@ export default function CompatibilityList({ compatibility, compact = false }: Pr
 
   return (
     <div>
-      <h2 className="font-serif text-xl font-extrabold text-neutral-900 mb-2 tracking-tight">In comune con te</h2>
-      <p className="text-sm text-neutral-500 font-medium mb-4">
+      <h2 className="font-serif text-xl font-extrabold text-foreground mb-2 tracking-tight">In comune con te</h2>
+      <p className="text-sm text-foreground-subtle font-medium mb-4">
         Confronto tra città, budget (differenza entro 100 €) e abitudini indicate in entrambi i profili.
       </p>
       {items.length > 0 ? (
         <div className="flex flex-wrap gap-2">{chips}</div>
       ) : (
-        <p className="text-neutral-400 font-medium italic">Nessun elemento in comune tra quelli indicati.</p>
+        <p className="text-foreground-subtle font-medium italic">Nessun elemento in comune tra quelli indicati.</p>
       )}
     </div>
   );
