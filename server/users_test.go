@@ -6,8 +6,11 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
+
+	"roomdate-backend/internal/validate"
 )
 
 type sessionResponse struct {
@@ -368,9 +371,9 @@ func TestProfilePrivacy(t *testing.T) {
 	})
 
 	t.Run("età al posto della data di nascita", func(t *testing.T) {
-		// Compleanno oggi: anni compiuti. Compleanno domani: un anno in meno.
-		testPool.Exec(context.Background(), `UPDATE roomdate_app.users SET birthdate = CURRENT_DATE - interval '30 years' WHERE id = $1`, anna.ID)
-		testPool.Exec(context.Background(), `UPDATE roomdate_app.users SET birthdate = CURRENT_DATE - interval '30 years' + interval '1 day' WHERE id = $1`, bruno.ID)
+		// Compleanno oggi (in Italia): anni compiuti. Compleanno domani: un anno in meno.
+		setBirthdate(t, anna.ID, validate.Today(time.Now()).AddDate(-30, 0, 0))
+		setBirthdate(t, bruno.ID, validate.Today(time.Now()).AddDate(-30, 0, 1))
 		expect(t, app.do(http.MethodGet, "/api/v1/users/"+anna.ID, nil), http.StatusOK, `"age":30,`)
 		expect(t, app.do(http.MethodGet, "/api/v1/users/"+bruno.ID, nil), http.StatusOK, `"age":29,`)
 	})
@@ -443,4 +446,41 @@ func TestRoleChangeAppliesWithoutNewLogin(t *testing.T) {
 
 	expect(t, app.do(http.MethodPut, "/api/v1/me", profileInput(nil), withSession(u.Cookie)), http.StatusOK, `"userType":"cerca"`)
 	expect(t, app.do(http.MethodPost, "/api/v1/listings", validListing(), withSession(u.Cookie)), http.StatusForbidden, "landlord_only")
+}
+
+func setBirthdate(t *testing.T, userID string, birthdate time.Time) {
+	t.Helper()
+	tag, err := testPool.Exec(context.Background(), `UPDATE roomdate_app.users SET birthdate = $2 WHERE id = $1`, userID, birthdate.Format(time.DateOnly))
+	if err != nil || tag.RowsAffected() != 1 {
+		t.Fatalf("data di nascita non aggiornata: %v", err)
+	}
+}
+
+// L'età mostrata segue il calendario italiano qualunque sia il fuso della sessione del database.
+// Con due fusi agli antipodi, a qualsiasi ora almeno uno dei due è in un giorno diverso dall'Italia:
+// un calcolo con CURRENT_DATE fallirebbe sempre in uno dei due.
+func TestAgeFollowsItalianCalendar(t *testing.T) {
+	for _, timeZone := range []string{"Pacific/Kiritimati", "Pacific/Niue"} {
+		t.Run(timeZone, func(t *testing.T) {
+			app := newAppInTimeZone(t, timeZone)
+			anna := app.registerUser("Anna", "cerca", true)
+			bruno := app.registerUser("Bruno", "cerca", true)
+			today := validate.Today(time.Now())
+			setBirthdate(t, anna.ID, today.AddDate(-30, 0, 0))
+			setBirthdate(t, bruno.ID, today.AddDate(-30, 0, 1))
+			expect(t, app.do(http.MethodGet, "/api/v1/users/"+anna.ID, nil), http.StatusOK, `"age":30,`)
+			expect(t, app.do(http.MethodGet, "/api/v1/users/"+bruno.ID, nil), http.StatusOK, `"age":29,`)
+			// Stessa età nell'elenco dei coinquilini
+			page := app.roommates("", "")
+			ages := map[string]int{}
+			for _, item := range page.Items {
+				if item.Age != nil {
+					ages[item.FirstName] = *item.Age
+				}
+			}
+			if ages["Anna"] != 30 || ages["Bruno"] != 29 {
+				t.Errorf("età nell'elenco dei coinquilini: %v", ages)
+			}
+		})
+	}
 }

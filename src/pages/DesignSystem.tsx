@@ -3,14 +3,17 @@ import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Heart, Inbox, MessageCircle, Search, Trash2 } from 'lucide-react';
 import PageMeta from '../components/PageMeta';
+import Alert from '../components/ui/Alert';
 import Avatar from '../components/ui/Avatar';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import Checkbox from '../components/ui/Checkbox';
 import Chip from '../components/ui/Chip';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogTrigger } from '../components/ui/Dialog';
 import EmptyState from '../components/ui/EmptyState';
 import { Field, Input, Select, Textarea } from '../components/ui/Field';
+import PasswordInput from '../components/ui/PasswordInput';
 import { Sheet, SheetContent, SheetTrigger } from '../components/ui/Sheet';
 import Skeleton from '../components/ui/Skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/Tabs';
@@ -58,6 +61,11 @@ function Showcase() {
         <Field label="Presentazione">
           <Textarea placeholder="Due righe su di te" />
         </Field>
+        <Field label="Password" hint="Almeno 10 caratteri: una frase facile da ricordare è l'ideale.">
+          <PasswordInput autoComplete="off" />
+        </Field>
+        <Checkbox>Ho letto e accetto i Termini di servizio.</Checkbox>
+        <Checkbox error="Per continuare accetta i Termini di servizio">Casella con errore</Checkbox>
         <div className="flex flex-wrap gap-2">
           {['non_fumatore', 'animali', 'ordinato'].map((key) => (
             <Chip key={key} selected={tags.includes(key)} onClick={() => toggle(key)}>{key.replace('_', ' ')}</Chip>
@@ -91,6 +99,10 @@ function Showcase() {
           description="Quando contatti qualcuno da un annuncio o da un profilo, la chat compare qui."
           action={<Button variant="secondary"><Search /> Cerca una stanza</Button>}
         />
+        <Alert tone="danger">Credenziali non valide</Alert>
+        <Alert tone="warning" title="Chiave dei messaggi non aperta">Potresti non riuscire a leggere i messaggi.</Alert>
+        <Alert tone="success">Password aggiornata</Alert>
+        <Alert>Messaggio informativo dentro la pagina.</Alert>
         <p className="text-foreground">Testo principale · <span className="text-foreground-muted">secondario</span> · <span className="text-foreground-subtle">tenue</span></p>
       </Card>
 

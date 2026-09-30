@@ -45,6 +45,9 @@ import (
 // produzione (modulo M3.6). Se all'app servisse un permesso in più, i test lo scoprirebbero.
 var testPool, appPool *pgxpool.Pool
 
+// appConfig è la configurazione di appPool, per creare pool con impostazioni di sessione diverse.
+var appConfig *pgxpool.Config
+
 func TestMain(m *testing.M) {
 	os.Exit(run(m))
 }
@@ -123,6 +126,7 @@ func run(m *testing.M) int {
 		return 1
 	}
 	defer appPool.Close()
+	appConfig = appCfg
 
 	return m.Run()
 }
@@ -288,6 +292,31 @@ func newAppWithStorage(t *testing.T, st storage.Storage) *testApp {
 // newAppWithConfig crea l'applicazione con una configurazione diversa da quella dei test.
 func newAppWithConfig(t *testing.T, st storage.Storage, cfg config.Config) *testApp {
 	t.Helper()
+	return newAppWithPool(t, st, cfg, appPool)
+}
+
+// newAppInTimeZone è newApp con le connessioni dell'applicazione nel fuso orario indicato (come fa
+// Neon, che è in UTC): nessun calcolo sui giorni deve dipendere dal fuso della sessione.
+func newAppInTimeZone(t *testing.T, timeZone string) *testApp {
+	t.Helper()
+	if testPool == nil {
+		t.Skip("TEST_DATABASE_URL non impostata")
+	}
+	cfg := appConfig.Copy()
+	cfg.ConnConfig.RuntimeParams["timezone"] = timeZone
+	pool, err := pgxpool.NewWithConfig(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	fake := newFakeStorage()
+	app := newAppWithPool(t, fake, config.Config{SecretKey: "segreto-di-test", SecureCookies: true, Pusher: testPusher}, pool)
+	app.storage = fake
+	return app
+}
+
+func newAppWithPool(t *testing.T, st storage.Storage, cfg config.Config, pool *pgxpool.Pool) *testApp {
+	t.Helper()
 	if testPool == nil {
 		t.Skip("TEST_DATABASE_URL non impostata")
 	}
@@ -301,7 +330,7 @@ func newAppWithConfig(t *testing.T, st storage.Storage, cfg config.Config) *test
 	publisher := &recordingPublisher{}
 	handler, err := server.New(server.Deps{
 		Config:    cfg,
-		DB:        appPool,
+		DB:        pool,
 		Publisher: publisher,
 		Logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Storage:   st,

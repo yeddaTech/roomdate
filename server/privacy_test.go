@@ -7,15 +7,17 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"roomdate-backend/internal/validate"
 )
 
 // Modulo M3.3: età minima, profili privati, cancellazione verificata ed esportazione dei dati.
 
 func TestMinimumAge(t *testing.T) {
 	app := newApp(t)
-	// Lo stesso orologio del server (time.Now nel fuso del processo): con UTC, tra mezzanotte e le
-	// 2 in Italia il test e il server vedrebbero due giorni diversi e il test fallirebbe
-	today := time.Now()
+	// Il giorno italiano, come il server: in UTC, tra mezzanotte e l'una o le due in Italia, il test
+	// e il server vedrebbero due giorni diversi
+	today := validate.Today(time.Now())
 	// Il giorno esatto del compleanno (anche il 29 febbraio) lo verifica TestAgeAtLeast
 	minor := today.AddDate(-18, 0, 1).Format(time.DateOnly)  // compie 18 anni domani
 	adult := today.AddDate(-18, 0, -1).Format(time.DateOnly) // li ha compiuti ieri

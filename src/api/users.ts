@@ -57,11 +57,17 @@ export function formatAge(age: number | null): string | null {
 /** Età minima per usare RoomDate, la stessa che controlla il server. */
 export const MIN_AGE = 18;
 
-/** Data di nascita più recente ammessa (AAAA-MM-GG): chi compie 18 anni oggi. */
-export function latestAdultBirthdate(today = new Date()): string {
-  const year = today.getFullYear() - MIN_AGE;
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
+const italianDay = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Rome', year: 'numeric', month: 'numeric', day: 'numeric' });
+
+/**
+ * Data di nascita più recente ammessa (AAAA-MM-GG): chi compie 18 anni oggi. Il giorno è quello
+ * italiano, come per il server, qualunque sia il fuso del dispositivo.
+ */
+export function latestAdultBirthdate(now = new Date()): string {
+  const parts = Object.fromEntries(italianDay.formatToParts(now).map((p) => [p.type, p.value]));
+  const year = Number(parts.year) - MIN_AGE;
+  const month = parts.month.padStart(2, '0');
+  const day = parts.day.padStart(2, '0');
   // Il 29 febbraio di un anno non bisestile non esiste: chi è nato quel giorno compie gli anni il 1° marzo
   return month === '02' && day === '29' && new Date(year, 1, 29).getMonth() !== 1 ? `${year}-02-28` : `${year}-${month}-${day}`;
 }
