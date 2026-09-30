@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect } from 'react';
 
-// Le pagine dell'area personale possono chiedere al layout di nascondere la barra in basso: la chat
-// lo fa quando una conversazione è aperta sul telefono, per lasciare spazio a messaggi e tastiera.
+// Una pagina può chiedere al layout di nascondere la barra in basso: la chat lo fa quando una
+// conversazione è aperta sul telefono, per lasciare spazio a messaggi e tastiera; annuncio e
+// profilo ci mettono al suo posto il pulsante di contatto (ContactBar).
 export const TabBarContext = createContext<((hidden: boolean) => void) | null>(null);
 
 export function useHideTabBar(hidden: boolean) {

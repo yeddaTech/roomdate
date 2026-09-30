@@ -189,6 +189,22 @@ The interface is built on tokens and a small set of accessible components. Every
   * `RoommateCard` is the card for the "Coinquilini" tab.
 * **Favorites page** (`/preferiti`, in the bottom bar and in the header for signed-in users). Removing a listing there offers "Annulla".
 
+### Listing and profile pages (module M2.5)
+
+* **Gallery** (`Gallery`): on phones, a strip you swipe edge to edge (native scroll-snap, no library), with a "2 / 5" counter. On desktop, a mosaic with the first photo large.
+  * Tapping a photo opens every photo full screen (Radix Dialog): swipe, the arrow buttons (always visible, not only on hover) or the keyboard arrows move between them. The counter is announced, and Esc closes.
+  * On close, focus returns to the photo you opened. At either end the arrows use `aria-disabled` rather than `disabled`, so they keep focus.
+  * Each photo's alt text is "Foto 2 di 5: title".
+* **Amenities** have an icon each (`AmenityList`). A new amenity in `shared/options.json` without an icon shows a check mark.
+* **Contact on phones:** `ContactBar` puts the main action at the bottom of the screen in place of the tab bar (`useHideTabBar`, which now also works in the public layout): price, heart and "Contatta" on a listing, "Scrivi a …" on a profile. On desktop the same actions sit in a sticky side column.
+* **"Per te"** (`ListingFit`): for a signed-in viewer, the listing compared with their profile, e.g. "94 € sopra il tuo budget di 650 €" or "Nella città che cerchi".
+* **Compatibility, explained** (`CompatibilityDetails`), item by item with both people's real figures: same or different city, similar or different budget ("il tuo è 650 €, il suo 450 €"), shared habits, and the smoking warning.
+  * It says how the comparison works: no score, only city, budget (similar within 100 €) and habits both people entered.
+  * It suggests filling in the viewer's profile when data is missing.
+  * Without a session there is an invitation to sign in. On your own profile, a note says this is how others see it.
+* **"Indietro"** (`BackLink`) goes back to the previous page of the site, such as the search with its filters. On a page opened from an outside link it goes to the search instead of leaving the site.
+* **Errors:** a missing listing or profile ("non trovato") and a server error (with "Riprova") are shown differently.
+
 ### Tests
 
 `npm run test:api` runs the Go tests. Unit tests need nothing else; the integration tests in `server/` (every endpoint through the real router, middleware and database, with an in-memory photo storage) run when `TEST_DATABASE_URL` is set, and are skipped otherwise. They create a temporary `roomdate_test_…` database, migrate it from scratch and drop it at the end.
