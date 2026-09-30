@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	// Il database dei fusi orari dentro il binario: su Vercel il sistema potrebbe non averlo
+	_ "time/tzdata"
 	"unicode"
 	"unicode/utf8"
 
@@ -99,21 +101,41 @@ func Base64(s string, maxLen int) bool {
 	return err == nil
 }
 
-// PastDate indica se la stringa è una data AAAA-MM-GG non futura e non precedente al 1900.
-func PastDate(s string, now time.Time) bool {
-	t, err := time.Parse(time.DateOnly, s)
-	return err == nil && t.Year() >= 1900 && !t.After(now)
+// Italy è il fuso con cui si contano i giorni del calendario (età, date nel passato): il sito è
+// italiano, mentre su Vercel l'ora del server è UTC, un'ora indietro d'inverno e due d'estate.
+var Italy = mustLoadLocation("Europe/Rome")
+
+func mustLoadLocation(name string) *time.Location {
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		panic(err) // non succede: time/tzdata contiene tutti i fusi
+	}
+	return loc
 }
 
-// AgeAtLeast indica se chi è nato nella data AAAA-MM-GG ha già compiuto years anni alla data now.
-// Chi è nato il 29 febbraio li compie il 1° marzo negli anni non bisestili.
+// Today è la data di oggi in Italia, a mezzanotte UTC: si confronta direttamente con le date
+// AAAA-MM-GG lette con time.Parse(time.DateOnly, ...).
+func Today(now time.Time) time.Time {
+	y, m, d := now.In(Italy).Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
+// PastDate indica se la stringa è una data AAAA-MM-GG non futura (in Italia) e non precedente al 1900.
+func PastDate(s string, now time.Time) bool {
+	t, err := time.Parse(time.DateOnly, s)
+	return err == nil && t.Year() >= 1900 && !t.After(Today(now))
+}
+
+// AgeAtLeast indica se chi è nato nella data AAAA-MM-GG ha già compiuto years anni all'istante now,
+// secondo il calendario italiano. Chi è nato il 29 febbraio li compie il 1° marzo negli anni non bisestili.
 func AgeAtLeast(birthdate string, now time.Time, years int) bool {
 	t, err := time.Parse(time.DateOnly, birthdate)
 	if err != nil {
 		return false
 	}
-	age := now.Year() - t.Year()
-	if now.Month() < t.Month() || (now.Month() == t.Month() && now.Day() < t.Day()) {
+	today := Today(now)
+	age := today.Year() - t.Year()
+	if today.Month() < t.Month() || (today.Month() == t.Month() && today.Day() < t.Day()) {
 		age--
 	}
 	return age >= years

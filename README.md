@@ -28,6 +28,9 @@ Password reset by email does not exist yet: it needs an email provider (decision
 ## Privacy and moderation (module M3.3)
 
 * **Minimum age:** registration and profile changes require a birth date of at least 18 years ago, checked by the server (`validate.AgeAtLeast`; people born on 29 February turn a year older on 1 March in non-leap years). Migration `00011` only warns about existing accounts under 18, which have to be checked by hand.
+  * Days follow the Italian calendar (`validate.Italy`, Europe/Rome), not the server clock. On Vercel the server clock is UTC, still on the previous day until 1 or 2 a.m. in Italy.
+  * Everything that counts days uses the Italian day: the age shown on profiles (SQL `now() AT TIME ZONE 'Europe/Rome'`, never `CURRENT_DATE`, which depends on the session time zone and is UTC on Neon) and the registration form (`latestAdultBirthdate`, whatever the device's time zone).
+  * The binary embeds the time zone database (`time/tzdata`). A test runs the app with the database session in two time zones on opposite sides of the world.
 * **Private profiles:** a private or suspended profile is invisible to others everywhere: profile page, roommates list and new direct chats. A conversation that already exists goes on.
 * **Blocks** (`GET /api/v1/me/blocks`, `PUT`/`DELETE /api/v1/me/blocks/{userId}`) work both ways, whoever blocked whom. Neither user can write to the other, open the real-time channel of their conversation, start a new chat, or see the other's profile and listings. Old messages stay readable. Conversations say `blocked: "by_me" | "by_other" | null`.
 * **Reports** (`POST /api/v1/reports`) target a user or a listing, with a reason from `shared/options.json` (`reportReasons`, the same list as the `reports_reason_check` constraint) and optional details. From the chat, the reporter may attach up to 20 received messages, decrypted in their browser, because the server cannot read them otherwise. One open report per reporter and target, and at most 10 a day per user.
@@ -107,7 +110,7 @@ The interface is built on tokens and a small set of accessible components; the p
 
 * **Tokens** live in `src/index.css`, inside `@theme`: colours have names that say what they are for (`bg-surface`, `text-foreground-muted`, `bg-primary`, `border-control`), so a page never names a colour. Warm neutrals with a deep orange for actions; the orange-to-pink gradient (`bg-brand`) is kept for brand moments. Every pair was checked against WCAG 2.2 AA: 4.5:1 for text, 3:1 for field borders and the focus ring. Three radii (`rounded-control`, `rounded-card`, `rounded-full`), two shadows (`shadow-card`, `shadow-overlay`), Tailwind's 4px spacing grid, animations of 150–250 ms that stop under `prefers-reduced-motion`.
 * **Dark theme:** the same tokens have dark values under `.dark`. Nothing switches yet: it is turned on once every page uses the tokens, so half the site is not left unreadable in the meantime.
-* **Components** in `src/components/ui/`: `Button`, `Field` with `Input`/`Textarea`/`Select` (label, hint and error tied to the control), `Chip`, `Card`, `Badge`, `Avatar`, `Dialog`, `Sheet`, `Tabs`, `Toaster`, `Skeleton`, `EmptyState`. Dialogs, sheets and tabs are Radix primitives: focus trap, Esc, focus returned to the opener, arrow keys between tabs. `cn()` merges classes so a `className` passed in wins over the default one.
+* **Components** in `src/components/ui/`: `Button`, `Field` with `Input`/`Textarea`/`Select` (label, hint and error tied to the control), `PasswordInput`, `Checkbox`, `Chip`, `Card`, `Badge`, `Alert`, `Avatar`, `Dialog`, `Sheet`, `Tabs`, `Toaster`, `Skeleton`, `EmptyState`. Dialogs, sheets and tabs are Radix primitives: focus trap, Esc, focus returned to the opener, arrow keys between tabs. `cn()` merges classes so a `className` passed in wins over the default one.
 * **Feedback instead of `alert`/`confirm`:** `toast.success(...)` / `toast.error(...)` (sonner) for the outcome of an action, and `useConfirm()` for a question — an AlertDialog that does not close on an outside click, starts focused on "Annulla" and returns a promise. The 23 native `alert`, `confirm` and `prompt` calls are gone; an E2E test fails if any of them comes back. The confirm dialog's code is loaded after the page, so Radix does not weigh on the first load.
 * **Fonts** (DM Sans and Playfair Display) are served by the site itself through Fontsource, imported in `main.jsx`. They used to come from Google Fonts and the CSP blocked them, so the site never showed them (anomaly F20); now no visitor IP reaches Google and `font-src` is `'self'`.
 * **Page title and meta:** `<PageMeta title=… noindex />`. React 19 hoists these into `<head>` by itself, so react-helmet-async is gone.
@@ -136,6 +139,27 @@ The interface is built on tokens and a small set of accessible components; the p
   * `ScrollRestoration`: back and forward return to where the user was, and a new page starts at the top. Search filters use `preventScrollReset`, so changing one does not jump to the top.
   * After every navigation, focus moves to the main content (`#contenuto`) so screen readers announce the new page. "Salta al contenuto" is the first Tab stop.
 * **iOS safe areas:** `viewport-fit=cover` plus `env(safe-area-inset-*)` padding on the header, tab bar, side panel and chat composer.
+
+### Forms, sign-in and registration (module M2.3)
+
+* **Forms** use react-hook-form with zod schemas, through `zodResolver`.
+  * The field rules live in `src/forms/rules.ts` and mirror the server's: names up to 50 characters, a valid email, at least 18 years old, a city from the list, a budget from 0 to 20,000 €, a bio up to 1,000 characters. The password rules stay in `src/auth/passwordPolicy.ts`, because the password never reaches the server.
+  * Import zod only from `src/forms/zod.ts`. It is the "mini" build, 19 KB instead of 80, with `jitless` switched on. The full build compiles schemas with `new Function`, which the CSP blocks; this was checked on the production build.
+  * Errors show when you leave a field. After that, and after a failed submit, they update while you type.
+  * An error sent back by the server clears as soon as the field is edited. Otherwise it would disappear only when you click the button, which would jump away from the pointer.
+* **Registration** (`/registrati`) has four steps: account → role → profile → lifestyle.
+  * Each step is its own form. Data builds up in memory and goes to the server in a single request at the end.
+  * The step is in the URL (`?passo=2`), so the browser's and the phone's back button return to the previous step with the data still there. A reload starts again from step 1: the password is never saved in `sessionStorage`.
+  * If the server rejects a field, the page jumps back to that field's step, shows the message and focuses the field.
+  * Terms and Privacy open in a new tab, so nothing typed is lost. An email typo in a common domain gets a hint ("Forse intendevi …@gmail.com?"): there is no email verification yet, so a mistyped address would be hard to recover.
+  * Once the account exists, the recovery key is shown while the browser signs in. At the end, users looking for a room land on the search, users letting one on their profile, or on the protected page they came from.
+* **Sign-in** (`/accedi`) shows errors inside the page, not as toasts. It returns to the page that asked for a login. Users who already have a session are sent on from `/accedi` and `/registrati`. The email typed there carries over to `/recupero` and back.
+* **New components** in `src/components/ui/`:
+  * `PasswordInput`: a "Mostra" button instead of a second field to retype the password, and hidden again on submit;
+  * `Alert`: a message inside the page, announced to screen readers when it is an error;
+  * `Checkbox`: a native checkbox with its error text linked.
+
+  `bg-brand-deep` is the brand gradient for panels with white text: `bg-brand` with white text is below 3:1.
 
 ### Tests
 

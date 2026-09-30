@@ -134,3 +134,43 @@ func TestAgeAtLeast(t *testing.T) {
 		}
 	}
 }
+
+// I giorni si contano sul calendario italiano: su Vercel l'ora del server è UTC, che tra mezzanotte
+// e l'una (d'inverno) o le due (d'estate) è ancora al giorno prima.
+func TestItalianCalendar(t *testing.T) {
+	at := func(s string) time.Time {
+		v, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	for _, c := range []struct {
+		now, today string
+	}{
+		{"2026-09-25T21:59:00Z", "2026-09-25"}, // 23:59 in Italia (ora legale, UTC+2)
+		{"2026-09-25T22:00:00Z", "2026-09-26"}, // mezzanotte in Italia, in UTC è ancora il 25
+		{"2027-01-15T22:59:00Z", "2027-01-15"}, // 23:59 in Italia (ora solare, UTC+1)
+		{"2027-01-15T23:00:00Z", "2027-01-16"},
+		{"2026-03-29T00:30:00Z", "2026-03-29"}, // giorno del passaggio all'ora legale
+	} {
+		if got := Today(at(c.now)).Format(time.DateOnly); got != c.today {
+			t.Errorf("Today(%s) = %s, atteso %s", c.now, got, c.today)
+		}
+	}
+
+	// Il 26 settembre compie 18 anni chi è nato il 26 settembre 2008: in Italia dalla mezzanotte
+	if AgeAtLeast("2008-09-26", at("2026-09-25T21:59:00Z"), 18) {
+		t.Error("alle 23:59 del 25 settembre (ora italiana) non ha ancora 18 anni")
+	}
+	if !AgeAtLeast("2008-09-26", at("2026-09-25T22:00:00Z"), 18) {
+		t.Error("a mezzanotte del 26 settembre (ora italiana) ha 18 anni, anche se in UTC è ancora il 25")
+	}
+	if !AgeAtLeast("2009-01-16", at("2027-01-15T23:00:00Z"), 18) || AgeAtLeast("2009-01-16", at("2027-01-15T22:59:00Z"), 18) {
+		t.Error("d'inverno la mezzanotte italiana è alle 23:00 UTC")
+	}
+	// Una data di oggi (in Italia) non è nel futuro, quella di domani sì
+	if !PastDate("2026-09-26", at("2026-09-25T22:30:00Z")) || PastDate("2026-09-27", at("2026-09-25T22:30:00Z")) {
+		t.Error("PastDate deve usare il giorno italiano")
+	}
+}

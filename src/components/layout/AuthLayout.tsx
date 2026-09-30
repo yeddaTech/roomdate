@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { Link, Outlet, useMatches } from 'react-router-dom';
+import { Link, Outlet, useLocation, useMatches } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import PageLoader from '../PageLoader';
 import { cn, focusRing } from '../ui/cn';
@@ -13,6 +13,8 @@ import SkipLink from './SkipLink';
  */
 export default function AuthLayout() {
   const authSwitch = useMatches().map((m) => (m.handle as RouteHandle | undefined)?.authSwitch).find(Boolean);
+  // Passando da accesso a registrazione (e viceversa) restano la pagina da riaprire e l'email
+  const { state } = useLocation();
 
   return (
     <div className="flex min-h-dvh flex-col bg-background">
@@ -28,7 +30,7 @@ export default function AuthLayout() {
           {authSwitch && (
             <p className="text-sm text-foreground-muted">
               <span className="hidden sm:inline">{authSwitch.text} </span>
-              <Link to={authSwitch.to} className={cn('rounded-sm font-bold text-primary hover:text-primary-hover', focusRing)}>{authSwitch.label}</Link>
+              <Link to={authSwitch.to} state={state} className={cn('rounded-sm font-bold text-primary hover:text-primary-hover', focusRing)}>{authSwitch.label}</Link>
             </p>
           )}
         </div>
