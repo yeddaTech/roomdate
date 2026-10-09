@@ -129,7 +129,7 @@ export default function Search() {
     setContacting(targetId);
     try {
       const conversationId = await startChat.mutateAsync({ targetId });
-      navigate('/chat', { state: { openChatId: conversationId } });
+      navigate(`/chat/${conversationId}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Non è stato possibile aprire la chat.');
     } finally {

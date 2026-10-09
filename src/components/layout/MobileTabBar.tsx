@@ -14,7 +14,6 @@ function TabLink({ to, icon, label, end = false, badge = 0 }: { to: string; icon
     <NavLink
       to={to}
       end={end}
-      aria-label={badge > 0 ? `${label}, ${unreadLabel(badge)}` : undefined}
       className={({ isActive }) => cn(
         'relative flex h-16 flex-col items-center justify-center gap-1 text-xs font-bold transition-colors duration-150 [&_svg]:size-6',
         isActive ? 'text-primary' : 'text-foreground-muted',
@@ -30,6 +29,8 @@ function TabLink({ to, icon, label, end = false, badge = 0 }: { to: string; icon
         )}
       </span>
       {label}
+      {/* Il numero si legge dopo il nome: "Chat, 2 conversazioni con messaggi non letti" */}
+      {badge > 0 && <span className="sr-only">, {unreadLabel(badge)}</span>}
     </NavLink>
   );
 }

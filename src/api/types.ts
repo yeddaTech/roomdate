@@ -230,16 +230,44 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+/** Annuncio da cui è nata una chat: la scheda in cima alla conversazione. */
+export interface ConversationListing {
+  id: number;
+  title: string;
+  city: string;
+  price: number;
+  /** Prima foto dell'annuncio, o null se non ne ha. */
+  coverUrl: string | null;
+  /** L'annuncio è di chi guarda. */
+  mine: boolean;
+  /** Ancora visibile all'altro partecipante (attivo, non rimosso, nessun blocco). */
+  available: boolean;
+}
+
+export interface ConversationParticipant {
+  id: string;
+  firstName: string;
+  publicKey: string;
+  /** Account sospeso: non gli si può più scrivere. */
+  unavailable: boolean;
+  /** Il suo profilo si può aprire: pubblico, non sospeso, nessun blocco. */
+  profileVisible: boolean;
+}
+
 export interface Conversation {
   id: number;
   /** Annuncio da cui è nata la chat; null per le chat dirette o se l'annuncio è stato eliminato. */
-  listing: { id: number; title: string; price: number } | null;
-  /** null se l'altro partecipante ha eliminato l'account. unavailable: account sospeso. */
-  other: { id: string; firstName: string; publicKey: string; unavailable: boolean } | null;
+  listing: ConversationListing | null;
+  /** La chat è nata su un annuncio che il proprietario ha poi eliminato. */
+  listingDeleted: boolean;
+  /** null se l'altro partecipante ha eliminato l'account. */
+  other: ConversationParticipant | null;
   lastMessage: ChatMessage | null;
   /** Blocco tra i due partecipanti: con un blocco nessuno dei due può scrivere. */
   blocked: 'by_me' | 'by_other' | null;
   unreadCount: number;
+  /** Ultima lettura di chi guarda (null se mai): i messaggi dell'altro arrivati dopo sono nuovi. */
+  lastReadAt: string | null;
   updatedAt: string;
 }
 

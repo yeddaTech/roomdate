@@ -81,6 +81,7 @@ func TestEveryEndpointChecksAccess(t *testing.T) {
 
 		"GET /api/v1/conversations":                {path: "/api/v1/conversations", anonymous: 401},
 		"POST /api/v1/conversations":               {path: "/api/v1/conversations", body: map[string]any{"targetId": f.anna.ID}, anonymous: 401},
+		"GET /api/v1/conversations/{id}":           {path: chat, anonymous: 401, intruder: 403},
 		"GET /api/v1/conversations/{id}/messages":  {path: chat + "/messages", anonymous: 401, intruder: 403},
 		"POST /api/v1/conversations/{id}/messages": {path: chat + "/messages", body: message, anonymous: 401, intruder: 403},
 		"POST /api/v1/conversations/{id}/read":     {path: chat + "/read", anonymous: 401, intruder: 403},

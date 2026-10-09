@@ -167,15 +167,24 @@ func scanMessage(row pgx.CollectableRow) (MessageRow, error) {
 
 // ConversationRow è una conversazione vista da un partecipante.
 type ConversationRow struct {
-	ID           int
-	ListingID    *int
-	ListingTitle string
-	ListingPrice int
+	ID                        int
+	ListingID                 *int
+	ListingTitle, ListingCity string
+	ListingPrice              int
+	// ListingCoverKey è la chiave della prima foto dell'annuncio, se ne ha.
+	ListingCoverKey *string
+	// ListingMine: l'annuncio è di chi guarda. ListingActive: attivo, non rimosso dalla
+	// moderazione e di un account non sospeso, cioè visibile agli altri (blocchi a parte).
+	ListingMine, ListingActive bool
+	// ListingDeleted: la chat è nata su un annuncio che poi è stato eliminato.
+	ListingDeleted bool
 	// OtherID è vuoto se l'altro partecipante ha eliminato l'account.
 	OtherID, OtherFirstName, OtherPublicKey string
-	// Blocchi tra i due partecipanti e sospensione dell'altro
-	BlockedByMe, BlockedByOther, OtherSuspended bool
-	UnreadCount                                 int
+	// Blocchi tra i due partecipanti, sospensione dell'altro e se il suo profilo è pubblico
+	BlockedByMe, BlockedByOther, OtherSuspended, OtherPublic bool
+	UnreadCount                                              int
+	// LastReadAt è l'ultima volta che chi guarda ha letto la conversazione; nil se mai.
+	LastReadAt *time.Time
 	// LastActivity è la data dell'ultimo messaggio, o quella della conversazione se non ce ne sono.
 	LastActivity time.Time
 	// LastMessage è nil se la conversazione non ha ancora messaggi.
@@ -187,6 +196,8 @@ type ConversationsQuery struct {
 	UserID string
 	After  *ConversationsCursor
 	Limit  int
+	// OnlyID limita il risultato a una conversazione (0: tutte).
+	OnlyID int
 }
 
 // ConversationsCursor è la posizione dell'ultima conversazione della pagina precedente.
@@ -204,18 +215,23 @@ func (s *Store) Conversations(ctx context.Context, q ConversationsQuery) ([]Conv
 		afterTime, afterID = &q.After.LastActivity, q.After.ID
 	}
 	rows, err := s.db.Query(ctx, `
-        SELECT c.id, l.id, COALESCE(l.title, ''), COALESCE(l.price, 0),
+        SELECT c.id, l.id, COALESCE(l.title, ''), COALESCE(l.city, ''), COALESCE(l.price, 0),
+               (SELECT i.storage_key FROM roomdate_app.listing_images i WHERE i.listing_id = l.id ORDER BY i.position, i.id LIMIT 1),
+               COALESCE(l.user_id = me.user_id, false),
+               COALESCE(l.is_active AND l.removed_at IS NULL AND listing_owner.suspended_at IS NULL, false),
+               c.listing_id IS NULL AND COALESCE(c.dedup_key LIKE 'listing:%', false),
                COALESCE(other.user_id::text, ''), COALESCE(other.first_name, ''), COALESCE(other.public_key, ''),
                EXISTS (SELECT 1 FROM roomdate_app.user_blocks b WHERE b.blocker_id = me.user_id AND b.blocked_id = other.user_id),
                EXISTS (SELECT 1 FROM roomdate_app.user_blocks b WHERE b.blocker_id = other.user_id AND b.blocked_id = me.user_id),
-               COALESCE(other.suspended_at IS NOT NULL, false),
-               unread.count, COALESCE(m.created_at, c.created_at, 'epoch'),
+               COALESCE(other.suspended_at IS NOT NULL, false), COALESCE(other.is_public, true),
+               unread.count, me.last_read_at, COALESCE(m.created_at, c.created_at, 'epoch'),
                `+messageColumns+`
         FROM roomdate_app.conversation_participants me
         JOIN roomdate_app.conversations c ON c.id = me.conversation_id
         LEFT JOIN roomdate_app.listings l ON l.id = c.listing_id
+        LEFT JOIN roomdate_app.users listing_owner ON listing_owner.id = l.user_id
         LEFT JOIN LATERAL (
-            SELECT p.user_id, u.first_name, u.public_key, u.suspended_at
+            SELECT p.user_id, u.first_name, u.public_key, u.suspended_at, u.is_public
             FROM roomdate_app.conversation_participants p
             JOIN roomdate_app.users u ON u.id = p.user_id
             WHERE p.conversation_id = c.id AND p.user_id <> me.user_id
@@ -237,9 +253,10 @@ func (s *Store) Conversations(ctx context.Context, q ConversationsQuery) ([]Conv
         WHERE me.user_id = $1
           AND ($3::timestamptz IS NULL
                OR (COALESCE(m.created_at, c.created_at, 'epoch'), c.id) < ($3::timestamptz, $4))
+          AND ($6::int = 0 OR c.id = $6)
         ORDER BY COALESCE(m.created_at, c.created_at, 'epoch') DESC, c.id DESC
         LIMIT $5`,
-		q.UserID, q.UserID, afterTime, afterID, q.Limit)
+		q.UserID, q.UserID, afterTime, afterID, q.Limit, q.OnlyID)
 	if err != nil {
 		return nil, err
 	}
@@ -247,9 +264,10 @@ func (s *Store) Conversations(ctx context.Context, q ConversationsQuery) ([]Conv
 		var c ConversationRow
 		var messageID *int
 		var m MessageRow
-		err := row.Scan(&c.ID, &c.ListingID, &c.ListingTitle, &c.ListingPrice,
-			&c.OtherID, &c.OtherFirstName, &c.OtherPublicKey, &c.BlockedByMe, &c.BlockedByOther, &c.OtherSuspended,
-			&c.UnreadCount, &c.LastActivity,
+		err := row.Scan(&c.ID, &c.ListingID, &c.ListingTitle, &c.ListingCity, &c.ListingPrice,
+			&c.ListingCoverKey, &c.ListingMine, &c.ListingActive, &c.ListingDeleted,
+			&c.OtherID, &c.OtherFirstName, &c.OtherPublicKey, &c.BlockedByMe, &c.BlockedByOther, &c.OtherSuspended, &c.OtherPublic,
+			&c.UnreadCount, &c.LastReadAt, &c.LastActivity,
 			&messageID, &m.SenderID, &m.Format, &m.Body, &m.IV, &m.WrappedKey, &m.CreatedAt)
 		if err == nil && messageID != nil {
 			m.ID = *messageID
@@ -303,22 +321,52 @@ type NewMessage struct {
 	Keys map[string]string
 }
 
-// InsertMessage salva il messaggio e le chiavi dei partecipanti, e lo restituisce come lo legge il mittente.
-func (s *Store) InsertMessage(ctx context.Context, m NewMessage) (MessageRow, error) {
+// sendLock è lo spazio dei blocchi consultivi che mettono in fila gli invii di una conversazione.
+const sendLock int32 = 0x6d736773 // "msgs"
+
+// InsertMessage salva il messaggio e le chiavi dei partecipanti, e lo restituisce come lo legge il
+// mittente. created è false se lo stesso messaggio era già stato salvato: in quel caso
+// restituisce quello, senza duplicarlo.
+//
+// "Riprova" dopo una risposta persa (rete del telefono) rimanda il messaggio già cifrato, identico.
+// Testo cifrato e IV sono casuali per ogni messaggio, quindi due invii identici dello stesso
+// mittente sono lo stesso messaggio, se arrivano entro un giorno. Il blocco consultivo mette in
+// fila gli invii della conversazione: due tentativi contemporanei non superano entrambi il controllo.
+func (s *Store) InsertMessage(ctx context.Context, m NewMessage) (saved MessageRow, created bool, err error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
-		return MessageRow{}, err
+		return MessageRow{}, false, err
 	}
 	defer tx.Rollback(ctx)
 
-	saved := MessageRow{SenderID: m.SenderID, Format: FormatHybrid, Body: m.Body, IV: m.IV, WrappedKey: m.Keys[m.SenderID]}
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1, $2)`, sendLock, m.ConversationID); err != nil {
+		return MessageRow{}, false, err
+	}
+
+	saved = MessageRow{SenderID: m.SenderID, Format: FormatHybrid, Body: m.Body, IV: m.IV}
+	err = tx.QueryRow(ctx, `
+        SELECT m.id, m.created_at, COALESCE(k.wrapped_key, '')
+        FROM roomdate_app.messages m
+        LEFT JOIN roomdate_app.message_keys k ON k.message_id = m.id AND k.user_id = m.sender_id
+        WHERE m.conversation_id = $1 AND m.sender_id = $2 AND m.format = $3 AND m.iv = $4 AND m.body = $5
+          AND m.created_at > now() - interval '1 day'
+        LIMIT 1`, m.ConversationID, m.SenderID, FormatHybrid, m.IV, m.Body,
+	).Scan(&saved.ID, &saved.CreatedAt, &saved.WrappedKey)
+	if err == nil {
+		return saved, false, nil
+	}
+	if !db.IsNoRows(err) {
+		return MessageRow{}, false, err
+	}
+
+	saved.WrappedKey = m.Keys[m.SenderID]
 	err = tx.QueryRow(ctx, `
         INSERT INTO roomdate_app.messages (conversation_id, sender_id, format, body, iv, content)
         VALUES ($1, $2, $3, $4, $5, '')
         RETURNING id, created_at`, m.ConversationID, m.SenderID, FormatHybrid, m.Body, m.IV,
 	).Scan(&saved.ID, &saved.CreatedAt)
 	if err != nil {
-		return MessageRow{}, err
+		return MessageRow{}, false, err
 	}
 
 	for userID, key := range m.Keys {
@@ -326,10 +374,10 @@ func (s *Store) InsertMessage(ctx context.Context, m NewMessage) (MessageRow, er
             INSERT INTO roomdate_app.message_keys (message_id, user_id, wrapped_key)
             VALUES ($1, $2, $3)`, saved.ID, userID, key)
 		if err != nil {
-			return MessageRow{}, err
+			return MessageRow{}, false, err
 		}
 	}
-	return saved, tx.Commit(ctx)
+	return saved, true, tx.Commit(ctx)
 }
 
 // UnreadConversations conta le conversazioni dell'utente con almeno un messaggio non ancora letto

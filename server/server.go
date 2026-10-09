@@ -62,7 +62,7 @@ func New(d Deps) (http.Handler, error) {
 	usersHandler := users.NewHandler(users.NewService(users.NewStore(d.DB), security, mod, sessions.Hash,
 		users.Photos{Delete: deleteImages, URL: photos.PublicURL}), sessions)
 	listingsHandler := listings.NewHandler(listings.NewService(listings.NewStore(d.DB), photos, mod), sessions)
-	chatHandler := chat.NewHandler(chat.NewService(chat.NewStore(d.DB), d.Publisher, realtime.NewAuthorizer(d.Config.Pusher), mod), sessions)
+	chatHandler := chat.NewHandler(chat.NewService(chat.NewStore(d.DB), d.Publisher, realtime.NewAuthorizer(d.Config.Pusher), mod, photos), sessions)
 	moderationHandler := moderation.NewHandler(moderation.NewService(mod), sessions)
 
 	type methods = map[string]http.HandlerFunc
@@ -121,6 +121,7 @@ func New(d Deps) (http.Handler, error) {
 	mux.Handle("/api/v1/conversations", httpx.Methods(methods{
 		http.MethodGet: chatHandler.Conversations, http.MethodPost: chatHandler.StartChat,
 	}))
+	mux.Handle("/api/v1/conversations/{id}", httpx.Methods(methods{http.MethodGet: chatHandler.Conversation}))
 	mux.Handle("/api/v1/conversations/{id}/messages", httpx.Methods(methods{
 		http.MethodGet: chatHandler.Messages, http.MethodPost: chatHandler.SendMessage,
 	}))

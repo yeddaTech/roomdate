@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { ChatMessage, ConversationsPage, MessagesPage } from './types';
+import type { ChatMessage, Conversation, ConversationsPage, MessagesPage } from './types';
 
 export type StartChatTarget = { listingId: number } | { targetId: string };
 
@@ -12,6 +12,11 @@ export async function startChat(target: StartChatTarget): Promise<number> {
 /** Una pagina di conversazioni, dalla più attiva, con ultimo messaggio e non letti. */
 export function listConversations({ cursor = '' } = {}): Promise<ConversationsPage> {
   return request<ConversationsPage>(`/api/v1/conversations${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`);
+}
+
+/** Una conversazione, come nell'elenco: per la chat aperta da un indirizzo (/chat/7). */
+export function getConversation(conversationId: number): Promise<Conversation> {
+  return request<Conversation>(`/api/v1/conversations/${conversationId}`);
 }
 
 /** Una pagina di messaggi, dal più recente: il cursore carica quelli più vecchi. */
@@ -27,6 +32,10 @@ export interface OutgoingMessage {
   keys: { userId: string; key: string }[];
 }
 
+/**
+ * Invia il messaggio cifrato e lo restituisce come salvato. Lo stesso messaggio rimandato identico
+ * (un "Riprova" dopo una risposta persa) restituisce quello già salvato, senza duplicarlo.
+ */
 export function sendMessage(conversationId: number, message: OutgoingMessage): Promise<ChatMessage> {
   return request<ChatMessage>(`/api/v1/conversations/${conversationId}/messages`, { method: 'POST', body: message });
 }

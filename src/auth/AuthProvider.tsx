@@ -52,13 +52,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [queryClient],
   );
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async ({ signInAgain = false } = {}) => {
     try {
       await apiLogout();
     } catch {
       // anche se il server non risponde, i dati locali vanno puliti
     }
-    endLocalSession('signed_out');
+    // Per rientrare subito la pagina non va ricordata come "lasciata": rimanda all'accesso
+    endLocalSession(signInAgain ? 'expired' : 'signed_out');
   }, [endLocalSession]);
 
   const { refetch } = session;

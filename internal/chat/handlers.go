@@ -62,6 +62,20 @@ func (h *Handler) Conversations(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, page)
 }
 
+// Conversation gestisce GET /api/v1/conversations/{id}: la conversazione come nell'elenco.
+func (h *Handler) Conversation(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.requireSession(w, r)
+	if !ok {
+		return
+	}
+	conversation, err := h.svc.Conversation(r.Context(), session.UserID, r.PathValue("id"))
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, conversation)
+}
+
 // Unread gestisce GET /api/v1/me/unread: {"conversations": n}, il numero sul badge della chat.
 func (h *Handler) Unread(w http.ResponseWriter, r *http.Request) {
 	session, ok := h.requireSession(w, r)
@@ -91,7 +105,8 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, page)
 }
 
-// SendMessage gestisce POST /api/v1/conversations/{id}/messages.
+// SendMessage gestisce POST /api/v1/conversations/{id}/messages. Rimandare lo stesso messaggio
+// cifrato (un "Riprova") restituisce quello già salvato, senza duplicarlo.
 func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	session, ok := h.requireSession(w, r)
 	if !ok {
@@ -102,12 +117,17 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, err)
 		return
 	}
-	saved, err := h.svc.SendMessage(r.Context(), session.UserID, r.PathValue("id"), in)
+	saved, created, err := h.svc.SendMessage(r.Context(), session.UserID, r.PathValue("id"), in)
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
 	}
-	httpx.JSON(w, http.StatusCreated, saved)
+	// Lo stesso messaggio arrivato di nuovo: 200 con quello già salvato, invece di un duplicato
+	status := http.StatusCreated
+	if !created {
+		status = http.StatusOK
+	}
+	httpx.JSON(w, status, saved)
 }
 
 // MarkRead gestisce POST /api/v1/conversations/{id}/read.
