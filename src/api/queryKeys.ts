@@ -19,5 +19,6 @@ export const queryKeys = {
   conversations: ['conversations'] as const,
   // Sotto "conversations": ogni aggiornamento delle conversazioni aggiorna anche il badge
   unread: ['conversations', 'unread'] as const,
+  conversation: (conversationId: number) => ['conversations', 'detail', conversationId] as const,
   messages: (conversationId: number) => ['conversations', conversationId, 'messages'] as const,
 };

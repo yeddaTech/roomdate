@@ -20,7 +20,6 @@ function HeaderLink({ to, icon, children, badge = 0 }: { to: string; icon: React
   return (
     <NavLink
       to={to}
-      aria-label={badge > 0 ? `${children}, ${unreadLabel(badge)}` : undefined}
       className={({ isActive }) => cn(
         'relative inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-bold transition-colors duration-150 [&_svg]:size-4',
         isActive ? 'bg-surface-muted text-foreground' : 'text-foreground-muted hover:bg-surface-muted hover:text-foreground',
@@ -30,9 +29,12 @@ function HeaderLink({ to, icon, children, badge = 0 }: { to: string; icon: React
       {icon}
       {children}
       {badge > 0 && (
-        <span aria-hidden="true" className="min-w-5 rounded-full bg-primary px-1.5 text-center text-xs leading-5 text-primary-foreground">
-          {badge > 99 ? '99+' : badge}
-        </span>
+        <>
+          <span aria-hidden="true" className="min-w-5 rounded-full bg-primary px-1.5 text-center text-xs leading-5 text-primary-foreground">
+            {badge > 99 ? '99+' : badge}
+          </span>
+          <span className="sr-only">, {unreadLabel(badge)}</span>
+        </>
       )}
     </NavLink>
   );

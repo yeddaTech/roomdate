@@ -13,8 +13,11 @@ export interface AuthContextValue {
   signedOutFrom: string | null;
   /** Accede e prepara le chiavi E2EE. keysUnlocked è false se la chiave privata non si è aperta. */
   login(email: string, password: string): Promise<{ keysUnlocked: boolean }>;
-  /** Chiude la sessione sul server e pulisce i dati locali. */
-  logout(): Promise<void>;
+  /**
+   * Chiude la sessione sul server e pulisce i dati locali. Con signInAgain la pagina protetta da
+   * cui si esce porta all'accesso, e dopo l'accesso torna lì, invece di mandare alla home.
+   */
+  logout(options?: { signInAgain?: boolean }): Promise<void>;
   /**
    * Pulisce i dati locali senza chiamare il server, quando la sessione è già chiusa sul server:
    * reason "signed_out" dopo l'eliminazione dell'account, "expired" se la sessione è scaduta.

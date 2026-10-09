@@ -89,7 +89,12 @@ Both lists answer `{"items": [...], "nextCursor": "…"}` and are paginated by c
 
 Public profiles show the age, never the birth date. For a signed-in viewer, profiles also carry `compatibility`: what the two profiles have in common (same city, budgets within 100 €, shared lifestyle tags) and whether one smokes and the other does not. There is deliberately no percentage score, so every item shown to users has a stated reason.
 
-* Chat: `conversations` (list, start), `conversations/{id}/messages` (read, send), `conversations/{id}/read`, and `realtime/auth` (signature for private real-time channels). The conversation list carries the last message, the unread count and the other participant; messages are paginated newest-first, so opening a chat no longer loads its whole history. Every message the caller receives already contains the ciphertext and the key that caller can open.
+* Chat: `conversations` (list, start), `conversations/{id}` (one conversation, as in the list), `conversations/{id}/messages` (read, send), `conversations/{id}/read`, and `realtime/auth` (signature for private real-time channels).
+  * The conversation list carries the last message, the unread count, the caller's last read time (`lastReadAt`) and the other participant.
+  * The other participant comes with `profileVisible`: the same rule as the profile page (public, not suspended, no block).
+  * The listing a chat started from comes with its city, first photo, `mine` and `available`: whether the other participant can still see it (active, not removed, no block). `listingDeleted` says the chat started on a listing that was deleted since.
+  * Messages are paginated newest-first, so opening a chat no longer loads its whole history. Every message the caller receives already contains the ciphertext and the key that caller can open.
+  * **Sending again is safe.** A message sent again identical (same ciphertext and IV, both random per message) by the same sender in the same conversation within a day is the same message: the API answers 200 with the saved one instead of 201 and a duplicate, and does not notify the other participant again. "Riprova" after a lost response relies on this. An advisory lock per conversation (`pg_advisory_xact_lock`) serialises sends, so two simultaneous attempts cannot both pass the check. No migration is needed.
 
 Real-time events use Pusher **private** channels, which carry only IDs, never message content. Pusher accepts a subscription only with a signature from `POST /api/v1/realtime/auth`. The API signs only the caller's own channel and the channels of conversations they take part in.
 * `private-user-<id>`: the server's "new message" notice (conversation and message ID), so a message wakes only its participants instead of every connected client.
@@ -137,7 +142,7 @@ The interface is built on tokens and a small set of accessible components. Every
   * **Phone:** a side panel holds the rest. Its code (Radix Dialog) is fetched when the browser is idle, not with the page.
 * **Bottom tab bar on phones** (`MobileTabBar`): Home, Cerca, Preferiti, Chat, Profilo/Accedi.
   * Content above it gets bottom padding (`tabBarPadding`), so the bar never covers a button.
-  * A page can hide the bar with `useHideTabBar(true)`. The chat does this while a conversation is open, to leave room for messages and the keyboard.
+  * A page can hide the bar with `useHideTabBar(true)`. The chat does this while a conversation is open (`/chat/7`), to leave room for messages and the keyboard.
   * The bar is absent on auth pages.
 * **Unread badge:** `GET /api/v1/me/unread` returns `{ "conversations": n }`, the number of conversations with messages the user has not read. Its query key sits under `conversations`, so reading or receiving a message refreshes it; it also refreshes every minute.
 * **Errors:** `RouteError` is the `errorElement` of each layout, so a crash in a page shows a message inside the layout, with the navigation still there.
@@ -204,6 +209,60 @@ The interface is built on tokens and a small set of accessible components. Every
   * Without a session there is an invitation to sign in. On your own profile, a note says this is how others see it.
 * **"Indietro"** (`BackLink`) goes back to the previous page of the site, such as the search with its filters. On a page opened from an outside link it goes to the search instead of leaving the site.
 * **Errors:** a missing listing or profile ("non trovato") and a server error (with "Riprova") are shown differently.
+
+### Chat (module M2.6)
+
+* **Every conversation has an address:** `/chat` is the list, `/chat/7` the open conversation. Phones show one of the two; the arrow and the phone's own back button return to the list, and a conversation opened from a link goes to the list instead of leaving the site. On phones the list keeps its scroll position.
+* **Messages** (`MessageThread`, `src/chat/thread.ts`):
+  * They are grouped by day, with the day pinned at the top while scrolling.
+  * Within a day, consecutive messages from the same person less than 5 minutes apart form one group, with one avatar and one time.
+  * Times use the viewer's local time.
+* **"Nuovi messaggi":** on opening a conversation, a divider sits before the first message from the other person that arrived after the last read.
+  * Its position comes from `lastReadAt` as the server returns it at that moment, not from the copy in the list or in the cache, which may predate the new messages.
+  * The conversation is shown once that is known, already scrolled to the divider. The divider does not move afterwards.
+* **Read state:** a conversation is marked read only while the page is in view, the messages can be decrypted and the conversation has come back from the server.
+  * It is marked again at every new last message.
+  * The counter drops to zero at once in the loaded data, because a request already in flight would bring back the old number.
+  * A hidden tab or a locked chat keeps the unread badge.
+* **Scrolling:**
+  * The conversation opens on the first new message, or at the bottom.
+  * A new message keeps the reader at the bottom if they were there. Otherwise a "1 nuovo messaggio ↓" button appears, instead of yanking them down.
+  * Older messages load by themselves at the top, and the message being read stays in place.
+* **Sending** (`useOutbox`):
+  * A message appears at once with "Invio…", then "Inviato" under the latest one.
+  * If it fails, it stays in place with the reason, "Riprova" and "Elimina".
+  * The retry sends the same ciphertext, so the API recognises it and does not duplicate it.
+  * Offline, the message fails at once ("Sei offline") and goes out by itself when the connection returns.
+  * When the server refuses a message (block, suspended account), its reason is shown and the conversation is reloaded, so it shows as closed.
+* **Real time** (`useChatRealtime`):
+  * New messages are added to the ones already loaded (`pullLatestMessages`) instead of reloading every page.
+  * "Sta scrivendo" shows under the name, as dots in the conversation and in the list. It disappears as soon as the message arrives.
+  * Without Pusher, or while its connection is down, the chat refreshes every 5 seconds.
+  * After a reconnection, or when the tab comes back into view, the chat reloads.
+* **Listing card** at the top of the conversation: photo, title, price and city, linking to the listing.
+  * For the other person, "Non più disponibile" without a link once the listing is no longer visible to them.
+  * For the owner, "Il tuo annuncio", plus "non visibile agli altri" when it is hidden from others.
+  * "L'annuncio di questa conversazione è stato eliminato" when it was deleted.
+  * The other person's name links to their profile only when `profileVisible` is true.
+* **Composer:**
+  * With a mouse and keyboard, Enter sends and Shift+Enter starts a new line. With a finger, Enter starts a new line and the button sends, as in messaging apps.
+  * Enter during composition (some Asian and Android keyboards) never sends.
+  * The field grows up to about six lines. Messages are capped at 4,000 characters, with a counter near the limit.
+  * Drafts are kept per conversation, in memory only.
+  * Suggested questions appear when someone writes about a listing that is not theirs and has not written yet.
+* **Phone keyboard:** on iPhone and on Android Chrome 108+, the keyboard covers the page without shrinking it.
+  * The full-height layout follows the visual viewport (`useVisualViewport`): its height, and its offset when iOS pans the view. So the header and the composer stay visible.
+  * While the keyboard is open, the listing card steps aside.
+  * Pinch zoom is left alone.
+  * The send button does not take focus, so the keyboard stays open between messages.
+* **Unlocking** (`UnlockPanel`) replaces the old blurred overlay. There are two cases:
+  * **The encrypted key is on the device:** a password form that password managers recognise, with a hidden username field. It shows a clear error on a wrong password and links to the recovery key.
+  * **The key is missing**, for example after the site data was cleared: "Esci e accedi di nuovo" signs out (`logout({ signInAgain: true })`) and returns to the chat after sign-in.
+* **Accessibility:**
+  * Each message carries its author and time for screen readers.
+  * Incoming messages and "sta scrivendo" are announced politely.
+  * The message area can be focused and scrolled with the keyboard.
+  * The unread count on the Chat links is read after the label ("Chat, 2 conversazioni con messaggi non letti").
 
 ### Tests
 

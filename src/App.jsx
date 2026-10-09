@@ -15,7 +15,7 @@ const Register = lazy(() => import('./pages/Register'));
 const RecoverAccount = lazy(() => import('./pages/RecoverAccount'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Search = lazy(() => import('./pages/Search'));
-const Chatpage = lazy(() => import('./pages/Chatpage'));
+const Chat = lazy(() => import('./pages/Chat'));
 const ListingDetails = lazy(() => import('./pages/ListingDetails'));
 const Impostazioni = lazy(() => import('./pages/Impostazioni'));
 const RoommateDetails = lazy(() => import('./pages/RoommateDetails'));
@@ -60,7 +60,8 @@ const router = createBrowserRouter([
           errorElement: <RouteError />,
           children: [
             { path: 'dashboard', element: <Dashboard /> },
-            { path: 'chat', element: <Chatpage />, handle: { fullHeight: true } },
+            // Ogni conversazione ha il suo indirizzo: /chat è l'elenco, /chat/7 la conversazione aperta
+            { path: 'chat/:conversationId?', element: <Chat />, handle: { fullHeight: true } },
             { path: 'impostazioni', element: <Impostazioni /> },
             { path: 'moderazione', element: <Moderation /> },
             { path: 'preferiti', element: <Favorites /> },

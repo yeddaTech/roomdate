@@ -12,6 +12,7 @@ import (
 	"roomdate-backend/internal/moderation"
 	"roomdate-backend/internal/page"
 	"roomdate-backend/internal/realtime"
+	"roomdate-backend/internal/storage"
 	"roomdate-backend/internal/validate"
 )
 
@@ -43,10 +44,12 @@ type Service struct {
 	authorizer realtime.Authorizer
 	// blocks dice se due utenti si sono bloccati: non possono più scriversi
 	blocks *moderation.Store
+	// photos dà l'indirizzo della foto dell'annuncio nella scheda della conversazione
+	photos storage.Storage
 }
 
-func NewService(store *Store, publisher realtime.Publisher, authorizer realtime.Authorizer, blocks *moderation.Store) *Service {
-	return &Service{store: store, publisher: publisher, authorizer: authorizer, blocks: blocks}
+func NewService(store *Store, publisher realtime.Publisher, authorizer realtime.Authorizer, blocks *moderation.Store, photos storage.Storage) *Service {
+	return &Service{store: store, publisher: publisher, authorizer: authorizer, blocks: blocks, photos: photos}
 }
 
 // StartChatInput identifica l'annuncio (chat su annuncio) o l'utente (chat diretta).
@@ -158,11 +161,18 @@ func message(r MessageRow) Message {
 	return Message{ID: r.ID, SenderID: r.SenderID, Format: r.Format, Body: r.Body, IV: r.IV, Key: r.WrappedKey, CreatedAt: r.CreatedAt.UTC()}
 }
 
-// Listing è l'annuncio da cui è nata la conversazione, se esiste ancora.
+// Listing è l'annuncio da cui è nata la conversazione, se esiste ancora: la scheda in cima alla chat.
 type Listing struct {
-	ID    int    `json:"id"`
-	Title string `json:"title"`
-	Price int    `json:"price"`
+	ID       int     `json:"id"`
+	Title    string  `json:"title"`
+	City     string  `json:"city"`
+	Price    int     `json:"price"`
+	CoverURL *string `json:"coverUrl"`
+	// Mine: l'annuncio è di chi guarda.
+	Mine bool `json:"mine"`
+	// Available: l'annuncio è ancora visibile all'altro partecipante (attivo, non rimosso, nessun
+	// blocco). Se è falso, per chi non è il proprietario la pagina dell'annuncio non esiste più.
+	Available bool `json:"available"`
 }
 
 // Participant è l'altro partecipante; è null se ha eliminato l'account.
@@ -172,6 +182,8 @@ type OtherParticipant struct {
 	PublicKey string `json:"publicKey"`
 	// Unavailable: l'account è stato sospeso, non gli si può più scrivere.
 	Unavailable bool `json:"unavailable"`
+	// ProfileVisible: il suo profilo si può aprire (pubblico, non sospeso, nessun blocco).
+	ProfileVisible bool `json:"profileVisible"`
 }
 
 // Stato di blocco di una conversazione, visto da chi la legge.
@@ -182,14 +194,19 @@ const (
 
 // Conversation è una conversazione nell'elenco.
 type Conversation struct {
-	ID          int               `json:"id"`
-	Listing     *Listing          `json:"listing"`
-	Other       *OtherParticipant `json:"other"`
-	LastMessage *Message          `json:"lastMessage"`
+	ID      int      `json:"id"`
+	Listing *Listing `json:"listing"`
+	// ListingDeleted: la chat è nata su un annuncio che il proprietario ha poi eliminato.
+	ListingDeleted bool              `json:"listingDeleted"`
+	Other          *OtherParticipant `json:"other"`
+	LastMessage    *Message          `json:"lastMessage"`
 	// Blocked è "by_me", "by_other" o null: con un blocco nessuno dei due può scrivere.
-	Blocked     *string   `json:"blocked"`
-	UnreadCount int       `json:"unreadCount"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	Blocked     *string `json:"blocked"`
+	UnreadCount int     `json:"unreadCount"`
+	// LastReadAt è l'ultima lettura di chi guarda (null se mai): i messaggi dell'altro arrivati
+	// dopo sono quelli nuovi, sotto il separatore "Nuovi messaggi".
+	LastReadAt *time.Time `json:"lastReadAt"`
+	UpdatedAt  time.Time  `json:"updatedAt"`
 }
 
 // ConversationsPage è una pagina dell'elenco delle conversazioni.
@@ -241,29 +258,67 @@ func (s *Service) Conversations(ctx context.Context, userID, cursor, rawLimit st
 		result.NextCursor = &cursor
 	}
 	for _, r := range rows {
-		c := Conversation{ID: r.ID, UnreadCount: r.UnreadCount, UpdatedAt: r.LastActivity.UTC()}
-		if r.ListingID != nil {
-			c.Listing = &Listing{ID: *r.ListingID, Title: r.ListingTitle, Price: r.ListingPrice}
-		}
-		if r.OtherID != "" {
-			c.Other = &OtherParticipant{ID: r.OtherID, FirstName: r.OtherFirstName, PublicKey: r.OtherPublicKey, Unavailable: r.OtherSuspended}
-		}
-		// Se si sono bloccati a vicenda conta il blocco di chi guarda: è quello che può togliere
-		switch {
-		case r.BlockedByMe:
-			state := BlockedByMe
-			c.Blocked = &state
-		case r.BlockedByOther:
-			state := BlockedByOther
-			c.Blocked = &state
-		}
-		if r.LastMessage != nil {
-			last := message(*r.LastMessage)
-			c.LastMessage = &last
-		}
-		result.Items = append(result.Items, c)
+		result.Items = append(result.Items, s.conversation(r))
 	}
 	return result, nil
+}
+
+// conversation converte una riga nella conversazione come la vede chi l'ha chiesta.
+func (s *Service) conversation(r ConversationRow) Conversation {
+	c := Conversation{ID: r.ID, ListingDeleted: r.ListingDeleted, UnreadCount: r.UnreadCount, UpdatedAt: r.LastActivity.UTC()}
+	if r.LastReadAt != nil {
+		read := r.LastReadAt.UTC()
+		c.LastReadAt = &read
+	}
+	if r.ListingID != nil {
+		c.Listing = &Listing{
+			ID: *r.ListingID, Title: r.ListingTitle, City: r.ListingCity, Price: r.ListingPrice, Mine: r.ListingMine,
+			// Con un blocco l'annuncio sparisce per l'altro, come nella ricerca
+			Available: r.ListingActive && !r.BlockedByMe && !r.BlockedByOther,
+		}
+		if r.ListingCoverKey != nil {
+			if url := s.photos.PublicURL(*r.ListingCoverKey); url != "" {
+				c.Listing.CoverURL = &url
+			}
+		}
+	}
+	if r.OtherID != "" {
+		c.Other = &OtherParticipant{
+			ID: r.OtherID, FirstName: r.OtherFirstName, PublicKey: r.OtherPublicKey, Unavailable: r.OtherSuspended,
+			ProfileVisible: r.OtherPublic && !r.OtherSuspended && !r.BlockedByMe && !r.BlockedByOther,
+		}
+	}
+	// Se si sono bloccati a vicenda conta il blocco di chi guarda: è quello che può togliere
+	switch {
+	case r.BlockedByMe:
+		state := BlockedByMe
+		c.Blocked = &state
+	case r.BlockedByOther:
+		state := BlockedByOther
+		c.Blocked = &state
+	}
+	if r.LastMessage != nil {
+		last := message(*r.LastMessage)
+		c.LastMessage = &last
+	}
+	return c
+}
+
+// Conversation restituisce una conversazione dell'utente, come nell'elenco: serve alla chat
+// aperta da un indirizzo (/chat/7) quando non è tra quelle già caricate.
+func (s *Service) Conversation(ctx context.Context, userID, rawConversationID string) (Conversation, error) {
+	conversationID, err := s.requireParticipantByID(ctx, userID, rawConversationID)
+	if err != nil {
+		return Conversation{}, err
+	}
+	rows, err := s.store.Conversations(ctx, ConversationsQuery{UserID: userID, Limit: 1, OnlyID: conversationID})
+	if err != nil {
+		return Conversation{}, apperr.Wrap(err, "chats_read_failed", "Errore caricamento chat")
+	}
+	if len(rows) == 0 {
+		return Conversation{}, errNotParticipant
+	}
+	return s.conversation(rows[0]), nil
 }
 
 // Messages restituisce una pagina di messaggi, dal più recente: il cursore serve a caricare i più vecchi.
@@ -321,33 +376,34 @@ type SendMessageInput struct {
 	} `json:"keys"`
 }
 
-// SendMessage salva il messaggio e avvisa i partecipanti.
-func (s *Service) SendMessage(ctx context.Context, userID, rawConversationID string, in SendMessageInput) (Message, error) {
+// SendMessage salva il messaggio e avvisa i partecipanti. created è false se lo stesso messaggio
+// cifrato era già arrivato (un nuovo tentativo dopo una risposta persa): non viene duplicato.
+func (s *Service) SendMessage(ctx context.Context, userID, rawConversationID string, in SendMessageInput) (msg Message, created bool, err error) {
 	conversationID, err := s.requireParticipantByID(ctx, userID, rawConversationID)
 	if err != nil {
-		return Message{}, err
+		return Message{}, false, err
 	}
 
 	var v validate.Validator
 	v.Check(validate.NotBlank(in.Body) && validate.Base64(in.Body, maxBodyLength), "body", "Messaggio non valido")
 	v.Check(validate.Base64(in.IV, 64) && in.IV != "", "iv", "Messaggio non valido")
 	if err := v.Err(); err != nil {
-		return Message{}, err
+		return Message{}, false, err
 	}
 
 	participants, err := s.store.Participants(ctx, conversationID)
 	if err != nil {
-		return Message{}, fmt.Errorf("lettura partecipanti: %w", err)
+		return Message{}, false, fmt.Errorf("lettura partecipanti: %w", err)
 	}
 	if err := s.requireOpen(ctx, userID, participants); err != nil {
-		return Message{}, err
+		return Message{}, false, err
 	}
 
 	// Serve una chiave per ogni partecipante che ha una chiave pubblica, e nessuna in più
 	keys := make(map[string]string, len(in.Keys))
 	for _, k := range in.Keys {
 		if !validate.Base64(k.Key, maxKeyLength) || k.Key == "" {
-			return Message{}, errKeysMismatch
+			return Message{}, false, errKeysMismatch
 		}
 		keys[k.UserID] = k.Key
 	}
@@ -358,18 +414,22 @@ func (s *Service) SendMessage(ctx context.Context, userID, rawConversationID str
 		}
 		expected++
 		if keys[p.UserID] == "" {
-			return Message{}, errKeysMismatch
+			return Message{}, false, errKeysMismatch
 		}
 	}
 	if len(keys) != expected {
-		return Message{}, errKeysMismatch
+		return Message{}, false, errKeysMismatch
 	}
 
-	saved, err := s.store.InsertMessage(ctx, NewMessage{
+	saved, created, err := s.store.InsertMessage(ctx, NewMessage{
 		ConversationID: conversationID, SenderID: userID, Body: in.Body, IV: in.IV, Keys: keys,
 	})
 	if err != nil {
-		return Message{}, apperr.Wrap(err, "message_send_failed", "Impossibile inviare il messaggio")
+		return Message{}, false, apperr.Wrap(err, "message_send_failed", "Impossibile inviare il messaggio")
+	}
+	// Un nuovo tentativo dello stesso messaggio: gli altri sono già stati avvisati la prima volta
+	if !created {
+		return message(saved), false, nil
 	}
 
 	// Il messaggio è salvato: se la notifica in tempo reale fallisce, i client lo vedranno al prossimo aggiornamento
@@ -383,7 +443,7 @@ func (s *Service) SendMessage(ctx context.Context, userID, rawConversationID str
 			logx.From(ctx).Warn("notifica nuovo messaggio non inviata", "err", err)
 		}
 	}
-	return message(saved), nil
+	return message(saved), true, nil
 }
 
 // UnreadCount restituisce quante conversazioni hanno messaggi non letti.

@@ -1,6 +1,6 @@
 // Hook per leggere e modificare i dati: le pagine usano questi, non le chiamate API dirette.
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
-import { getUnreadCount, listConversations, listMessages, markConversationRead, sendMessage, startChat } from './chat';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryClient, type QueryKey } from '@tanstack/react-query';
+import { getConversation, getUnreadCount, listConversations, listMessages, markConversationRead, sendMessage, startChat } from './chat';
 import {
   createListing,
   deleteListing,
@@ -18,7 +18,7 @@ import {
 import { blockUser, listAdminReports, listBlocks, resolveReport, restoreListing, sendReport, unblockUser, unsuspendUser } from './moderation';
 import { queryKeys } from './queryKeys';
 import type { OutgoingMessage } from './chat';
-import type { ListingFilters, ListingInput, ModerationAction, SessionUser } from './types';
+import type { ChatMessage, Conversation, ConversationsPage, ListingFilters, ListingInput, MessagesPage, ModerationAction, SessionUser } from './types';
 import { getMyProfile, getPublicProfile, listRoommates, listSessions, revokeOtherSessions, revokeSession, updateMyProfile } from './users';
 
 /** Il proprio profilo. Solo con una sessione: senza, /api/v1/me risponde 401 (sessione assente). */
@@ -255,6 +255,33 @@ export function useUnreadCount({ enabled = true } = {}) {
   });
 }
 
+/**
+ * Una conversazione, come nell'elenco. Finché arriva si mostra quella già nell'elenco, se c'è:
+ * aperta da un indirizzo (/chat/7) o appena creata potrebbe non esserci ancora.
+ */
+export function useConversation(conversationId: number | null) {
+  const queryClient = useQueryClient();
+  return useQuery({
+    queryKey: queryKeys.conversation(conversationId ?? 0),
+    queryFn: () => getConversation(conversationId as number),
+    enabled: conversationId !== null,
+    placeholderData: () => (conversationId === null ? undefined : listedConversation(queryClient, conversationId)),
+  });
+}
+
+function listedConversation(queryClient: QueryClient, conversationId: number) {
+  const data = queryClient.getQueryData<InfiniteData<ConversationsPage, string>>(queryKeys.conversations);
+  return data?.pages.flatMap((page) => page.items).find((c) => c.id === conversationId);
+}
+
+/**
+ * Aggiorna elenco, conversazioni aperte e badge, ma non i messaggi: quelli nuovi si aggiungono da
+ * soli (addMessagesToCache, pullLatestMessages) senza ricaricare le pagine già lette.
+ */
+export function invalidateConversations(queryClient: QueryClient) {
+  return queryClient.invalidateQueries({ queryKey: queryKeys.conversations, predicate: (query) => query.queryKey[2] !== 'messages' });
+}
+
 /** Messaggi di una conversazione, dal più recente: fetchNextPage carica quelli più vecchi. */
 export function useMessages(conversationId: number | null) {
   return useInfiniteQuery({
@@ -266,24 +293,75 @@ export function useMessages(conversationId: number | null) {
   });
 }
 
+const newestFirst = (a: ChatMessage, b: ChatMessage) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id - a.id;
+
+/** Aggiunge messaggi già salvati in testa alla conversazione, senza duplicarli. */
+export function addMessagesToCache(queryClient: QueryClient, conversationId: number, incoming: ChatMessage[]) {
+  queryClient.setQueryData<InfiniteData<MessagesPage, string>>(queryKeys.messages(conversationId), (data) => {
+    if (!data || data.pages.length === 0) return data;
+    const known = new Set(data.pages.flatMap((page) => page.items.map((m) => m.id)));
+    const fresh = incoming.filter((m) => !known.has(m.id));
+    if (fresh.length === 0) return data;
+    const [first, ...rest] = data.pages;
+    return { ...data, pages: [{ ...first, items: [...fresh, ...first.items].sort(newestFirst) }, ...rest] };
+  });
+}
+
+/**
+ * Scarica i messaggi arrivati da poco e li aggiunge a quelli già caricati: un messaggio nuovo non
+ * fa ricaricare tutte le pagine lette. Se sono tanti da riempire una pagina, ricarica tutto.
+ */
+export async function pullLatestMessages(queryClient: QueryClient, conversationId: number) {
+  const key = queryKeys.messages(conversationId);
+  if (!queryClient.getQueryData(key) || queryClient.isFetching({ queryKey: key }) > 0) {
+    await queryClient.invalidateQueries({ queryKey: key });
+    return;
+  }
+  const latest = await listMessages(conversationId);
+  const data = queryClient.getQueryData<InfiniteData<MessagesPage, string>>(key);
+  const known = new Set(data?.pages.flatMap((page) => page.items.map((m) => m.id)) ?? []);
+  if (latest.nextCursor && latest.items.every((m) => !known.has(m.id))) {
+    await queryClient.invalidateQueries({ queryKey: key });
+    return;
+  }
+  addMessagesToCache(queryClient, conversationId, latest.items);
+}
+
+/**
+ * Invia un messaggio cifrato; quello salvato entra subito nella conversazione. Senza rete l'invio
+ * fallisce subito invece di restare in pausa: la chat lo mostra "offline" e lo rimanda da sé.
+ */
 export function useSendMessage() {
   const queryClient = useQueryClient();
   return useMutation({
+    networkMode: 'always',
     mutationFn: ({ conversationId, message }: { conversationId: number; message: OutgoingMessage }) =>
       sendMessage(conversationId, message),
-    onSuccess: (_, { conversationId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+    onSuccess: (saved, { conversationId }) => {
+      addMessagesToCache(queryClient, conversationId, [saved]);
+      invalidateConversations(queryClient);
     },
   });
 }
 
-/** Segna letta la conversazione aperta, così il contatore dei non letti torna a zero. */
+/**
+ * Segna letta la conversazione aperta, così il contatore dei non letti torna a zero. Lo zero si
+ * scrive subito nei dati già caricati: una richiesta partita prima della lettura riporterebbe il
+ * numero vecchio, e TanStack non la ripete se non ha ancora dati.
+ */
 export function useMarkConversationRead() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: markConversationRead,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.conversations }),
+    onSuccess: (_, conversationId) => {
+      const read = (c: Conversation) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c);
+      queryClient.setQueryData<Conversation>(queryKeys.conversation(conversationId), (c) => c && read(c));
+      queryClient.setQueryData<InfiniteData<ConversationsPage, string>>(queryKeys.conversations, (data) => data && {
+        ...data,
+        pages: data.pages.map((page) => ({ ...page, items: page.items.map(read) })),
+      });
+      invalidateConversations(queryClient);
+    },
   });
 }
 
@@ -291,7 +369,7 @@ export function useStartChat() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: startChat,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.conversations }),
+    onSuccess: () => invalidateConversations(queryClient),
   });
 }
 
