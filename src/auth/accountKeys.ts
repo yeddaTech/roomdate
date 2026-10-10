@@ -14,6 +14,7 @@ import {
   type LoginResult,
 } from '../api/auth';
 import { ApiError } from '../api/client';
+import { deleteMyAccount } from '../api/users';
 import type { CryptoKeys, KdfParams, RecoveryInput, WrappedPrivateKey } from '../api/types';
 import {
   deriveAccountKeys,
@@ -28,6 +29,18 @@ import {
   wrapPrivateKeyWith,
 } from '../utils/crypto';
 import { hasStoredVault, readPrivateKeyWithPassword, saveVault, storeKeysAtLogin } from './keyStorage';
+
+/**
+ * La prova della password da mandare al server per le operazioni che la richiedono di nuovo: la
+ * chiave d'accesso ricavata nel browser, oppure la password stessa per un account non ancora
+ * passato al metodo nuovo. La password non lascia mai il browser.
+ */
+async function passwordProof(email: string, password: string): Promise<string> {
+  const current = await prelogin(email);
+  return current.version === 2
+    ? (await deriveAccountKeys(password, current.salt, current.iterations)).authKey
+    : password;
+}
 
 /** Parametri nuovi, con un sale casuale. */
 function newKdf(): KdfParams {
@@ -140,10 +153,7 @@ export async function prepareRegistration(password: string): Promise<PreparedReg
  * da mostrare, o null se la password non apre la chiave salvata su questo dispositivo.
  */
 export async function setupRecoveryKey(email: string, password: string): Promise<string | null> {
-  const current = await prelogin(email);
-  const secret = current.version === 2
-    ? (await deriveAccountKeys(password, current.salt, current.iterations)).authKey
-    : password;
+  const secret = await passwordProof(email, password);
 
   const privateKeyBase64 = await readPrivateKeyWithPassword(password);
   if (privateKeyBase64 === null && hasStoredVault()) return null;
@@ -200,10 +210,7 @@ export async function preparePasswordChange(
   currentPassword: string,
   newPassword: string,
 ): Promise<PreparedPasswordChange> {
-  const current = await prelogin(email);
-  const currentSecret = current.version === 2
-    ? (await deriveAccountKeys(currentPassword, current.salt, current.iterations)).authKey
-    : currentPassword;
+  const currentSecret = await passwordProof(email, currentPassword);
 
   const kdf = newKdf();
   const { authKey, wrapKey } = await deriveAccountKeys(newPassword, kdf.salt, kdf.iterations);
@@ -223,4 +230,12 @@ export async function preparePasswordChange(
       if (keys) saveVault(keys, kdf);
     },
   };
+}
+
+/**
+ * Elimina l'account. Il server vuole di nuovo la password, cioè la chiave d'accesso ricavata da
+ * essa: mandare la password in chiaro non funzionerebbe (e non deve succedere).
+ */
+export async function deleteAccount(email: string, password: string): Promise<void> {
+  await deleteMyAccount(await passwordProof(email, password));
 }

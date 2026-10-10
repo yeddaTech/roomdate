@@ -66,7 +66,7 @@ export default function CompatibilityDetails({ compatibility: c, other, me }: Pr
       {missing.length > 0 && (
         <p className="text-sm text-foreground-muted">
           Nel tuo profilo mancano {missing.join(', ').replace(/, ([^,]*)$/, ' e $1')}: aggiungili nel{' '}
-          <Link to="/dashboard" className={cn('rounded-sm font-bold text-primary hover:text-primary-hover', focusRing)}>tuo profilo</Link>{' '}
+          <Link to="/profilo" className={cn('rounded-sm font-bold text-primary hover:text-primary-hover', focusRing)}>tuo profilo</Link>{' '}
           per un confronto più completo.
         </p>
       )}

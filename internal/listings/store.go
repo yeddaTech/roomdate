@@ -42,14 +42,15 @@ type Data struct {
 	AvailableFrom               *time.Time
 }
 
-func (s *Store) Create(ctx context.Context, ownerID string, d Data) (int, error) {
+// Create salva un annuncio nuovo; active false lo crea non pubblicato (bozza).
+func (s *Store) Create(ctx context.Context, ownerID string, d Data, active bool) (int, error) {
 	var id int
 	err := s.db.QueryRow(ctx, `
         INSERT INTO roomdate_app.listings
-            (user_id, title, city, zone, room_type, price, description, amenities, bills_included, available_from)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            (user_id, title, city, zone, room_type, price, description, amenities, bills_included, available_from, is_active)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING id`,
-		ownerID, d.Title, d.City, d.Zone, d.RoomType, d.Price, d.Description, d.Amenities, d.BillsIncluded, d.AvailableFrom,
+		ownerID, d.Title, d.City, d.Zone, d.RoomType, d.Price, d.Description, d.Amenities, d.BillsIncluded, d.AvailableFrom, active,
 	).Scan(&id)
 	return id, err
 }

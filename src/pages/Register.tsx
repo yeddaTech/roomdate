@@ -10,6 +10,7 @@ import AuthShell from '../components/auth/AuthShell';
 import RecoveryCodePanel from '../components/RecoveryCodePanel';
 import Alert from '../components/ui/Alert';
 import Card from '../components/ui/Card';
+import StepIndicator from '../components/ui/StepIndicator';
 import { cn, focusRing } from '../components/ui/cn';
 import { budgetValue } from '../forms/rules';
 import { LAST_STEP, STEPS, emptyRegistration, errorsOfStep, stepOfField, type RegistrationData, type ServerErrors } from './register/model';
@@ -31,29 +32,6 @@ interface Created {
 interface StepState extends AuthLocationState {
   /** Passo da cui si è arrivati con "Avanti": "Indietro" torna lì con la cronologia. */
   fromStep?: number;
-}
-
-function StepIndicator({ step }: { step: number }) {
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm font-bold text-foreground-muted">Passo {step} di {LAST_STEP}</p>
-      <ol className="flex gap-2" aria-label="Passi della registrazione">
-        {STEPS.map(({ title }, i) => {
-          const n = i + 1;
-          return (
-            <li key={title} className="flex flex-1 flex-col gap-2" aria-current={n === step ? 'step' : undefined}>
-              <span className={cn('h-1.5 rounded-full transition-colors duration-200', n <= step ? 'bg-primary' : 'bg-line')} aria-hidden="true" />
-              <span className={cn('hidden text-xs font-bold sm:block', n === step ? 'text-foreground' : 'text-foreground-muted')}>
-                {title}
-              </span>
-              <span className="sr-only sm:hidden">{title}</span>
-              {n < step && <span className="sr-only">, completato</span>}
-            </li>
-          );
-        })}
-      </ol>
-    </div>
-  );
 }
 
 export default function Register() {
@@ -189,7 +167,7 @@ export default function Register() {
       return;
     }
     toast.success(`Ciao ${data.firstName}, il tuo account è pronto.`);
-    navigate(from ?? (data.userType === 'affitta' ? '/dashboard' : '/ricerca'), { replace: true });
+    navigate(from ?? (data.userType === 'affitta' ? '/annunci' : '/ricerca'), { replace: true });
   };
 
   // Chi ha già una sessione non ha niente da registrare (tranne chi è appena entrato qui sotto)
@@ -213,7 +191,7 @@ export default function Register() {
           <>
             <div className="flex flex-col gap-6">
               <h1 className="font-display text-3xl font-bold text-foreground md:text-4xl">Crea il tuo account</h1>
-              <StepIndicator step={step} />
+              <StepIndicator steps={STEPS.map((s) => s.title)} current={step} label="Passi della registrazione" />
             </div>
             {step === 1 && <StepAccount {...stepProps} onNext={next} />}
             {step === 2 && <StepRole {...stepProps} onNext={next} onBack={back} />}

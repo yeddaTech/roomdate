@@ -1,15 +1,22 @@
 import { useRef, useState, type ChangeEvent } from 'react';
+import { ImagePlus, Trash2 } from 'lucide-react';
 import { ApiError } from '../../api/client';
 import { MAX_LISTING_IMAGES } from '../../api/listings';
 import { useDeleteListingImage, useUploadListingPhoto } from '../../api/hooks';
 import type { ListingDetail } from '../../api/types';
+import Alert from '../ui/Alert';
+import { cn, focusRing } from '../ui/cn';
 import { useConfirm } from '../ui/confirm';
+import Spinner from '../ui/Spinner';
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : 'Si è verificato un errore. Riprova.';
 }
 
-/** Foto di un annuncio: elenco, caricamento (più file alla volta) ed eliminazione. La prima foto è la copertina. */
+/**
+ * Foto di un annuncio: elenco, caricamento (più file alla volta) ed eliminazione. La prima foto è
+ * la copertina, quella che si vede negli elenchi.
+ */
 export default function ListingPhotos({ listing }: { listing: ListingDetail }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const upload = useUploadListingPhoto();
@@ -48,8 +55,8 @@ export default function ListingPhotos({ listing }: { listing: ListingDetail }) {
     setError(errors.join(' '));
   };
 
-  const handleDelete = async (imageId: number) => {
-    if (!(await confirm({ title: 'Eliminare questa foto?', confirmLabel: 'Elimina foto', tone: 'danger' }))) return;
+  const handleDelete = async (imageId: number, index: number) => {
+    if (!(await confirm({ title: `Eliminare la foto ${index + 1}?`, confirmLabel: 'Elimina foto', tone: 'danger' }))) return;
     setError('');
     try {
       await deleteImage.mutateAsync({ listingId: listing.id, imageId });
@@ -60,51 +67,62 @@ export default function ListingPhotos({ listing }: { listing: ListingDetail }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap justify-between items-baseline gap-2">
-        <h3 className="text-lg font-extrabold text-foreground">Foto</h3>
-        <span className="text-sm text-foreground-subtle font-medium">{listing.images.length} di {MAX_LISTING_IMAGES} · la prima è la copertina</span>
-      </div>
+      <p className="text-sm text-foreground-muted">
+        {listing.images.length} di {MAX_LISTING_IMAGES} foto. La prima è la copertina, quella che si vede nei risultati della ricerca.
+      </p>
 
-      {error && <div className="p-4 rounded-2xl font-bold bg-danger-soft text-danger border border-danger/30 text-sm">⚠️ {error}</div>}
+      {error && <Alert tone="danger">{error}</Alert>}
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Foto dell’annuncio">
         {listing.images.map((image, index) => (
-          <div key={image.id} className="relative aspect-4/3 rounded-2xl overflow-hidden bg-surface-muted border border-line group">
-            <img src={image.url} alt={`Foto ${index + 1} dell'annuncio`} className="w-full h-full object-cover" />
-            {index === 0 && <span className="absolute top-2 left-2 bg-surface/90 text-foreground text-[11px] font-bold px-2 py-1 rounded-full">Copertina</span>}
+          <li key={image.id} className="relative aspect-[4/3] overflow-hidden rounded-control border border-line bg-surface-muted">
+            <img src={image.url} alt={`Foto ${index + 1}`} className="size-full object-cover" />
+            {index === 0 && (
+              <span className="absolute top-2 left-2 rounded-full bg-neutral-950/75 px-2.5 py-1 text-xs font-bold text-white">Copertina</span>
+            )}
+            {/* Sopra le foto i colori restano fissi: devono staccare su qualsiasi immagine */}
             <button
               type="button"
-              onClick={() => handleDelete(image.id)}
+              onClick={() => handleDelete(image.id, index)}
               disabled={isBusy}
               aria-label={`Elimina la foto ${index + 1}`}
-              className="absolute top-2 right-2 w-8 h-8 rounded-full bg-neutral-900/80 text-white font-bold hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50"
+              className={cn('absolute top-2 right-2 inline-flex size-9 items-center justify-center rounded-full bg-neutral-950/75 text-white transition-colors hover:bg-red-700 disabled:opacity-50 [&_svg]:size-4', focusRing)}
             >
-              ×
+              <Trash2 aria-hidden="true" />
             </button>
-          </div>
+          </li>
         ))}
 
         {remaining > 0 && (
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={isBusy}
-            className="aspect-4/3 rounded-2xl border-2 border-dashed border-control hover:border-primary text-foreground-subtle hover:text-primary font-bold text-sm flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {progress ? (
-              <span>Caricamento {Math.min(progress.done + 1, progress.total)} di {progress.total}...</span>
-            ) : (
-              <>
-                <span className="text-2xl">＋</span>
-                <span>Aggiungi foto</span>
-              </>
-            )}
-          </button>
+          <li className="aspect-[4/3]">
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              disabled={isBusy}
+              className={cn(
+                'flex size-full flex-col items-center justify-center gap-1.5 rounded-control border-2 border-dashed border-control text-sm font-bold text-foreground-muted transition-colors',
+                'hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 [&_svg]:size-6',
+                focusRing,
+              )}
+            >
+              {progress ? (
+                <>
+                  <Spinner />
+                  <span role="status">Caricamento {Math.min(progress.done + 1, progress.total)} di {progress.total}…</span>
+                </>
+              ) : (
+                <>
+                  <ImagePlus aria-hidden="true" />
+                  Aggiungi foto
+                </>
+              )}
+            </button>
+          </li>
         )}
-      </div>
+      </ul>
 
       <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFiles} className="hidden" data-testid="listing-photo-input" />
-      <p className="text-xs text-foreground-subtle font-medium">Le foto vengono ridimensionate e private dei dati di posizione prima del caricamento.</p>
+      <p className="text-xs text-foreground-muted">Prima di caricarle le ridimensioniamo e togliamo i dati di posizione salvati dal telefono.</p>
     </div>
   );
 }

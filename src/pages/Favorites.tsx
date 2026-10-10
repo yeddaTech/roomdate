@@ -11,7 +11,10 @@ import { buttonClasses } from '../components/ui/buttonClasses';
 import EmptyState from '../components/ui/EmptyState';
 import Skeleton from '../components/ui/Skeleton';
 
-/** Gli annunci salvati con il cuore, dal più recente. Non compaiono quelli che oggi non sono visibili. */
+/**
+ * Gli annunci salvati con il cuore, dal più recente, nell'area personale. Non compaiono quelli che
+ * oggi non sono visibili.
+ */
 export default function Favorites() {
   const saved = useSavedListings();
   const setSaved = useSetListingSaved();
@@ -27,13 +30,13 @@ export default function Favorites() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-6 md:py-10">
+    <div>
       <PageMeta title="Preferiti | RoomDate" noindex />
-      <h1 className="font-display text-3xl font-bold text-foreground md:text-5xl">I tuoi preferiti</h1>
-      <p className="mb-8 mt-2 text-foreground-muted">Le stanze che hai salvato con il cuore, per ritrovarle e confrontarle.</p>
+      <h1 className="font-display text-3xl font-bold text-foreground md:text-4xl">I tuoi preferiti</h1>
+      <p className="mb-6 mt-2 text-foreground-muted">Le stanze che hai salvato con il cuore, per ritrovarle e confrontarle.</p>
 
       {saved.isPending ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
+        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
           {[1, 2, 3].map((n) => <Skeleton key={n} className="aspect-[4/5] rounded-card" />)}
         </div>
       ) : saved.isError && !saved.data ? (
@@ -54,7 +57,7 @@ export default function Favorites() {
           className="rounded-card border border-dashed border-line bg-surface"
         />
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
           {listings.map((listing, i) => (
             <ListingCard key={listing.id} listing={listing} eager={i < 3} headingLevel="h2" onSaved={onSaved(listing)} />
           ))}

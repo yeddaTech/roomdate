@@ -57,8 +57,12 @@ export function getListing(id: string | number): Promise<ListingDetail> {
   return request<ListingDetail>(`/api/v1/listings/${encodeURIComponent(String(id))}`);
 }
 
-export function createListing(input: ListingInput): Promise<ListingDetail> {
-  return request<ListingDetail>('/api/v1/listings', { method: 'POST', body: input });
+/**
+ * Pubblica un annuncio nuovo. Con draft resta una bozza che vede solo il proprietario: la
+ * creazione guidata lo pubblica alla fine, dopo le foto.
+ */
+export function createListing(input: ListingInput, { draft = false } = {}): Promise<ListingDetail> {
+  return request<ListingDetail>('/api/v1/listings', { method: 'POST', body: { ...input, draft } });
 }
 
 export function updateListing(id: number, input: ListingInput): Promise<ListingDetail> {

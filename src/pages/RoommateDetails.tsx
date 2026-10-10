@@ -144,7 +144,7 @@ export default function RoommateDetails() {
       {isOwn && (
         <Alert className="mt-6">
           Questo è il tuo profilo come lo vedono gli altri.{' '}
-          <Link to="/dashboard" className={cn('rounded-sm font-bold underline', focusRing)}>Modificalo</Link>
+          <Link to="/profilo" className={cn('rounded-sm font-bold underline', focusRing)}>Modificalo</Link>
         </Alert>
       )}
 
@@ -194,7 +194,7 @@ export default function RoommateDetails() {
           <div className="sticky top-24 flex flex-col gap-6 rounded-card border border-line bg-surface p-6 shadow-card">
             <Facts profile={profile} />
             {isOwn ? (
-              <Link to="/dashboard" className={buttonClasses({ variant: 'secondary', size: 'lg' })}><Pencil /> Modifica il profilo</Link>
+              <Link to="/profilo" className={buttonClasses({ variant: 'secondary', size: 'lg' })}><Pencil /> Modifica il profilo</Link>
             ) : (
               <Button size="lg" onClick={contact} loading={startChat.isPending}><MessageCircle /> Scrivi a {name}</Button>
             )}

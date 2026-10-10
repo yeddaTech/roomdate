@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
 import { AuthProvider } from '../../auth/AuthProvider';
+import { RealtimeProvider } from '../../realtime/RealtimeProvider';
 import ConfirmProvider from '../ui/ConfirmProvider';
 import Toaster from '../ui/Toaster';
 import { ThemeProvider } from '../../theme/ThemeProvider';
@@ -25,18 +26,20 @@ function FocusOnNavigate() {
   return null;
 }
 
-/** Radice dell'app: tema, sessione, conferme, notifiche e comportamento comune a tutte le pagine. */
+/** Radice dell'app: tema, sessione, tempo reale, conferme, notifiche e comportamento comune a tutte le pagine. */
 export default function RootLayout() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <ConfirmProvider>
-          <Outlet />
-          <Toaster />
-          {/* Indietro e avanti tornano al punto in cui si era; una pagina nuova parte dall'alto */}
-          <ScrollRestoration />
-          <FocusOnNavigate />
-        </ConfirmProvider>
+        <RealtimeProvider>
+          <ConfirmProvider>
+            <Outlet />
+            <Toaster />
+            {/* Indietro e avanti tornano al punto in cui si era; una pagina nuova parte dall'alto */}
+            <ScrollRestoration />
+            <FocusOnNavigate />
+          </ConfirmProvider>
+        </RealtimeProvider>
       </AuthProvider>
     </ThemeProvider>
   );

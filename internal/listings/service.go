@@ -85,6 +85,9 @@ type Input struct {
 	BillsIncluded *bool    `json:"billsIncluded"`
 	// AvailableFrom è una data AAAA-MM-GG, oppure vuota se non indicata.
 	AvailableFrom string `json:"availableFrom"`
+	// Draft vale solo alla creazione: l'annuncio nasce non pubblicato (la creazione guidata lo
+	// pubblica alla fine, dopo le foto). Nelle modifiche non conta: lo stato cambia con /active.
+	Draft bool `json:"draft"`
 }
 
 // parseInput valida l'input e lo converte nei dati da salvare.
@@ -407,7 +410,7 @@ func (s *Service) Create(ctx context.Context, userID string, in Input) (Detail, 
 	if err != nil {
 		return Detail{}, err
 	}
-	id, err := s.store.Create(ctx, userID, data)
+	id, err := s.store.Create(ctx, userID, data, !in.Draft)
 	if err != nil {
 		return Detail{}, apperr.Wrap(err, "listing_create_failed", "Impossibile pubblicare l'annuncio. Controlla i dati e riprova.")
 	}

@@ -9,7 +9,7 @@ export function updateMyProfile(input: ProfileInput): Promise<Profile> {
   return request<Profile>('/api/v1/me', { method: 'PUT', body: input });
 }
 
-/** L'eliminazione è definitiva: il server chiede di nuovo la password. */
+/** L'eliminazione è definitiva: il server chiede di nuovo la password (la prova ricavata da deleteAccount). */
 export function deleteMyAccount(password: string): Promise<void> {
   return request<void>('/api/v1/me', { method: 'DELETE', body: { password } });
 }

@@ -97,7 +97,7 @@ Public profiles show the age, never the birth date. For a signed-in viewer, prof
   * **Sending again is safe.** A message sent again identical (same ciphertext and IV, both random per message) by the same sender in the same conversation within a day is the same message: the API answers 200 with the saved one instead of 201 and a duplicate, and does not notify the other participant again. "Riprova" after a lost response relies on this. An advisory lock per conversation (`pg_advisory_xact_lock`) serialises sends, so two simultaneous attempts cannot both pass the check. No migration is needed.
 
 Real-time events use Pusher **private** channels, which carry only IDs, never message content. Pusher accepts a subscription only with a signature from `POST /api/v1/realtime/auth`. The API signs only the caller's own channel and the channels of conversations they take part in.
-* `private-user-<id>`: the server's "new message" notice (conversation and message ID), so a message wakes only its participants instead of every connected client.
+* `private-user-<id>`: the server's "new message" notice (conversation and message ID), so a message wakes only its participants instead of every connected client. Since M2.7 every signed-in tab keeps one connection on this channel (`RealtimeProvider`), on every page and not only in the chat: the unread badge updates at once, and browser alerts can work. The pusher-js library (about 18 KB gzip) is loaded on demand after sign-in (`src/api/realtimeClient.ts`), so visitors without an account never download it.
 * `private-conversation-<id>`: "typing" travels as a client event (`client-typing`, carrying only the sender's ID) straight between the participants' browsers, with no API call. In the Pusher dashboard, **App Settings → Enable client events** must be on, otherwise the typing indicator stays silent (everything else works).
 
 Without the `PUSHER_*` variables the app still works: the chat page refreshes every few seconds instead. To try real time locally without a Pusher app, run a Pusher-compatible server such as [soketi](https://docs.soketi.app/) and set `PUSHER_HOST` / `VITE_PUSHER_HOST` (see `.env.example`).
@@ -133,7 +133,7 @@ The interface is built on tokens and a small set of accessible components. Every
 
 * **Routing** is a data router (`createBrowserRouter` in `App.jsx`). Every page sits in one of three layouts in `src/components/layout/`:
   * `PublicLayout`: header, content, footer. It is used by home, search, detail pages, guide, legal pages and the 404.
-  * `AppLayout`: header only, with the pages behind `ProtectedRoute`. It is used by dashboard, chat, settings and moderation.
+  * `AppLayout`: header only, with the pages behind `ProtectedRoute`. It is used by the personal area (`AccountLayout`, see M2.7), chat and moderation.
   * `AuthLayout`: a minimal header with "Torna al sito" and a link to the other form. It is used by login, registration and recovery.
 
   The legal pages use the public layout, because they need the same navigation. A route's `handle` tweaks its layout: `{ fullHeight: true }` makes the chat fill the screen without page scroll, and `{ authSwitch }` sets the header link on the auth pages.
@@ -263,6 +263,37 @@ The interface is built on tokens and a small set of accessible components. Every
   * Incoming messages and "sta scrivendo" are announced politely.
   * The message area can be focused and scrolled with the keyboard.
   * The unread count on the Chat links is read after the label ("Chat, 2 conversazioni con messaggi non letti").
+
+### Personal area (module M2.7)
+
+* **Addresses:** `/profilo`, `/annunci`, `/annunci/nuovo`, `/annunci/:id/modifica`, `/preferiti` and `/impostazioni` share one navigation (`AccountLayout`): a column on desktop, and on phones a scrolling row that keeps the open section in view. `/dashboard` redirects to `/profilo`. "I miei annunci" shows for landlords, and for anyone who still has listings from before a role change.
+* **Profile** (`/profilo`):
+  * A react-hook-form + zod/mini form with the same rules as registration and the server: role, city, birth date, budget (seekers only), occupation, introduction and habits.
+  * A completeness card lists what makes the saved profile useful to others: city, budget, occupation, an introduction of at least 40 characters and at least three habits. Each missing item focuses its field.
+  * Visibility moved to Settings → Privacy.
+* **Unsaved changes** (`useLeaveGuard`): leaving a page whose form has unsaved changes asks for confirmation. This covers a site link or Back (`useBlocker` with a site dialog) and closing or reloading the tab (`beforeunload`). Changing only the query string, like a wizard step, does not count.
+* **New listing** (`/annunci/nuovo`) is a 4-step wizard: room, description and amenities, photos, publication.
+  * The step is in the address (`?passo=2`), so the browser's Back goes back a step.
+  * At the end of step 2 the listing is saved as a **draft**: `POST /api/v1/listings` with `"draft": true` creates it unpublished, and only the owner sees it.
+  * Photos are added before anyone else sees it. A reload or a later visit (`?annuncio=7&passo=3`) resumes the draft, and going back updates it instead of creating another.
+  * "Pubblica l'annuncio" activates it. "La pubblico più tardi" leaves it in "I miei annunci" as "Non pubblicato".
+  * Step 1 is checked with `handleSubmit`, as in registration. After a failed attempt, fields revalidate while typing, not on blur: an error that vanished on blur would move "Avanti" under the pointer and swallow the click.
+* **My listings** (`/annunci`) shows each listing with its status (Pubblicato, Non pubblicato, Rimosso dalla moderazione) and the actions it allows. The edit page (`/annunci/:id/modifica`) groups publication, photos, all the fields and deletion. A listing removed by moderation can only be deleted.
+* **Settings** (`/impostazioni`) has one section per topic, each with its own anchor (`#privacy`):
+  * password, with the strength meter;
+  * recovery key;
+  * connected devices;
+  * message alerts;
+  * privacy, with profile visibility and blocked people;
+  * appearance;
+  * data export;
+  * account deletion.
+* **Message alerts** (`src/realtime/notifications.ts`). There is no email (decision D2), so a new message shows a browser alert while RoomDate is open in a hidden tab or behind other windows.
+  * The alert names the sender, never the text, which stays encrypted until the chat is opened. One alert per conversation (`tag`), and clicking it opens the chat.
+  * The choice is per device and needs the browser's permission. A test alert shows straight away.
+  * If the alerts are blocked, the section explains how to allow them again. If the browser rejects alerts outside an installed app (Chrome on Android), it says so.
+  * With RoomDate closed nothing arrives: that would need push notifications (with the PWA, M2.8).
+* **Account deletion fix:** since M3.4 the server checks a key derived from the password, but the settings page still sent the password itself. Deletion failed with "password non corretta" for every account that had signed in at least once with the new method. Now the browser derives the proof (`deleteAccount` in `accountKeys.ts`), as password change and recovery key already did.
 
 ### Tests
 
