@@ -12,6 +12,8 @@ interface Props {
   /** Livello del titolo, secondo la pagina (h2 se le schede sono il contenuto principale). */
   headingLevel?: 'h2' | 'h3';
   onSaved?: (saved: boolean) => void;
+  /** Il cuore dei preferiti; false nell'anteprima del proprio annuncio. */
+  showSave?: boolean;
 }
 
 const roomTypeLabel: Record<string, string> = { singola: 'Singola', doppia: 'Doppia' };
@@ -20,7 +22,7 @@ const roomTypeLabel: Record<string, string> = { singola: 'Singola', doppia: 'Dop
  * Scheda di un annuncio: foto, prezzo, luogo e caratteristiche. Tutta la scheda porta al dettaglio
  * (il link è sul titolo e si estende alla scheda), il cuore resta un pulsante a parte.
  */
-export default function ListingCard({ listing, eager = false, headingLevel: Heading = 'h3', onSaved }: Props) {
+export default function ListingCard({ listing, eager = false, headingLevel: Heading = 'h3', onSaved, showSave = true }: Props) {
   const place = listing.zone ? `${listing.zone}, ${listing.city}` : listing.city;
   const facts = [roomTypeLabel[listing.roomType] ?? listing.roomType, formatBills(listing.billsIncluded), formatAvailability(listing.availableFrom)]
     .filter((fact): fact is string => Boolean(fact));
@@ -51,7 +53,7 @@ export default function ListingCard({ listing, eager = false, headingLevel: Head
           <span className="text-lg font-extrabold">{listing.price} €</span>
           <span className="text-xs font-bold text-foreground-muted"> al mese</span>
         </p>
-        <SaveButton listing={listing} onSaved={onSaved} className="absolute right-3 top-3 z-10" />
+        {showSave && <SaveButton listing={listing} onSaved={onSaved} className="absolute right-3 top-3 z-10" />}
       </div>
       <div className="flex flex-1 flex-col gap-2 p-4">
         <Heading className="line-clamp-1 font-bold text-foreground">

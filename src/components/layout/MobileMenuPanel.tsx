@@ -1,6 +1,6 @@
 import type { ReactNode, RefObject } from 'react';
 import { NavLink } from 'react-router-dom';
-import { BookOpen, FileText, LogIn, LogOut, Settings, Shield, ShieldCheck, User, UserPlus } from 'lucide-react';
+import { BookOpen, FileText, House, LogIn, LogOut, Settings, Shield, ShieldCheck, User, UserPlus } from 'lucide-react';
 import type { SessionUser } from '../../api/types';
 import { buttonClasses } from '../ui/buttonClasses';
 import { cn, focusRing } from '../ui/cn';
@@ -53,7 +53,8 @@ export default function MobileMenuPanel({ user, open, onOpenChange, onSignOut, t
         <nav aria-label="Menu" className="flex flex-col gap-1">
           {user ? (
             <>
-              <SheetLink to="/dashboard" icon={<User />} onNavigate={go}>Il mio profilo</SheetLink>
+              <SheetLink to="/profilo" icon={<User />} onNavigate={go}>Il mio profilo</SheetLink>
+              {user.userType === 'affitta' && <SheetLink to="/annunci" icon={<House />} onNavigate={go}>I miei annunci</SheetLink>}
               <SheetLink to="/impostazioni" icon={<Settings />} onNavigate={go}>Impostazioni</SheetLink>
               {user.isAdmin && <SheetLink to="/moderazione" icon={<ShieldCheck />} onNavigate={go}>Moderazione</SheetLink>}
             </>

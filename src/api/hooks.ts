@@ -32,7 +32,7 @@ export function useUpdateMyProfile() {
     mutationFn: updateMyProfile,
     onSuccess: (profile) => {
       queryClient.setQueryData(queryKeys.myProfile, profile);
-      // Nome e ruolo fanno parte anche della sessione (es. per le tab della dashboard)
+      // Nome e ruolo fanno parte anche della sessione (es. per la voce «I miei annunci» del menu)
       queryClient.setQueryData<SessionUser | null>(queryKeys.session, (current) =>
         current
           ? { ...current, firstName: profile.firstName, lastName: profile.lastName, userType: profile.userType }
@@ -168,7 +168,7 @@ export function useCreateListing() {
   const queryClient = useQueryClient();
   const invalidate = useInvalidateListings();
   return useMutation({
-    mutationFn: createListing,
+    mutationFn: ({ input, draft = false }: { input: ListingInput; draft?: boolean }) => createListing(input, { draft }),
     onSuccess: (listing) => {
       queryClient.setQueryData(queryKeys.listing(String(listing.id)), listing);
       invalidate();

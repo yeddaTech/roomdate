@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronDown, LogOut, Settings, ShieldCheck, User } from 'lucide-react';
+import { ChevronDown, House, LogOut, Settings, ShieldCheck, User } from 'lucide-react';
 import type { SessionUser } from '../../api/types';
 import Avatar from '../ui/Avatar';
 import { cn, focusRing } from '../ui/cn';
@@ -82,7 +82,8 @@ export default function AccountMenu({ user, onSignOut }: { user: SessionUser; on
         </p>
         <div className="my-1.5 h-px bg-line" />
         <ul>
-          <MenuLink to="/dashboard" icon={<User />}>Il mio profilo</MenuLink>
+          <MenuLink to="/profilo" icon={<User />}>Il mio profilo</MenuLink>
+          {user.userType === 'affitta' && <MenuLink to="/annunci" icon={<House />}>I miei annunci</MenuLink>}
           <MenuLink to="/impostazioni" icon={<Settings />}>Impostazioni</MenuLink>
           {user.isAdmin && <MenuLink to="/moderazione" icon={<ShieldCheck />}>Moderazione</MenuLink>}
         </ul>

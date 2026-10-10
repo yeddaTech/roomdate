@@ -51,6 +51,11 @@ export const city = z.string().check(
   z.refine(isCity, "Scegli la città dall'elenco"),
 );
 
+/** Città nel profilo: si può lasciare vuota (chi la indica trova chi cerca nella stessa città). */
+export const optionalCity = z.string().check(
+  z.refine((value) => value === '' || isCity(value), "Scegli la città dall'elenco"),
+);
+
 /** Budget mensile in euro, come testo del campo: vuoto vuol dire "non indicato". */
 export const budget = z.string().check(
   z.trim(),

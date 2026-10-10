@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -528,4 +529,38 @@ func TestListingConstraintsInDatabase(t *testing.T) {
 			t.Errorf("vincolo non applicato: %s", query)
 		}
 	}
+}
+
+// La creazione guidata salva l'annuncio come bozza: nessuno lo vede finché il proprietario non lo
+// pubblica, dopo aver aggiunto le foto.
+func TestCreateDraftListing(t *testing.T) {
+	app := newApp(t)
+	landlord := app.registerUser("Marco", "affitta", false)
+	seeker := app.registerUser("Giulia", "cerca", false)
+
+	rec := app.do(http.MethodPost, "/api/v1/listings", listingWith(map[string]any{"draft": true}), withSession(landlord.Cookie))
+	expect(t, rec, http.StatusCreated, `"isActive":false`)
+	var draft listingDetail
+	decode(t, rec, &draft)
+
+	if slices.Contains(app.publicListingIDs(), draft.ID) {
+		t.Fatal("la bozza compare nell'elenco pubblico")
+	}
+	if _, code := app.listing(draft.ID, seeker.Cookie); code != http.StatusNotFound {
+		t.Fatalf("la bozza vista da altri: stato %d, atteso 404", code)
+	}
+	if mine, code := app.listing(draft.ID, landlord.Cookie); code != http.StatusOK || mine.IsActive {
+		t.Fatalf("il proprietario vede la sua bozza: %d %+v", code, mine)
+	}
+	expect(t, app.do(http.MethodPost, "/api/v1/conversations", map[string]any{"listingId": draft.ID}, withSession(seeker.Cookie)), http.StatusNotFound, "")
+
+	// Pubblicata, è un annuncio come gli altri
+	expect(t, app.do(http.MethodPut, "/api/v1/listings/"+itoa(draft.ID)+"/active", map[string]bool{"active": true}, withSession(landlord.Cookie)), http.StatusNoContent, "")
+	if !slices.Contains(app.publicListingIDs(), draft.ID) {
+		t.Fatal("pubblicata, la bozza deve comparire nell'elenco")
+	}
+
+	// Senza "draft" l'annuncio nasce pubblicato, come prima; nelle modifiche "draft" non conta
+	published := app.createListing(landlord.Cookie, nil)
+	expect(t, app.do(http.MethodPut, "/api/v1/listings/"+itoa(published), listingWith(map[string]any{"draft": true}), withSession(landlord.Cookie)), http.StatusOK, `"isActive":true`)
 }

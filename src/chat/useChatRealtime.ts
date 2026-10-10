@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type Pusher from 'pusher-js';
 import { invalidateConversations, pullLatestMessages } from '../api/hooks';
-import { conversationChannel, createRealtimeClient, realtimeEnabled, TYPING_EVENT, userChannel, type TypingEvent } from '../api/realtime';
+import { conversationChannel, TYPING_EVENT, type TypingEvent } from '../api/realtime';
+import { useRealtime } from '../realtime/realtimeContext';
 
 /** Senza tempo reale (Pusher assente o disconnesso) si controlla con questa frequenza. */
 export const FALLBACK_REFRESH_MS = 5000;
@@ -20,14 +21,14 @@ interface Options {
 }
 
 /**
- * Tempo reale della chat sui canali privati (modulo M3.5): l'avviso dei messaggi nuovi sul canale
- * dell'utente e "sta scrivendo" su quello della conversazione aperta. Se Pusher manca o la
- * connessione cade, la chat si aggiorna da sola ogni pochi secondi finché non torna.
+ * Tempo reale della chat (moduli M3.5 e M2.6). I messaggi nuovi arrivano dalla connessione di
+ * tutto il sito (RealtimeProvider); qui si aggiunge "sta scrivendo", sul canale privato della
+ * conversazione aperta. Se Pusher manca o la connessione cade, la chat si aggiorna da sola ogni
+ * pochi secondi finché non torna.
  */
 export function useChatRealtime({ userId, conversationId, canWrite }: Options) {
   const queryClient = useQueryClient();
-  const [client, setClient] = useState<Pusher | null>(null);
-  const [live, setLive] = useState(false);
+  const { client, live, subscribe } = useRealtime();
   const [typing, setTyping] = useState(false);
   const typingChannel = useRef<ReturnType<Pusher['subscribe']> | null>(null);
   const lastNotice = useRef(0);
@@ -42,36 +43,12 @@ export function useChatRealtime({ userId, conversationId, canWrite }: Options) {
     if (activeId.current !== null) pullLatestMessages(queryClient, activeId.current).catch(() => {});
   }, [queryClient]);
 
-  // Canale privato dell'utente: arriva l'avviso con gli ID, mai il contenuto (anomalia F12)
-  useEffect(() => {
-    if (!userId || !realtimeEnabled) return undefined;
-    const pusher = createRealtimeClient();
-    const channel = pusher.subscribe(userChannel(userId));
-    channel.bind('nuovo-messaggio', ({ conversationId: raw }: { conversationId: number | string }) => {
-      const id = Number(raw);
-      invalidateConversations(queryClient);
-      pullLatestMessages(queryClient, id).catch(() => {});
-      // L'altro ha inviato quello che stava scrivendo: i puntini spariscono subito
-      if (id === activeId.current) setTyping(false);
-    });
-    let connectedBefore = false;
-    pusher.connection.bind('state_change', ({ current }: { current: string }) => {
-      const connected = current === 'connected';
-      setLive(connected);
-      if (!connected) return;
-      // Tornata la connessione: gli avvisi persi nel frattempo non arrivano più, si rilegge
-      if (connectedBefore) refresh();
-      connectedBefore = true;
-    });
-    setClient(pusher);
-    return () => {
-      setClient(null);
-      setLive(false);
-      channel.unbind_all();
-      pusher.connection.unbind('state_change');
-      pusher.disconnect();
-    };
-  }, [userId, queryClient, refresh]);
+  useEffect(() => subscribe((event) => {
+    // L'altro ha inviato quello che stava scrivendo: i puntini spariscono subito
+    if (event.type === 'message' && event.conversationId === activeId.current) setTyping(false);
+    // Dopo un'interruzione la conversazione aperta si rilegge (l'elenco lo aggiorna già chi avvisa)
+    if (event.type === 'reconnected' && activeId.current !== null) pullLatestMessages(queryClient, activeId.current).catch(() => {});
+  }), [subscribe, queryClient]);
 
   // "Sta scrivendo" della conversazione aperta, passato tra i browser senza chiamare il server
   useEffect(() => {

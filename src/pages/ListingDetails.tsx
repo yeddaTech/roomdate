@@ -96,7 +96,7 @@ export default function ListingDetails() {
       toast.error(err instanceof Error ? err.message : 'Non è stato possibile aprire la chat.');
     }
   };
-  const edit = () => navigate('/dashboard', { state: { editListingId: listing.id } });
+  const edit = () => navigate(`/annunci/${listing.id}/modifica`);
   const canEdit = listing.isOwner && !listing.removed;
 
   return (

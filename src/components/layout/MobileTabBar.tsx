@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { Heart, Home, LogIn, MessageCircle, Search, User } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useUnreadCount } from '../../api/hooks';
@@ -9,14 +9,24 @@ import { unreadLabel } from './unread';
 // Barra in basso sul telefono, come in un'app: le quattro destinazioni principali sempre a portata
 // di pollice, con il margine di sicurezza dell'iPhone sotto.
 
-function TabLink({ to, icon, label, end = false, badge = 0 }: { to: string; icon: ReactNode; label: string; end?: boolean; badge?: number }) {
+function TabLink({ to, icon, label, end = false, badge = 0, section = [] }: {
+  to: string;
+  icon: ReactNode;
+  label: string;
+  end?: boolean;
+  badge?: number;
+  /** Altre pagine della stessa sezione, in cui la voce resta evidenziata (es. "Profilo" negli annunci). */
+  section?: string[];
+}) {
+  const { pathname } = useLocation();
+  const inSection = section.some((path) => pathname === path || pathname.startsWith(`${path}/`));
   return (
     <NavLink
       to={to}
       end={end}
       className={({ isActive }) => cn(
         'relative flex h-16 flex-col items-center justify-center gap-1 text-xs font-bold transition-colors duration-150 [&_svg]:size-6',
-        isActive ? 'text-primary' : 'text-foreground-muted',
+        isActive || inSection ? 'text-primary' : 'text-foreground-muted',
         focusRing, 'focus-visible:ring-offset-0',
       )}
     >
@@ -50,7 +60,7 @@ export default function MobileTabBar() {
         <li><TabLink to="/chat" icon={<MessageCircle />} label="Chat" badge={unread} /></li>
         <li>
           {user
-            ? <TabLink to="/dashboard" icon={<User />} label="Profilo" />
+            ? <TabLink to="/profilo" icon={<User />} label="Profilo" section={['/annunci', '/impostazioni']} />
             : <TabLink to="/accedi" icon={<LogIn />} label="Accedi" />}
         </li>
       </ul>
