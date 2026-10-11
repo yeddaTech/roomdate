@@ -13,4 +13,4 @@
 
 ## Note
 
-Gli annunci sono inseriti dagli utenti. I profili delle persone e i messaggi non sono pubblici.
+Gli annunci sono inseriti dagli utenti. I profili delle persone non sono indicizzati e i messaggi sono privati, cifrati end-to-end.

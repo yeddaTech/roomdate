@@ -27,7 +27,7 @@ export default function Privacy() {
         <h1 className="font-serif text-3xl md:text-4xl font-extrabold text-foreground mb-2 tracking-tight">
           Informativa sulla Privacy e Sicurezza
         </h1>
-        <p className="text-sm text-foreground-subtle font-medium mb-8">Ultimo aggiornamento: Settembre 2026</p>
+        <p className="text-sm text-foreground-subtle font-medium mb-8">Ultimo aggiornamento: Ottobre 2026</p>
 
         <div className="flex flex-col gap-8 leading-relaxed text-foreground-muted font-medium">
           
@@ -72,7 +72,7 @@ export default function Privacy() {
           <section>
             <h2 className="font-serif text-xl font-extrabold text-foreground mb-3">4. Visibilità dei Dati e Bot AI</h2>
             <p>
-              Gli annunci immobiliari e i profili contrassegnati come &quot;pubblici&quot; sono accessibili liberamente sulla rete. Tali dati possono essere indicizzati dai motori di ricerca tradizionali e scansionati da bot di Intelligenza Artificiale (AIO) al solo scopo di favorire il matching e la visibilità degli annunci stessi. L&apos;utente può richiedere la rimozione o la modifica dei propri dati in qualsiasi momento.
+              Gli annunci pubblicati sono accessibili liberamente sulla rete: possono essere indicizzati dai motori di ricerca, compaiono nella mappa del sito e possono essere letti dai bot di Intelligenza Artificiale, così chi cerca una stanza li trova. I profili contrassegnati come &quot;pubblici&quot; sono visibili a chi visita RoomDate, ma non sono inseriti nella mappa del sito e chiediamo ai motori di ricerca di non indicizzarli (indicazione &quot;noindex&quot;, rispettata dai principali motori come Google e Bing). I profili privati non sono visibili agli altri utenti. L&apos;utente può rendere privato il proprio profilo dalle Impostazioni e richiedere la rimozione o la modifica dei propri dati in qualsiasi momento.
             </p>
           </section>
 
