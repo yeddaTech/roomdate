@@ -5,6 +5,7 @@ import { getSession, logout as apiLogout } from '../api/auth';
 import { queryKeys } from '../api/queryKeys';
 import { signIn } from './accountKeys';
 import { AuthContext, type AuthContextValue, type AuthStatus } from './AuthContext';
+import { forgetAlerts } from '../realtime/notifications';
 import { clearLocalSession } from './keyStorage';
 
 // Tutte le query tranne quella della sessione: vanno scartate quando cambia l'utente
@@ -34,6 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // in cui React applica la navigazione.
   const endLocalSession = useCallback((reason: 'signed_out' | 'expired') => {
     void clearLocalSession();
+    // Gli avvisi dei messaggi erano di chi è uscito: chi entra dopo li riattiva se vuole
+    void forgetAlerts();
     queryClient.removeQueries({ predicate: notSession });
     setSignedOutFrom(reason === 'signed_out' ? pathnameRef.current : null);
     queryClient.setQueryData(queryKeys.session, null);

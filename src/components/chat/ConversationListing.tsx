@@ -4,10 +4,10 @@ import type { ConversationListing as Listing } from '../../api/types';
 import { cn, focusRing } from '../ui/cn';
 
 /** Foto piccola dell'annuncio, o la casetta se non ne ha. */
-function Thumbnail({ url }: { url: string | null }) {
+function Thumbnail({ url, srcset }: { url: string | null; srcset: string | null }) {
   return (
     <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-muted text-foreground-subtle [&_svg]:size-5">
-      {url ? <img src={url} alt="" className="size-full object-cover" loading="lazy" /> : <House aria-hidden="true" />}
+      {url ? <img src={url} srcSet={srcset ?? undefined} sizes="44px" alt="" className="size-full object-cover" loading="lazy" /> : <House aria-hidden="true" />}
     </span>
   );
 }
@@ -34,7 +34,7 @@ export default function ConversationListing({ listing, deleted }: { listing: Lis
     : listing.available ? null : 'Non più disponibile';
   const content = (
     <>
-      <Thumbnail url={listing.coverUrl} />
+      <Thumbnail url={listing.coverUrl} srcset={listing.coverSrcset} />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate font-bold text-foreground">{listing.title}</span>
         <span className="truncate text-sm text-foreground-muted">

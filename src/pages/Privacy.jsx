@@ -6,7 +6,10 @@ export default function Privacy() {
 
   return (
     <div className="bg-background font-sans text-foreground py-12 px-6 selection:bg-primary/25">
-      <PageMeta title="Informativa sulla Privacy e Sicurezza | RoomDate" />
+      <PageMeta
+        title="Informativa sulla Privacy e Sicurezza | RoomDate"
+        description="Quali dati raccoglie RoomDate, dove li conserva e per quanto tempo, come funziona la chat cifrata e quali sono i tuoi diritti."
+      />
 
       <div className="max-w-3xl mx-auto bg-surface p-8 md:p-12 rounded-3xl shadow-xs border border-line relative overflow-hidden">
         
@@ -31,13 +34,13 @@ export default function Privacy() {
           <section className="bg-background p-6 rounded-3xl border border-line">
             <h2 className="font-serif text-xl font-extrabold text-foreground mb-3">1. Titolare del Trattamento</h2>
             <p className="text-foreground-muted">
-              La piattaforma <strong>RoomDate</strong> è un'applicazione in fase di sviluppo (MVP). Il Titolare del Trattamento dei dati personali è la Direzione di RoomDate. Per qualsiasi richiesta relativa alla privacy o per esercitare i propri diritti, è possibile contattare il Titolare all'indirizzo email: <a href="mailto:esyoun70@gmail.com" className="text-primary font-bold hover:text-primary transition-colors">esyoun70@gmail.com</a>.
+              La piattaforma <strong>RoomDate</strong> è un&apos;applicazione in fase di sviluppo (MVP). Il Titolare del Trattamento dei dati personali è la Direzione di RoomDate. Per qualsiasi richiesta relativa alla privacy o per esercitare i propri diritti, è possibile contattare il Titolare all&apos;indirizzo email: <a href="mailto:esyoun70@gmail.com" className="text-primary font-bold hover:text-primary transition-colors">esyoun70@gmail.com</a>.
             </p>
           </section>
 
           <section>
             <h2 className="font-serif text-xl font-extrabold text-foreground mb-3">2. Dati Raccolti e Luogo del Trattamento</h2>
-            <p className="mb-3">Raccogliamo solo i dati strettamente necessari all'utilizzo della piattaforma:</p>
+            <p className="mb-3">Raccogliamo solo i dati strettamente necessari all&apos;utilizzo della piattaforma:</p>
             <ul className="list-disc pl-5 flex flex-col gap-2 mb-4 text-foreground-muted">
               <li>Dati di registrazione (nome, cognome, email, data di nascita). La password non viene inviata ai nostri server: il browser ne ricava una chiave d&apos;accesso, di cui conserviamo solo l&apos;hash.</li>
               <li>Dati del profilo (città, occupazione, budget, presentazione, abitudini di vita). Se il profilo è pubblico sono visibili agli altri utenti insieme al nome; cognome, email e data di nascita restano privati (agli altri utenti mostriamo solo gli anni compiuti).</li>
@@ -69,7 +72,7 @@ export default function Privacy() {
           <section>
             <h2 className="font-serif text-xl font-extrabold text-foreground mb-3">4. Visibilità dei Dati e Bot AI</h2>
             <p>
-              Gli annunci immobiliari e i profili contrassegnati come "pubblici" sono accessibili liberamente sulla rete. Tali dati possono essere indicizzati dai motori di ricerca tradizionali e scansionati da bot di Intelligenza Artificiale (AIO) al solo scopo di favorire il matching e la visibilità degli annunci stessi. L'utente può richiedere la rimozione o la modifica dei propri dati in qualsiasi momento.
+              Gli annunci immobiliari e i profili contrassegnati come &quot;pubblici&quot; sono accessibili liberamente sulla rete. Tali dati possono essere indicizzati dai motori di ricerca tradizionali e scansionati da bot di Intelligenza Artificiale (AIO) al solo scopo di favorire il matching e la visibilità degli annunci stessi. L&apos;utente può richiedere la rimozione o la modifica dei propri dati in qualsiasi momento.
             </p>
           </section>
 
@@ -79,7 +82,7 @@ export default function Privacy() {
               RoomDate adotta misure di sicurezza tecniche (come la cifratura delle password e connessioni sicure) per proteggere i tuoi dati. Tuttavia, RoomDate funge esclusivamente da <strong>intermediario tecnologico</strong>. 
             </p>
             <div className="bg-danger-soft/50 p-5 rounded-2xl border border-danger/20 text-danger text-sm leading-relaxed">
-              ⚠️ <strong>Nota di sicurezza per gli utenti:</strong> Non inviare mai denaro, caparre o documenti d'identità sensibili all'interno della chat privata prima di aver visionato di persona l'immobile e aver sottoscritto un regolare contratto di locazione. RoomDate non si assume alcuna responsabilità per transazioni o accordi economici presi privatamente tra gli utenti.
+              ⚠️ <strong>Nota di sicurezza per gli utenti:</strong> Non inviare mai denaro, caparre o documenti d&apos;identità sensibili all&apos;interno della chat privata prima di aver visionato di persona l&apos;immobile e aver sottoscritto un regolare contratto di locazione. RoomDate non si assume alcuna responsabilità per transazioni o accordi economici presi privatamente tra gli utenti.
             </div>
           </section>
 

@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useSavedListings, useSetListingSaved } from '../api/hooks';
 import type { ListingSummary } from '../api/types';
 import ListingCard from '../components/listings/ListingCard';
+import { useLeadImage } from '../components/listings/useLeadImage';
 import PageMeta from '../components/PageMeta';
 import LoadMore from '../components/search/LoadMore';
 import Button from '../components/ui/Button';
@@ -19,6 +20,7 @@ export default function Favorites() {
   const saved = useSavedListings();
   const setSaved = useSetListingSaved();
   const listings = saved.data?.pages.flatMap((page) => page.items) ?? [];
+  const lead = useLeadImage(listings[0]?.coverUrl);
 
   // Togliendo un preferito da qui la scheda sparisce: si può rimettere subito con "Annulla"
   const onSaved = (listing: ListingSummary) => (isSaved: boolean) => {
@@ -59,7 +61,15 @@ export default function Favorites() {
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
           {listings.map((listing, i) => (
-            <ListingCard key={listing.id} listing={listing} eager={i < 3} headingLevel="h2" onSaved={onSaved(listing)} />
+            <ListingCard
+              key={listing.id}
+              listing={listing}
+              eager={i === 0}
+              deferImage={i > 0 && lead.waiting}
+              onImageSettled={i === 0 ? lead.settle : undefined}
+              headingLevel="h2"
+              onSaved={onSaved(listing)}
+            />
           ))}
         </div>
       )}

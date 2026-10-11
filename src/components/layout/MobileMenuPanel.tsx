@@ -5,6 +5,7 @@ import type { SessionUser } from '../../api/types';
 import { buttonClasses } from '../ui/buttonClasses';
 import { cn, focusRing } from '../ui/cn';
 import { Sheet, SheetContent } from '../ui/Sheet';
+import InstallApp from '../../pwa/InstallApp';
 import ThemeSelect from './ThemeSelect';
 
 // Pannello del menu sul telefono. Sta in un file a parte, caricato quando serve: il codice della
@@ -70,6 +71,7 @@ export default function MobileMenuPanel({ user, open, onOpenChange, onSignOut, t
           <SheetLink to="/termini" icon={<FileText />} onNavigate={go}>Termini di servizio</SheetLink>
         </nav>
         <ThemeSelect className="px-3" />
+        <InstallApp className="mx-3 self-start" />
         {user && (
           <button type="button" onClick={onSignOut} className={buttonClasses({ variant: 'secondary', className: 'mt-auto w-full' })}>
             <LogOut /> Esci

@@ -263,6 +263,7 @@ export default function Chat() {
         {conversationId === null ? (
           <EmptyState
             className="my-auto"
+            headingLevel="h2"
             icon={<MessagesSquare />}
             title="I tuoi messaggi"
             description="Scegli una conversazione dall'elenco per leggerla e rispondere."
@@ -270,6 +271,7 @@ export default function Chat() {
         ) : notFound ? (
           <EmptyState
             className="my-auto"
+            headingLevel="h2"
             icon={<MessagesSquare />}
             title="Conversazione non trovata"
             description="Non esiste o non ne fai parte."
@@ -279,6 +281,7 @@ export default function Chat() {
           conversationQuery.isError ? (
             <EmptyState
               className="my-auto"
+              headingLevel="h2"
               icon={<MessagesSquare />}
               title="Impossibile caricare la conversazione"
               description={conversationQuery.error.message}

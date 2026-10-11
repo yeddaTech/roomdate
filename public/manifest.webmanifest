@@ -1,0 +1,24 @@
+{
+  "id": "/",
+  "name": "RoomDate — Stanze in affitto e coinquilini",
+  "short_name": "RoomDate",
+  "description": "Cerca stanze in affitto e coinquilini e scrivi direttamente a chi ti interessa, in una chat cifrata.",
+  "lang": "it",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fafaf9",
+  "theme_color": "#fafaf9",
+  "categories": ["lifestyle", "social"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Cerca una stanza", "short_name": "Cerca", "url": "/ricerca", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Messaggi", "url": "/chat", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

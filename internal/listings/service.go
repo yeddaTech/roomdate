@@ -136,6 +136,17 @@ func (s *Service) parseInput(in Input) (Data, error) {
 type Image struct {
 	ID  int    `json:"id"`
 	URL string `json:"url"`
+	// Srcset elenca le versioni della foto per <img srcset>; null per le foto senza versioni ridotte.
+	Srcset *string `json:"srcset"`
+}
+
+// image è la foto con il suo indirizzo e lo srcset, se le versioni ridotte ci sono.
+func (s *Service) image(id int, key string, widths []int32) Image {
+	img := Image{ID: id, URL: s.storage.PublicURL(key)}
+	if srcset := storage.Srcset(s.storage, key, widths); srcset != "" {
+		img.Srcset = &srcset
+	}
+	return img
 }
 
 // Summary è un annuncio negli elenchi.
@@ -152,6 +163,8 @@ type Summary struct {
 	// Removed è vero se la moderazione ha rimosso l'annuncio: lo vede solo il proprietario.
 	Removed  bool    `json:"removed"`
 	CoverURL *string `json:"coverUrl"`
+	// CoverSrcset elenca le versioni della prima foto per <img srcset> (null se non ne ha).
+	CoverSrcset *string `json:"coverSrcset"`
 	// Saved: l'annuncio è tra i preferiti di chi guarda (sempre falso senza sessione).
 	Saved bool `json:"saved"`
 }
@@ -192,6 +205,9 @@ func (s *Service) summary(r Row) Summary {
 	if r.CoverKey != nil {
 		if url := s.storage.PublicURL(*r.CoverKey); url != "" {
 			sum.CoverURL = &url
+		}
+		if srcset := storage.Srcset(s.storage, *r.CoverKey, r.CoverWidths); srcset != "" {
+			sum.CoverSrcset = &srcset
 		}
 	}
 	return sum
@@ -365,8 +381,8 @@ func (s *Service) Get(ctx context.Context, viewerID, rawID string) (Detail, erro
 		detail.Amenities = []string{}
 	}
 	for _, img := range images {
-		if url := s.storage.PublicURL(img.Key); url != "" {
-			detail.Images = append(detail.Images, Image{ID: img.ID, URL: url})
+		if s.storage.PublicURL(img.Key) != "" {
+			detail.Images = append(detail.Images, s.image(img.ID, img.Key, img.Widths))
 		}
 	}
 	return detail, nil
@@ -508,12 +524,22 @@ type UploadInput struct {
 	ContentType string `json:"contentType"`
 }
 
-// PendingUpload autorizza il browser a caricare una foto direttamente sullo storage.
+// PendingUpload autorizza il browser a caricare una foto direttamente sullo storage, insieme alle
+// sue versioni ridotte (facoltative: senza, la foto resta solo nella misura originale).
 type PendingUpload struct {
 	Key      string            `json:"key"`
 	URL      string            `json:"url"`
 	Headers  map[string]string `json:"headers"`
 	MaxBytes int               `json:"maxBytes"`
+	Variants []PendingVariant  `json:"variants"`
+}
+
+// PendingVariant autorizza il caricamento della versione larga Width di una foto, in JPEG.
+type PendingVariant struct {
+	Width   int               `json:"width"`
+	Key     string            `json:"key"`
+	URL     string            `json:"url"`
+	Headers map[string]string `json:"headers"`
 }
 
 // PrepareUpload firma il caricamento di una foto. Il file finisce in "pending/": diventa una foto
@@ -543,7 +569,41 @@ func (s *Service) PrepareUpload(ctx context.Context, userID, rawID string, in Up
 	if err != nil {
 		return PendingUpload{}, fmt.Errorf("firma del caricamento: %w", err)
 	}
-	return PendingUpload{Key: key, URL: upload.URL, Headers: upload.Headers, MaxBytes: MaxImageBytes}, nil
+	pending := PendingUpload{Key: key, URL: upload.URL, Headers: upload.Headers, MaxBytes: MaxImageBytes, Variants: []PendingVariant{}}
+	for _, width := range storage.VariantWidths {
+		variantKey := storage.VariantKey(key, width)
+		variant, err := s.storage.PresignUpload(ctx, variantKey, "image/jpeg", uploadURLExpires)
+		if err != nil {
+			return PendingUpload{}, fmt.Errorf("firma del caricamento: %w", err)
+		}
+		pending.Variants = append(pending.Variants, PendingVariant{Width: width, Key: variantKey, URL: variant.URL, Headers: variant.Headers})
+	}
+	return pending, nil
+}
+
+// confirmVariants sposta accanto alla foto le versioni ridotte caricate e valide, e ne
+// restituisce le larghezze. Una versione mancante o non valida non blocca la foto: si scarta.
+func (s *Service) confirmVariants(ctx context.Context, pendingKey, finalKey string) []int32 {
+	widths := []int32{}
+	jpeg := imageTypes["image/jpeg"]
+	for _, width := range storage.VariantWidths {
+		from := storage.VariantKey(pendingKey, width)
+		info, err := s.storage.Stat(ctx, from)
+		if err != nil {
+			continue
+		}
+		head, err := s.storage.ReadPrefix(ctx, from, 12)
+		if err != nil || info.Size > MaxImageBytes || info.ContentType != "image/jpeg" || !jpeg.magic(head) {
+			DeleteObjects(ctx, s.storage, []string{from})
+			continue
+		}
+		if err := s.storage.Move(ctx, from, storage.VariantKey(finalKey, width)); err != nil {
+			logx.From(ctx).Warn("versione ridotta della foto non spostata", "key", from, "err", err)
+			continue
+		}
+		widths = append(widths, int32(width))
+	}
+	return widths
 }
 
 var errTooManyImagesResponse = apperr.Conflict("too_many_images", fmt.Sprintf("Puoi caricare al massimo %d foto per annuncio", MaxImages))
@@ -601,15 +661,16 @@ func (s *Service) ConfirmUpload(ctx context.Context, userID, rawID string, in Co
 	if err := s.storage.Move(ctx, in.Key, finalKey); err != nil {
 		return Image{}, fmt.Errorf("spostamento della foto: %w", err)
 	}
-	img, err := s.store.AddImage(ctx, id, finalKey, MaxImages)
+	widths := s.confirmVariants(ctx, in.Key, finalKey)
+	img, err := s.store.AddImage(ctx, id, finalKey, widths, MaxImages)
 	if err != nil {
-		DeleteObjects(ctx, s.storage, []string{finalKey})
+		DeleteObjects(ctx, s.storage, storage.ImageKeys(finalKey, widths))
 		if errors.Is(err, errTooManyImages) {
 			return Image{}, errTooManyImagesResponse
 		}
 		return Image{}, fmt.Errorf("salvataggio della foto: %w", err)
 	}
-	return Image{ID: img.ID, URL: s.storage.PublicURL(finalKey)}, nil
+	return s.image(img.ID, finalKey, widths), nil
 }
 
 // DeleteImage elimina una foto dell'annuncio.
@@ -622,14 +683,14 @@ func (s *Service) DeleteImage(ctx context.Context, userID, rawID, rawImageID str
 	if !ok {
 		return errImageNotFound
 	}
-	key, err := s.store.DeleteImage(ctx, id, imageID)
+	keys, err := s.store.DeleteImage(ctx, id, imageID)
 	if db.IsNoRows(err) {
 		return errImageNotFound
 	}
 	if err != nil {
 		return apperr.Wrap(err, "image_delete_failed", "Impossibile eliminare la foto")
 	}
-	DeleteObjects(ctx, s.storage, []string{key})
+	DeleteObjects(ctx, s.storage, keys)
 	return nil
 }
 

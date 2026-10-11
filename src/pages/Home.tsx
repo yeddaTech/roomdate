@@ -4,6 +4,7 @@ import { ArrowRight, CalendarCheck, LockKeyhole, MapPin, Search } from 'lucide-r
 import { useLatestListings, useListingCities } from '../api/hooks';
 import { CITIES } from '../api/options';
 import ListingCard from '../components/listings/ListingCard';
+import PageMeta from '../components/PageMeta';
 import Button from '../components/ui/Button';
 import { buttonClasses } from '../components/ui/buttonClasses';
 import { cn, focusRing } from '../components/ui/cn';
@@ -30,6 +31,10 @@ export default function Home() {
 
   return (
     <div className="flex flex-col">
+      <PageMeta
+        title="RoomDate — Stanze in affitto e coinquilini"
+        description="Cerca stanze in affitto e coinquilini in tutta Italia: annunci con foto e prezzi, filtri per città e budget e una chat cifrata per scrivere a chi affitta."
+      />
       {/* In apertura: che cos'è e dove cercare */}
       <section className="relative overflow-hidden px-4 pb-16 pt-14 md:px-6 md:pb-24 md:pt-24">
         <div className="pointer-events-none absolute left-1/2 top-0 h-[400px] w-[600px] -translate-x-1/2 rounded-full bg-orange-400/20 blur-[100px]" aria-hidden="true" />
@@ -96,7 +101,8 @@ export default function Home() {
           <EmptyState title="Ancora nessuna stanza pubblicata" description="Hai una stanza libera? Pubblicala dal tuo profilo." className="rounded-card border border-dashed border-line bg-surface" />
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {latest.data.map((listing, i) => <ListingCard key={listing.id} listing={listing} eager={i < 4} />)}
+            {/* Sotto la prima schermata: le foto si scaricano quando ci si avvicina */}
+            {latest.data.map((listing) => <ListingCard key={listing.id} listing={listing} />)}
           </div>
         )}
         <Link to="/ricerca" className={buttonClasses({ variant: 'secondary', size: 'lg', className: 'mt-6 w-full sm:hidden' })}>

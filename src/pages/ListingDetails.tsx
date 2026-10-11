@@ -15,13 +15,16 @@ import Gallery from '../components/listings/Gallery';
 import ListingFit from '../components/listings/ListingFit';
 import SaveButton from '../components/listings/SaveButton';
 import PageMeta from '../components/PageMeta';
-import ReportDialog from '../components/ReportDialog';
 import Alert from '../components/ui/Alert';
 import Avatar from '../components/ui/Avatar';
 import Button from '../components/ui/Button';
 import { cn, focusRing } from '../components/ui/cn';
 import EmptyState from '../components/ui/EmptyState';
 import Skeleton from '../components/ui/Skeleton';
+import { useLazyComponent } from '../components/ui/useLazyComponent';
+
+// La finestra per segnalare (Radix Dialog) ha il codice a parte: serve solo dopo un tocco
+const importReportDialog = () => import('../components/ReportDialog');
 
 function Price({ listing, compact = false }: { listing: ListingDetail; compact?: boolean }) {
   const bills = formatBills(listing.billsIncluded);
@@ -54,6 +57,11 @@ export default function ListingDetails() {
   const me = useMyProfile({ enabled: Boolean(user) });
   const startChat = useStartChat();
   const [reporting, setReporting] = useState(false);
+  const { Component: ReportDialog, load: loadReportDialog } = useLazyComponent(importReportDialog);
+  const startReport = () => {
+    setReporting(true);
+    loadReportDialog();
+  };
 
   if (query.isPending) return <DetailSkeleton />;
   if (query.isError) {
@@ -173,7 +181,7 @@ export default function ListingDetails() {
                 <Button size="lg" onClick={contact} loading={startChat.isPending}><MessageCircle /> Contatta in chat</Button>
                 <SaveButton listing={listing} variant="full" />
                 {user && (
-                  <button type="button" onClick={() => setReporting(true)} className={cn('inline-flex items-center justify-center gap-1.5 self-center rounded-sm text-sm font-bold text-foreground-muted hover:text-danger', focusRing)}>
+                  <button type="button" onClick={startReport} className={cn('inline-flex items-center justify-center gap-1.5 self-center rounded-sm text-sm font-bold text-foreground-muted hover:text-danger', focusRing)}>
                     <Flag className="size-4" aria-hidden="true" /> Segnala l&apos;annuncio
                   </button>
                 )}
@@ -185,7 +193,7 @@ export default function ListingDetails() {
 
       {/* Sul telefono: il report resta raggiungibile anche senza la colonna laterale */}
       {user && !listing.isOwner && (
-        <button type="button" onClick={() => setReporting(true)} className={cn('mt-8 inline-flex items-center gap-1.5 rounded-sm text-sm font-bold text-foreground-muted hover:text-danger lg:hidden', focusRing)}>
+        <button type="button" onClick={startReport} className={cn('mt-8 inline-flex items-center gap-1.5 rounded-sm text-sm font-bold text-foreground-muted hover:text-danger lg:hidden', focusRing)}>
           <Flag className="size-4" aria-hidden="true" /> Segnala l&apos;annuncio
         </button>
       )}
@@ -204,7 +212,7 @@ export default function ListingDetails() {
         </ContactBar>
       )}
 
-      {reporting && <ReportDialog target={{ listingId: listing.id }} title="Segnala annuncio" onClose={() => setReporting(false)} />}
+      {reporting && ReportDialog && <ReportDialog target={{ listingId: listing.id }} title="Segnala annuncio" onClose={() => setReporting(false)} />}
     </div>
   );
 }

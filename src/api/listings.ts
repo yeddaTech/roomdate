@@ -1,4 +1,5 @@
 import { ApiError, request } from './client';
+import { listingPath, listingsPath } from './early';
 import { prepareImage } from './photos';
 import type { CityCount, ListingDetail, ListingFilters, ListingImage, ListingInput, ListingsPage, ListingSummary, PendingUpload } from './types';
 
@@ -25,12 +26,7 @@ export function formatBills(billsIncluded: boolean | null): string | null {
  * I filtri vuoti non vengono inviati.
  */
 export function listListings(filters: ListingFilters = {}, { cursor = '', limit = '' } = {}): Promise<ListingsPage> {
-  const params = new URLSearchParams();
-  for (const [name, value] of Object.entries({ ...filters, cursor, limit })) {
-    if (value) params.set(name, String(value));
-  }
-  const query = params.toString();
-  return request<ListingsPage>(`/api/v1/listings${query ? `?${query}` : ''}`);
+  return request<ListingsPage>(listingsPath(filters, { cursor, limit }));
 }
 
 /** Le città con annunci, dalla più ricca: le mostra la home. */
@@ -54,7 +50,7 @@ export function listMyListings(): Promise<ListingSummary[]> {
 }
 
 export function getListing(id: string | number): Promise<ListingDetail> {
-  return request<ListingDetail>(`/api/v1/listings/${encodeURIComponent(String(id))}`);
+  return request<ListingDetail>(listingPath(id));
 }
 
 /**
@@ -77,31 +73,41 @@ export function deleteListing(id: number): Promise<void> {
   return request<void>(`/api/v1/listings/${id}`, { method: 'DELETE' });
 }
 
-/**
- * Carica una foto: la ridimensiona nel browser (togliendo anche i metadati, come la posizione GPS),
- * chiede al server un indirizzo firmato, invia il file direttamente allo storage e chiede al server
- * di aggiungerlo all'annuncio dopo averlo verificato.
- */
-export async function uploadListingPhoto(listingId: number, file: File): Promise<ListingImage> {
-  const image = await prepareImage(file);
-  const pending = await request<PendingUpload>(`/api/v1/listings/${listingId}/images/uploads`, {
-    method: 'POST',
-    body: { contentType: image.type },
-  });
-  if (image.size > pending.maxBytes) {
-    throw new ApiError(413, 'image_too_large', 'La foto è troppo grande anche dopo il ridimensionamento.');
-  }
-
+/** Invia un file allo storage con l'indirizzo firmato dal server. */
+async function put(url: string, headers: Record<string, string>, body: Blob): Promise<void> {
   let response: Response;
   try {
     // Nessun cookie verso lo storage: l'autorizzazione è nella firma dell'indirizzo
-    response = await fetch(pending.url, { method: 'PUT', headers: pending.headers, body: image, credentials: 'omit' });
+    response = await fetch(url, { method: 'PUT', headers, body, credentials: 'omit' });
   } catch {
     throw new ApiError(0, 'upload_failed', 'Caricamento della foto non riuscito: controlla la connessione.');
   }
   if (!response.ok) {
     throw new ApiError(response.status, 'upload_failed', 'Caricamento della foto non riuscito. Riprova.');
   }
+}
+
+/**
+ * Carica una foto: la ridimensiona nel browser (togliendo anche i metadati, come la posizione GPS),
+ * chiede al server gli indirizzi firmati, invia l'originale e le versioni ridotte direttamente
+ * allo storage e chiede al server di aggiungere la foto all'annuncio dopo averla verificata. Una
+ * versione ridotta che non arriva non blocca la foto: le pagine useranno l'originale.
+ */
+export async function uploadListingPhoto(listingId: number, file: File): Promise<ListingImage> {
+  const image = await prepareImage(file);
+  const pending = await request<PendingUpload>(`/api/v1/listings/${listingId}/images/uploads`, {
+    method: 'POST',
+    body: { contentType: image.main.type },
+  });
+  if (image.main.size > pending.maxBytes) {
+    throw new ApiError(413, 'image_too_large', 'La foto è troppo grande anche dopo il ridimensionamento.');
+  }
+
+  const variants = image.variants.flatMap(({ width, blob }) => {
+    const slot = pending.variants.find((v) => v.width === width);
+    return slot && blob.size <= pending.maxBytes ? [put(slot.url, slot.headers, blob).catch(() => undefined)] : [];
+  });
+  await Promise.all([put(pending.url, pending.headers, image.main), ...variants]);
 
   return request<ListingImage>(`/api/v1/listings/${listingId}/images`, { method: 'POST', body: { key: pending.key } });
 }

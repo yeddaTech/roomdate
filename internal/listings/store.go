@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"roomdate-backend/internal/moderation"
+	"roomdate-backend/internal/storage"
 )
 
 // errTooManyImages indica che l'annuncio ha già il numero massimo di foto.
@@ -93,8 +94,10 @@ type Row struct {
 	Removed, OwnerSuspended bool
 	// CreatedAt serve a costruire il cursore dell'elenco; è NULL su qualche annuncio vecchio.
 	CreatedAt *time.Time
-	// CoverKey è la chiave della prima foto, se c'è (negli elenchi).
-	CoverKey *string
+	// CoverKey è la chiave della prima foto, se c'è (negli elenchi); CoverWidths le larghezze
+	// delle sue versioni ridotte.
+	CoverKey    *string
+	CoverWidths []int32
 	// Saved: chi guarda ha l'annuncio tra i preferiti (negli elenchi; sempre falso senza sessione).
 	Saved bool
 }
@@ -104,7 +107,8 @@ const rowColumns = `l.id, COALESCE(l.user_id::text, ''), COALESCE(u.first_name, 
     l.title, l.city, COALESCE(l.zone, ''), COALESCE(l.room_type, ''), l.price, COALESCE(l.description, ''),
     l.amenities, l.bills_included, l.available_from, l.is_active,
     l.removed_at IS NOT NULL, COALESCE(u.suspended_at IS NOT NULL, false), l.created_at,
-    (SELECT i.storage_key FROM roomdate_app.listing_images i WHERE i.listing_id = l.id ORDER BY i.position, i.id LIMIT 1)`
+    (SELECT i.storage_key FROM roomdate_app.listing_images i WHERE i.listing_id = l.id ORDER BY i.position, i.id LIMIT 1),
+    COALESCE((SELECT i.widths FROM roomdate_app.listing_images i WHERE i.listing_id = l.id ORDER BY i.position, i.id LIMIT 1), '{}')`
 
 // savedColumn dice se l'annuncio è tra i preferiti dell'utente nel parametro viewer (vuoto: nessuno).
 func savedColumn(viewer string) string {
@@ -116,7 +120,7 @@ func savedColumn(viewer string) string {
 func scanRow(row pgx.Row, extra ...any) (Row, error) {
 	var r Row
 	dest := []any{&r.ID, &r.OwnerID, &r.OwnerFirstName, &r.Title, &r.City, &r.Zone, &r.RoomType, &r.Price, &r.Description,
-		&r.Amenities, &r.BillsIncluded, &r.AvailableFrom, &r.IsActive, &r.Removed, &r.OwnerSuspended, &r.CreatedAt, &r.CoverKey, &r.Saved}
+		&r.Amenities, &r.BillsIncluded, &r.AvailableFrom, &r.IsActive, &r.Removed, &r.OwnerSuspended, &r.CreatedAt, &r.CoverKey, &r.CoverWidths, &r.Saved}
 	err := row.Scan(append(dest, extra...)...)
 	return r, err
 }
@@ -258,7 +262,7 @@ func (s *Store) Delete(ctx context.Context, id int) ([]string, error) {
 	}
 	defer tx.Rollback(ctx)
 
-	keys, err := imageKeys(ctx, tx, `SELECT storage_key FROM roomdate_app.listing_images WHERE listing_id = $1`, id)
+	keys, err := imageKeys(ctx, tx, `SELECT storage_key, widths FROM roomdate_app.listing_images WHERE listing_id = $1`, id)
 	if err != nil {
 		return nil, err
 	}
@@ -268,15 +272,16 @@ func (s *Store) Delete(ctx context.Context, id int) ([]string, error) {
 	return keys, tx.Commit(ctx)
 }
 
-// ImageRow è una foto di un annuncio.
+// ImageRow è una foto di un annuncio, con le larghezze delle sue versioni ridotte.
 type ImageRow struct {
-	ID  int
-	Key string
+	ID     int
+	Key    string
+	Widths []int32
 }
 
 func (s *Store) Images(ctx context.Context, listingID int) ([]ImageRow, error) {
 	rows, err := s.db.Query(ctx, `
-        SELECT id, storage_key FROM roomdate_app.listing_images
+        SELECT id, storage_key, widths FROM roomdate_app.listing_images
         WHERE listing_id = $1
         ORDER BY position, id`, listingID)
 	if err != nil {
@@ -287,7 +292,7 @@ func (s *Store) Images(ctx context.Context, listingID int) ([]ImageRow, error) {
 	images := []ImageRow{}
 	for rows.Next() {
 		var img ImageRow
-		if err := rows.Scan(&img.ID, &img.Key); err != nil {
+		if err := rows.Scan(&img.ID, &img.Key, &img.Widths); err != nil {
 			return nil, err
 		}
 		images = append(images, img)
@@ -303,7 +308,7 @@ func (s *Store) CountImages(ctx context.Context, listingID int) (int, error) {
 
 // AddImage aggiunge una foto in coda. Blocca la riga dell'annuncio, così due caricamenti
 // contemporanei non superano il limite; restituisce errTooManyImages se l'annuncio è pieno.
-func (s *Store) AddImage(ctx context.Context, listingID int, key string, max int) (ImageRow, error) {
+func (s *Store) AddImage(ctx context.Context, listingID int, key string, widths []int32, max int) (ImageRow, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return ImageRow{}, err
@@ -324,27 +329,33 @@ func (s *Store) AddImage(ctx context.Context, listingID int, key string, max int
 		return ImageRow{}, errTooManyImages
 	}
 
-	img := ImageRow{Key: key}
+	if widths == nil {
+		widths = []int32{}
+	}
+	img := ImageRow{Key: key, Widths: widths}
 	err = tx.QueryRow(ctx, `
-        INSERT INTO roomdate_app.listing_images (listing_id, storage_key, position)
-        VALUES ($1, $2, $3) RETURNING id`, listingID, key, lastPosition+1).Scan(&img.ID)
+        INSERT INTO roomdate_app.listing_images (listing_id, storage_key, position, widths)
+        VALUES ($1, $2, $3, $4) RETURNING id`, listingID, key, lastPosition+1, widths).Scan(&img.ID)
 	if err != nil {
 		return ImageRow{}, err
 	}
 	return img, tx.Commit(ctx)
 }
 
-// DeleteImage elimina la foto dell'annuncio e ne restituisce la chiave; pgx.ErrNoRows se non esiste.
-func (s *Store) DeleteImage(ctx context.Context, listingID, imageID int) (string, error) {
+// DeleteImage elimina la foto dell'annuncio e ne restituisce le chiavi (originale e versioni
+// ridotte); pgx.ErrNoRows se non esiste.
+func (s *Store) DeleteImage(ctx context.Context, listingID, imageID int) ([]string, error) {
 	var key string
+	var widths []int32
 	err := s.db.QueryRow(ctx, `
         DELETE FROM roomdate_app.listing_images
         WHERE id = $1 AND listing_id = $2
-        RETURNING storage_key`, imageID, listingID).Scan(&key)
-	return key, err
+        RETURNING storage_key, widths`, imageID, listingID).Scan(&key, &widths)
+	return storage.ImageKeys(key, widths), err
 }
 
-// imageKeys legge un elenco di chiavi di foto.
+// imageKeys legge le chiavi delle foto (colonne storage_key e widths) e aggiunge quelle delle
+// versioni ridotte: tutto quello da cancellare dallo storage.
 func imageKeys(ctx context.Context, q interface {
 	Query(context.Context, string, ...any) (pgx.Rows, error)
 }, query string, args ...any) ([]string, error) {
@@ -352,7 +363,17 @@ func imageKeys(ctx context.Context, q interface {
 	if err != nil {
 		return nil, err
 	}
-	return pgx.CollectRows(rows, pgx.RowTo[string])
+	defer rows.Close()
+	keys := []string{}
+	for rows.Next() {
+		var key string
+		var widths []int32
+		if err := rows.Scan(&key, &widths); err != nil {
+			return nil, err
+		}
+		keys = append(keys, storage.ImageKeys(key, widths)...)
+	}
+	return keys, rows.Err()
 }
 
 // visibleToViewer sono le condizioni per cui chi guarda (parametro viewer) vede un annuncio negli
@@ -438,6 +459,27 @@ func (s *Store) SavedListings(ctx context.Context, userID string, after *SavedCu
 type CityCount struct {
 	City  string `json:"city"`
 	Count int    `json:"count"`
+}
+
+// SitemapEntry è un annuncio visibile a tutti, per la mappa del sito.
+type SitemapEntry struct {
+	ID        int
+	UpdatedAt time.Time
+}
+
+// Sitemap restituisce gli annunci che vede anche chi non ha fatto l'accesso, dal più aggiornato.
+func (s *Store) Sitemap(ctx context.Context, limit int) ([]SitemapEntry, error) {
+	rows, err := s.db.Query(ctx, `
+        SELECT l.id, l.updated_at
+        FROM roomdate_app.listings l
+        LEFT JOIN roomdate_app.users u ON l.user_id = u.id
+        WHERE `+visibleToViewer("''")+`
+        ORDER BY l.updated_at DESC, l.id DESC
+        LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[SitemapEntry])
 }
 
 // Cities restituisce le città con almeno un annuncio visibile a chi guarda, dalla più ricca.

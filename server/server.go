@@ -23,9 +23,12 @@ import (
 	"roomdate-backend/internal/httpx"
 	"roomdate-backend/internal/listings"
 	"roomdate-backend/internal/moderation"
+	"roomdate-backend/internal/push"
 	"roomdate-backend/internal/realtime"
+	"roomdate-backend/internal/seo"
 	"roomdate-backend/internal/storage"
 	"roomdate-backend/internal/users"
+	"roomdate-backend/internal/webpush"
 )
 
 // Dimensione massima del corpo di una richiesta: la registrazione con le chiavi E2EE pesa circa 3 KB.
@@ -38,6 +41,8 @@ type Deps struct {
 	Logger    *slog.Logger
 	// Storage delle foto; se nil viene creato da Config.Storage (disattivato se incompleto).
 	Storage storage.Storage
+	// Push invia le notifiche push; se nil viene creato da Config.Push (spento senza chiave VAPID).
+	Push push.Sender
 }
 
 // New costruisce l'handler HTTP con tutte le rotte /api e i middleware comuni.
@@ -58,11 +63,19 @@ func New(d Deps) (http.Handler, error) {
 	}
 	deleteImages := func(ctx context.Context, keys []string) { listings.DeleteObjects(ctx, photos, keys) }
 
+	site := d.Config.SiteURL
+	if site == "" {
+		site = config.DefaultSiteURL
+	}
+	pushService := push.NewService(push.NewStore(d.DB), pushSender(d, site))
+
 	mod := moderation.NewStore(d.DB)
 	usersHandler := users.NewHandler(users.NewService(users.NewStore(d.DB), security, mod, sessions.Hash,
 		users.Photos{Delete: deleteImages, URL: photos.PublicURL}), sessions)
-	listingsHandler := listings.NewHandler(listings.NewService(listings.NewStore(d.DB), photos, mod), sessions)
-	chatHandler := chat.NewHandler(chat.NewService(chat.NewStore(d.DB), d.Publisher, realtime.NewAuthorizer(d.Config.Pusher), mod, photos), sessions)
+	listingsService := listings.NewService(listings.NewStore(d.DB), photos, mod)
+	listingsHandler := listings.NewHandler(listingsService, sessions)
+	chatHandler := chat.NewHandler(chat.NewService(chat.NewStore(d.DB), d.Publisher, realtime.NewAuthorizer(d.Config.Pusher), mod, photos, pushService), sessions)
+	pushHandler := push.NewHandler(pushService, sessions)
 	moderationHandler := moderation.NewHandler(moderation.NewService(mod), sessions)
 
 	type methods = map[string]http.HandlerFunc
@@ -129,6 +142,17 @@ func New(d Deps) (http.Handler, error) {
 	mux.Handle("/api/v1/me/unread", httpx.Methods(methods{http.MethodGet: chatHandler.Unread}))
 	mux.Handle("/api/v1/realtime/auth", httpx.Methods(methods{http.MethodPost: chatHandler.AuthorizeRealtime}))
 
+	mux.Handle("/api/v1/push/key", httpx.Methods(methods{http.MethodGet: pushHandler.Key}))
+	mux.Handle("/api/v1/me/push-subscriptions", httpx.Methods(methods{
+		http.MethodPut: pushHandler.Subscribe, http.MethodDelete: pushHandler.Unsubscribe,
+	}))
+
+	// Fuori da /api: vercel.json inoltra qui la mappa del sito e, solo per i programmi che creano
+	// l'anteprima dei link condivisi (WhatsApp, Telegram, social), il dettaglio degli annunci
+	seoHandler := seo.NewHandler(listingsService, site)
+	mux.Handle("/sitemap.xml", httpx.Methods(methods{http.MethodGet: seoHandler.Sitemap, http.MethodHead: seoHandler.Sitemap}))
+	mux.Handle("/dettagli/{id}", httpx.Methods(methods{http.MethodGet: seoHandler.ListingPreview, http.MethodHead: seoHandler.ListingPreview}))
+
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, apperr.NotFound("endpoint_not_found", "Endpoint non trovato"))
 	})
@@ -142,6 +166,27 @@ func New(d Deps) (http.Handler, error) {
 		crossOrigin,
 		httpx.RequireJSON(),
 	), nil
+}
+
+// pushSender crea il mittente delle notifiche push dalla configurazione: nil (notifiche spente)
+// senza chiave VAPID o con una chiave non valida.
+func pushSender(d Deps, site string) push.Sender {
+	if d.Push != nil {
+		return d.Push
+	}
+	if d.Config.Push.PrivateKey == "" {
+		return nil
+	}
+	keys, err := webpush.ParsePrivateKey(d.Config.Push.PrivateKey)
+	if err != nil {
+		d.Logger.Error("VAPID_PRIVATE_KEY non valida: notifiche push spente", "err", err)
+		return nil
+	}
+	subject := d.Config.Push.Subject
+	if subject == "" {
+		subject = site
+	}
+	return webpush.NewSender(keys, subject, webpush.Endpoints{Extra: d.Config.Push.TestOrigins})
 }
 
 // health verifica che il database risponda.

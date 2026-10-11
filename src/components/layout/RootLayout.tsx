@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
 import { AuthProvider } from '../../auth/AuthProvider';
+import ServiceWorkerBridge from '../../pwa/ServiceWorkerBridge';
 import { RealtimeProvider } from '../../realtime/RealtimeProvider';
 import ConfirmProvider from '../ui/ConfirmProvider';
+import OfflineBanner from './OfflineBanner';
 import Toaster from '../ui/Toaster';
 import { ThemeProvider } from '../../theme/ThemeProvider';
 
@@ -33,11 +35,13 @@ export default function RootLayout() {
       <AuthProvider>
         <RealtimeProvider>
           <ConfirmProvider>
+            <OfflineBanner />
             <Outlet />
             <Toaster />
             {/* Indietro e avanti tornano al punto in cui si era; una pagina nuova parte dall'alto */}
             <ScrollRestoration />
             <FocusOnNavigate />
+            <ServiceWorkerBridge />
           </ConfirmProvider>
         </RealtimeProvider>
       </AuthProvider>

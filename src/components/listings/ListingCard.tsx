@@ -3,12 +3,20 @@ import { Link } from 'react-router-dom';
 import { formatAvailability, formatBills } from '../../api/listings';
 import type { ListingSummary } from '../../api/types';
 import { cn } from '../ui/cn';
+import { CARD_SIZES } from './photoSizes';
 import SaveButton from './SaveButton';
 
 interface Props {
   listing: ListingSummary;
-  /** Le prime schede della pagina: la foto si scarica subito, le altre quando si avvicinano. */
+  /**
+   * La prima scheda della pagina: la sua foto è spesso l'elemento più grande che si vede (LCP), si
+   * scarica subito e prima delle altre. Le altre quando si avvicinano.
+   */
   eager?: boolean;
+  /** La foto aspetta, al suo posto resta lo sfondo: la prima della pagina ha la precedenza (useLeadImage). */
+  deferImage?: boolean;
+  /** Quando la foto è arrivata (o non è arrivata): la prima scheda lo dice alle altre. */
+  onImageSettled?: () => void;
   /** Livello del titolo, secondo la pagina (h2 se le schede sono il contenuto principale). */
   headingLevel?: 'h2' | 'h3';
   onSaved?: (saved: boolean) => void;
@@ -22,7 +30,7 @@ const roomTypeLabel: Record<string, string> = { singola: 'Singola', doppia: 'Dop
  * Scheda di un annuncio: foto, prezzo, luogo e caratteristiche. Tutta la scheda porta al dettaglio
  * (il link è sul titolo e si estende alla scheda), il cuore resta un pulsante a parte.
  */
-export default function ListingCard({ listing, eager = false, headingLevel: Heading = 'h3', onSaved, showSave = true }: Props) {
+export default function ListingCard({ listing, eager = false, deferImage = false, onImageSettled, headingLevel: Heading = 'h3', onSaved, showSave = true }: Props) {
   const place = listing.zone ? `${listing.zone}, ${listing.city}` : listing.city;
   const facts = [roomTypeLabel[listing.roomType] ?? listing.roomType, formatBills(listing.billsIncluded), formatAvailability(listing.availableFrom)]
     .filter((fact): fact is string => Boolean(fact));
@@ -36,13 +44,20 @@ export default function ListingCard({ listing, eager = false, headingLevel: Head
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-surface-muted">
         {listing.coverUrl ? (
-          <img
-            src={listing.coverUrl}
-            alt=""
-            loading={eager ? 'eager' : 'lazy'}
-            decoding="async"
-            className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none"
-          />
+          !deferImage && (
+            <img
+              src={listing.coverUrl}
+              srcSet={listing.coverSrcset ?? undefined}
+              sizes={CARD_SIZES}
+              alt=""
+              loading={eager ? 'eager' : 'lazy'}
+              fetchPriority={eager ? 'high' : 'auto'}
+              decoding="async"
+              onLoad={onImageSettled}
+              onError={onImageSettled}
+              className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none"
+            />
+          )
         ) : (
           <div className="flex size-full flex-col items-center justify-center gap-2 text-sm font-bold text-foreground-subtle">
             <ImageOff className="size-7" aria-hidden="true" />

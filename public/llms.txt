@@ -1,12 +1,16 @@
 # RoomDate
 
-Piattaforma italiana gratuita per pubblicare e cercare stanze in affitto e coinquilini, con contatto diretto tramite chat cifrata end-to-end.
+> Piattaforma italiana gratuita per pubblicare e cercare stanze in affitto e coinquilini, con contatto diretto tramite chat cifrata end-to-end.
 
-## Pagine Principali
-* [Home](/)
-* [Ricerca Stanze e Coinquilini](/ricerca)
-* [Guida e FAQ](/guida)
-* [Dashboard Utente](/dashboard)
+## Pagine principali
 
-## Dettagli Tecnici
-Annunci e profili sono inseriti dagli utenti e letti da un backend Go con database PostgreSQL.
+- [Home](https://roomdate.vercel.app/)
+- [Stanze in affitto](https://roomdate.vercel.app/ricerca): ricerca per città, budget, tipo di stanza e spese incluse
+- [Guida](https://roomdate.vercel.app/guida): come trovare coinquilini affidabili e stanze in affitto
+- [Informativa sulla privacy](https://roomdate.vercel.app/privacy)
+- [Termini di servizio](https://roomdate.vercel.app/termini)
+- [Mappa del sito](https://roomdate.vercel.app/sitemap.xml): tutti gli annunci pubblicati
+
+## Note
+
+Gli annunci sono inseriti dagli utenti. I profili delle persone e i messaggi non sono pubblici.

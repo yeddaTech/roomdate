@@ -231,6 +231,22 @@
     color: var(--foreground);
     font-family: var(--font-sans);
   }
+
+  /*
+    WCAG 2.4.11 (focus non coperto): quando il browser scorre per mostrare un elemento (Tab, ancore),
+    lo lascia fuori dalla barra in alto e, sul telefono, da quella in basso (navigazione o
+    "Contatta", alta al massimo 4,5 rem).
+  */
+  html {
+    scroll-padding-top: calc(4rem + env(safe-area-inset-top) + 0.5rem);
+    scroll-padding-bottom: calc(4.5rem + env(safe-area-inset-bottom) + 0.5rem);
+  }
+
+  @media (min-width: 768px) {
+    html {
+      scroll-padding-bottom: 0.5rem;
+    }
+  }
 }
 
 /* Cambio di tema: tutti i colori cambiano insieme, senza le transizioni dei singoli elementi */

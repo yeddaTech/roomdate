@@ -39,7 +39,30 @@ type Config struct {
 	// SecureCookies imposta il flag Secure sul cookie di sessione.
 	// È false solo nel server di sviluppo locale, che usa HTTP.
 	SecureCookies bool
+
+	// SiteURL è l'indirizzo pubblico del sito, senza "/" finale: serve agli indirizzi completi della
+	// mappa del sito e delle anteprime dei link condivisi. Da SITE_URL, altrimenti quello su Vercel.
+	SiteURL string
+
+	// Push sono le notifiche push dei messaggi, facoltative: senza chiave restano spente.
+	Push Push
 }
+
+// Push contiene la configurazione delle notifiche push (modulo M2.8).
+type Push struct {
+	// PrivateKey è la chiave VAPID privata (VAPID_PRIVATE_KEY), creata con "go run ./cmd/vapid";
+	// la pubblica si ricava da questa.
+	PrivateKey string
+	// Subject è il contatto del server per i servizi push (VAPID_SUBJECT): una mailto: o
+	// l'indirizzo del sito, che è il valore predefinito.
+	Subject string
+	// TestOrigins sono servizi push finti ammessi oltre a quelli veri (PUSH_TEST_ORIGINS, es.
+	// "http://127.0.0.1:9200"): solo per sviluppo e test, mai in produzione.
+	TestOrigins []string
+}
+
+// DefaultSiteURL è l'indirizzo del sito pubblicato (lo stesso di index.html e robots.txt).
+const DefaultSiteURL = "https://roomdate.vercel.app"
 
 // FromEnv legge la configurazione. Restituisce un errore se manca un valore obbligatorio:
 // meglio rifiutare le richieste che funzionare con un segreto vuoto.
@@ -62,6 +85,16 @@ func FromEnv() (Config, error) {
 			PublicURL:       strings.TrimSpace(os.Getenv("R2_PUBLIC_URL")),
 		},
 		SecureCookies: true,
+		SiteURL:       strings.TrimRight(firstNonEmpty(os.Getenv("SITE_URL"), DefaultSiteURL), "/"),
+		Push: Push{
+			PrivateKey: strings.TrimSpace(os.Getenv("VAPID_PRIVATE_KEY")),
+			Subject:    strings.TrimSpace(os.Getenv("VAPID_SUBJECT")),
+		},
+	}
+	for _, origin := range strings.Split(os.Getenv("PUSH_TEST_ORIGINS"), ",") {
+		if origin = strings.TrimSpace(origin); origin != "" {
+			cfg.Push.TestOrigins = append(cfg.Push.TestOrigins, origin)
+		}
 	}
 
 	for _, origin := range strings.Split(os.Getenv("TRUSTED_ORIGINS"), ",") {

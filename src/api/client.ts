@@ -1,5 +1,6 @@
 // Client HTTP unico per le API di Roomdate. Le API sono sempre sulla stessa origine del frontend:
 // in produzione su Vercel, in sviluppo tramite il proxy di Vite verso il server locale.
+import { takeEarly } from './early';
 
 export interface FieldError {
   field: string;
@@ -42,13 +43,14 @@ interface RequestOptions {
 export async function request<T>(path: string, { method = 'GET', body, signal }: RequestOptions = {}): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(path, {
+    // La prima pagina aperta può averla già chiesta src/boot.ts
+    response = await ((method === 'GET' && takeEarly(path)) || fetch(path, {
       method,
       credentials: 'include',
       headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal,
-    });
+    }));
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
     throw new ApiError(0, 'network_error', 'Errore di connessione al server.');

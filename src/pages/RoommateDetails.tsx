@@ -14,7 +14,6 @@ import ContactBar from '../components/layout/ContactBar';
 import PageMeta from '../components/PageMeta';
 import CompatibilityDetails from '../components/profile/CompatibilityDetails';
 import LifestyleTags from '../components/profile/LifestyleTags';
-import ReportDialog from '../components/ReportDialog';
 import Alert from '../components/ui/Alert';
 import Avatar from '../components/ui/Avatar';
 import Button from '../components/ui/Button';
@@ -23,6 +22,10 @@ import { cn, focusRing } from '../components/ui/cn';
 import { useConfirm } from '../components/ui/confirm';
 import EmptyState from '../components/ui/EmptyState';
 import Skeleton from '../components/ui/Skeleton';
+import { useLazyComponent } from '../components/ui/useLazyComponent';
+
+// La finestra per segnalare (Radix Dialog) ha il codice a parte: serve solo dopo un tocco
+const importReportDialog = () => import('../components/ReportDialog');
 
 /** Dati essenziali del profilo, uno per riga, con l'icona. */
 function Facts({ profile }: { profile: PublicProfile }) {
@@ -57,6 +60,11 @@ export default function RoommateDetails() {
   const startChat = useStartChat();
   const blockUser = useBlockUser();
   const [reporting, setReporting] = useState(false);
+  const { Component: ReportDialog, load: loadReportDialog } = useLazyComponent(importReportDialog);
+  const startReport = () => {
+    setReporting(true);
+    loadReportDialog();
+  };
 
   if (query.isPending) {
     return (
@@ -125,7 +133,8 @@ export default function RoommateDetails() {
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pt-4 pb-28 md:px-6 md:pt-6 md:pb-12">
-      <PageMeta title={`${name} | RoomDate`} description={`${name} ${profile.userType === 'affitta' ? 'offre una stanza' : 'cerca una stanza'}${profile.city ? ` a ${profile.city}` : ''} su RoomDate.`} />
+      {/* Profilo di una persona: per riservatezza non finisce nei motori di ricerca (né nella mappa del sito) */}
+      <PageMeta title={`${name} | RoomDate`} noindex />
       <BackLink fallback="/ricerca?intent=coinquilino" />
 
       <header className="mt-4 flex flex-col items-start gap-5 sm:flex-row sm:items-center">
@@ -184,7 +193,7 @@ export default function RoommateDetails() {
 
           {user && !isOwn && (
             <div className="flex gap-6 lg:hidden">
-              <button type="button" onClick={() => setReporting(true)} className={secondary}><Flag className="size-4" aria-hidden="true" /> Segnala</button>
+              <button type="button" onClick={startReport} className={secondary}><Flag className="size-4" aria-hidden="true" /> Segnala</button>
               <button type="button" onClick={block} disabled={blockUser.isPending} className={secondary}><Ban className="size-4" aria-hidden="true" /> Blocca</button>
             </div>
           )}
@@ -200,7 +209,7 @@ export default function RoommateDetails() {
             )}
             {user && !isOwn && (
               <div className="flex justify-center gap-6">
-                <button type="button" onClick={() => setReporting(true)} className={secondary}><Flag className="size-4" aria-hidden="true" /> Segnala</button>
+                <button type="button" onClick={startReport} className={secondary}><Flag className="size-4" aria-hidden="true" /> Segnala</button>
                 <button type="button" onClick={block} disabled={blockUser.isPending} className={secondary}><Ban className="size-4" aria-hidden="true" /> Blocca</button>
               </div>
             )}
@@ -216,7 +225,7 @@ export default function RoommateDetails() {
         </ContactBar>
       )}
 
-      {reporting && <ReportDialog target={{ userId: profile.id }} title={`Segnala ${name}`} onClose={() => setReporting(false)} />}
+      {reporting && ReportDialog && <ReportDialog target={{ userId: profile.id }} title={`Segnala ${name}`} onClose={() => setReporting(false)} />}
     </div>
   );
 }

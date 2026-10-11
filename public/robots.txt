@@ -1,21 +1,21 @@
+# Le pagine pubbliche (annunci, ricerca, guida) si possono leggere e indicizzare. L'area personale
+# richiede l'accesso e le API servono all'app: niente da indicizzare. I profili delle persone hanno
+# il meta noindex, per riservatezza.
+# I bot delle AI generative sono ammessi esplicitamente, con le stesse regole.
 User-agent: *
-Allow: /
-Disallow: /api/
-Disallow: /dashboard
-Disallow: /impostazioni
-
-# Autorizza esplicitamente i bot delle AI Generative a leggere il sito per l'AIO
 User-agent: GPTBot
-Allow: /
-
 User-agent: ChatGPT-User
-Allow: /
-
 User-agent: Google-Extended
-Allow: /
-
 User-agent: ClaudeBot
 Allow: /
+Disallow: /api/
+Disallow: /profilo
+Disallow: /annunci
+Disallow: /preferiti
+Disallow: /impostazioni
+Disallow: /chat
+Disallow: /moderazione
+Disallow: /dashboard
 
-# Indica la mappa del sito ai motori di ricerca
+# Mappa del sito con tutti gli annunci pubblicati (generata dal server)
 Sitemap: https://roomdate.vercel.app/sitemap.xml

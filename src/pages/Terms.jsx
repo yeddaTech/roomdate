@@ -6,7 +6,10 @@ export default function Terms() {
 
   return (
     <div className="bg-background font-sans text-foreground py-12 px-6 selection:bg-primary/25">
-      <PageMeta title="Termini di Servizio | RoomDate" />
+      <PageMeta
+        title="Termini di Servizio | RoomDate"
+        description="Le regole per usare RoomDate: ruolo della piattaforma, requisiti, regole di condotta e responsabilità di chi pubblica e di chi cerca."
+      />
 
       <div className="max-w-3xl mx-auto bg-surface p-8 md:p-12 rounded-3xl shadow-xs border border-line relative overflow-hidden">
         
@@ -28,7 +31,7 @@ export default function Terms() {
           <section className="bg-background p-6 rounded-3xl border border-line">
             <h2 className="font-serif text-xl font-extrabold text-foreground mb-3">1. Ruolo della Piattaforma</h2>
             <p className="text-foreground-muted">
-              RoomDate opera esclusivamente come fornitore di servizi della società dell'informazione (intermediario tecnico). La piattaforma mette a disposizione una bacheca digitale per facilitare l'incontro tra utenti che offrono e cercano stanze. <strong>RoomDate non è un'agenzia immobiliare</strong>, non interviene in alcun modo nelle trattative, non percepisce percentuali sugli affitti e non è parte dei contratti stipulati tra gli utenti.
+              RoomDate opera esclusivamente come fornitore di servizi della società dell&apos;informazione (intermediario tecnico). La piattaforma mette a disposizione una bacheca digitale per facilitare l&apos;incontro tra utenti che offrono e cercano stanze. <strong>RoomDate non è un&apos;agenzia immobiliare</strong>, non interviene in alcun modo nelle trattative, non percepisce percentuali sugli affitti e non è parte dei contratti stipulati tra gli utenti.
             </p>
           </section>
 
@@ -42,7 +45,7 @@ export default function Terms() {
           <section>
             <h2 className="font-serif text-xl font-extrabold text-foreground mb-3">3. Esclusione di Responsabilità</h2>
             <p>
-              RoomDate declina ogni responsabilità per eventuali danni, truffe, perdite economiche, controversie o illeciti derivanti dalle interazioni tra gli utenti, sia all'interno dell'applicazione (es. chat) che nella vita reale. L'utente si assume la totale e completa responsabilità di verificare l'identità dell'interlocutore, l'autenticità degli annunci e la validità legale di eventuali accordi economici o contratti di locazione.
+              RoomDate declina ogni responsabilità per eventuali danni, truffe, perdite economiche, controversie o illeciti derivanti dalle interazioni tra gli utenti, sia all&apos;interno dell&apos;applicazione (es. chat) che nella vita reale. L&apos;utente si assume la totale e completa responsabilità di verificare l&apos;identità dell&apos;interlocutore, l&apos;autenticità degli annunci e la validità legale di eventuali accordi economici o contratti di locazione.
             </p>
           </section>
 

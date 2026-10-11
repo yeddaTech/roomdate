@@ -153,6 +153,8 @@ export interface ListingSummary {
   removed: boolean;
   /** Prima foto dell'annuncio, o null se non ne ha. */
   coverUrl: string | null;
+  /** Versioni della prima foto per srcset; null se non ne ha (foto caricate prima del modulo M2.8). */
+  coverSrcset: string | null;
   /** Tra i preferiti di chi guarda (sempre false senza sessione). */
   saved: boolean;
 }
@@ -184,6 +186,8 @@ export interface ListingsPage {
 export interface ListingImage {
   id: number;
   url: string;
+  /** Versioni della foto per srcset, dalla più piccola all'originale; null se non ne ha. */
+  srcset: string | null;
 }
 
 export interface ListingDetail extends ListingSummary {
@@ -214,6 +218,8 @@ export interface PendingUpload {
   url: string;
   headers: Record<string, string>;
   maxBytes: number;
+  /** Indirizzi firmati per le versioni ridotte (JPEG larghi 480 e 960 px). */
+  variants: { width: number; key: string; url: string; headers: Record<string, string> }[];
 }
 
 /** Messaggio come arriva dal server: il testo resta cifrato finché il browser non lo apre. */
@@ -238,6 +244,7 @@ export interface ConversationListing {
   price: number;
   /** Prima foto dell'annuncio, o null se non ne ha. */
   coverUrl: string | null;
+  coverSrcset: string | null;
   /** L'annuncio è di chi guarda. */
   mine: boolean;
   /** Ancora visibile all'altro partecipante (attivo, non rimosso, nessun blocco). */

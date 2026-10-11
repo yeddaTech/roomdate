@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { BookOpen, Heart, Menu, MessageCircle, Search } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useUnreadCount } from '../../api/hooks';
 import { buttonClasses } from '../ui/buttonClasses';
 import { cn, focusRing } from '../ui/cn';
+import { useLazyComponent } from '../ui/useLazyComponent';
 import AccountMenu from './AccountMenu';
 import Logo from './Logo';
 import ThemeToggle from './ThemeToggle';
 import { unreadLabel } from './unread';
 
-type MobileMenuPanelComponent = typeof import('./MobileMenuPanel').default;
+// Il pannello del telefono (Radix Dialog) ha il codice a parte: non serve per aprire la pagina
+const importMobileMenu = () => import('./MobileMenuPanel');
 
 // L'unica barra di navigazione del sito (prima ce n'erano nove, copiate pagina per pagina con
 // link diversi). Su desktop: link principali e menu dell'account; sul telefono la navigazione
@@ -47,35 +49,15 @@ export default function SiteHeader() {
   const unread = useUnreadCount({ enabled: Boolean(user) }).data ?? 0;
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
-  // Il codice del pannello (Radix Dialog) si scarica appena il browser è libero, non con la pagina.
-  // Niente React.lazy: con Suspense React 19 aspetta almeno 300 ms prima di mostrare il pannello
-  const [MobileMenuPanel, setMobileMenuPanel] = useState<MobileMenuPanelComponent | null>(null);
-  const [menuLoadError, setMenuLoadError] = useState<unknown>(null);
-  const loadMobileMenu = useCallback(
-    () => import('./MobileMenuPanel').then((m) => setMobileMenuPanel(() => m.default)),
-    [],
-  );
+  const { Component: MobileMenuPanel, load: loadMobileMenu } = useLazyComponent(importMobileMenu);
 
   // Cambiando pagina il menu del telefono si chiude da solo
   useEffect(() => setMenuOpen(false), [pathname]);
 
-  useEffect(() => {
-    const prefetch = () => { loadMobileMenu().catch(() => {}); }; // riprova al tocco
-    // Safari non ha requestIdleCallback
-    if (typeof window.requestIdleCallback === 'function') {
-      const id = window.requestIdleCallback(prefetch, { timeout: 4000 });
-      return () => window.cancelIdleCallback(id);
-    }
-    const id = setTimeout(prefetch, 2000);
-    return () => clearTimeout(id);
-  }, [loadMobileMenu]);
-
   const openMobileMenu = () => {
     setMenuOpen(true);
-    if (!MobileMenuPanel) loadMobileMenu().catch(setMenuLoadError);
+    loadMobileMenu();
   };
-  // Codice non più disponibile (sito aggiornato nel frattempo): la pagina d'errore propone di ricaricare
-  if (menuLoadError) throw menuLoadError;
 
   const signOut = async () => {
     setMenuOpen(false);

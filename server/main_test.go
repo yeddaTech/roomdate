@@ -315,7 +315,8 @@ func newAppInTimeZone(t *testing.T, timeZone string) *testApp {
 	return app
 }
 
-func newAppWithPool(t *testing.T, st storage.Storage, cfg config.Config, pool *pgxpool.Pool) *testApp {
+// newAppWithPool crea l'applicazione sul pool indicato; options modifica le dipendenze (es. Push).
+func newAppWithPool(t *testing.T, st storage.Storage, cfg config.Config, pool *pgxpool.Pool, options ...func(*server.Deps)) *testApp {
 	t.Helper()
 	if testPool == nil {
 		t.Skip("TEST_DATABASE_URL non impostata")
@@ -328,13 +329,17 @@ func newAppWithPool(t *testing.T, st storage.Storage, cfg config.Config, pool *p
 	}
 
 	publisher := &recordingPublisher{}
-	handler, err := server.New(server.Deps{
+	deps := server.Deps{
 		Config:    cfg,
 		DB:        pool,
 		Publisher: publisher,
 		Logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Storage:   st,
-	})
+	}
+	for _, option := range options {
+		option(&deps)
+	}
+	handler, err := server.New(deps)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -52,6 +52,12 @@ func TestEveryEndpointChecksAccess(t *testing.T) {
 		"GET /api/v1/listings":                {path: "/api/v1/listings"},
 		"GET /api/v1/listings/{id}":           {path: listing},
 		"GET /api/v1/listings/cities":         {path: "/api/v1/listings/cities"},
+		// Mappa del sito e anteprime dei link (modulo M2.8): pubbliche come gli annunci
+		"GET /sitemap.xml":     {path: "/sitemap.xml"},
+		"HEAD /sitemap.xml":    {path: "/sitemap.xml"},
+		"GET /dettagli/{id}":   {path: "/dettagli/" + itoa(f.listingID)},
+		"HEAD /dettagli/{id}":  {path: "/dettagli/" + itoa(f.listingID)},
+		"GET /api/v1/push/key": {path: "/api/v1/push/key"},
 
 		"POST /api/v1/auth/password": {path: "/api/v1/auth/password", body: map[string]any{}, anonymous: 401},
 		"POST /api/v1/auth/kdf":      {path: "/api/v1/auth/kdf", body: map[string]any{}, anonymous: 401},
@@ -70,6 +76,9 @@ func TestEveryEndpointChecksAccess(t *testing.T) {
 		// Sbloccare riguarda solo i propri blocchi: 204 anche se non ce n'era uno
 		"DELETE /api/v1/me/blocks/{userId}": {path: "/api/v1/me/blocks/" + f.anna.ID, anonymous: 401},
 		"POST /api/v1/reports":              {path: "/api/v1/reports", body: map[string]any{}, anonymous: 401},
+		// Le iscrizioni alle notifiche sono quelle di chi ha la sessione (vedi TestPushSubscriptions)
+		"PUT /api/v1/me/push-subscriptions":    {path: "/api/v1/me/push-subscriptions", body: map[string]any{}, anonymous: 401},
+		"DELETE /api/v1/me/push-subscriptions": {path: "/api/v1/me/push-subscriptions", body: map[string]any{}, anonymous: 401},
 
 		"POST /api/v1/listings":                         {path: "/api/v1/listings", body: validListing(), anonymous: 401},
 		"PUT /api/v1/listings/{id}":                     {path: listing, body: validListing(), anonymous: 401, intruder: 403},

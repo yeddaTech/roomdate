@@ -3,41 +3,23 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { toast } from 'sonner';
 import { SearchX, SlidersHorizontal, X } from 'lucide-react';
 import { useListings, useRoommates, useStartChat } from '../api/hooks';
-import { isCity } from '../api/options';
-import type { ListingSort, RoomType } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import type { AuthLocationState } from '../auth/authLocation';
 import ListingCard from '../components/listings/ListingCard';
+import { useLeadImage } from '../components/listings/useLeadImage';
 import PageMeta from '../components/PageMeta';
 import RoommateCard from '../components/profile/RoommateCard';
 import LoadMore from '../components/search/LoadMore';
 import SearchFilters, { type FilterValues, type Intent } from '../components/search/SearchFilters';
+import { SORTS, budgetFromUrl, listingFilters, readSearch } from '../components/search/searchUrl';
 import Button from '../components/ui/Button';
 import { cn, focusRing } from '../components/ui/cn';
 import EmptyState from '../components/ui/EmptyState';
+import { useLazyComponent } from '../components/ui/useLazyComponent';
 import { Select } from '../components/ui/Field';
-import { Sheet, SheetContent } from '../components/ui/Sheet';
 import Skeleton from '../components/ui/Skeleton';
 
-const ROOM_TYPES = ['singola', 'doppia'];
-const SORTS: { value: ListingSort; label: string }[] = [
-  { value: 'recenti', label: 'Più recenti' },
-  { value: 'prezzo', label: 'Prezzo più basso' },
-  { value: 'prezzo-desc', label: 'Prezzo più alto' },
-];
-const MAX_BUDGET = 20000;
-
-/** Valore ammesso, oppure stringa vuota. */
-function oneOf(value: string | null, allowed: string[]): string {
-  return value && allowed.includes(value) ? value : '';
-}
-
-/** Budget come lo accetta il server: solo cifre, al massimo 20.000 €. */
-function budgetFromUrl(value: string | null): string {
-  const digits = (value ?? '').replace(/\D/g, '').slice(0, 6);
-  if (!digits || Number(digits) === 0) return '';
-  return String(Math.min(Number(digits), MAX_BUDGET));
-}
+const importFiltersSheet = () => import('../components/search/FiltersSheet');
 
 /** Parametri dell'URL per ciascun filtro. */
 const PARAM: Record<keyof FilterValues | 'budget', string> = { city: 'citta', budget: 'budget', roomType: 'tipo', bills: 'spese' };
@@ -64,15 +46,15 @@ export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const { Component: FiltersSheet, load: loadFiltersSheet } = useLazyComponent(importFiltersSheet);
+  const openFilters = () => {
+    setFiltersOpen(true);
+    loadFiltersSheet();
+  };
 
-  // L'URL è l'unica fonte dei filtri: le query seguono i parametri, non il contrario.
-  // Valori non ammessi (vecchi link, modifiche a mano) valgono come "nessun filtro".
-  const intent: Intent = searchParams.get('intent') === 'coinquilino' ? 'coinquilino' : 'stanza';
-  const city = isCity(searchParams.get('citta') ?? '') ? searchParams.get('citta') ?? '' : '';
-  const budget = budgetFromUrl(searchParams.get('budget'));
-  const roomType = intent === 'stanza' ? oneOf(searchParams.get('tipo'), ROOM_TYPES) : '';
-  const bills = intent === 'stanza' ? oneOf(searchParams.get('spese'), ['true', 'false']) : '';
-  const sort = (oneOf(searchParams.get('ordina'), SORTS.map((s) => s.value)) || 'recenti') as ListingSort;
+  // L'URL è l'unica fonte dei filtri: le query seguono i parametri, non il contrario
+  const search = readSearch(searchParams);
+  const { intent, city, budget, roomType, bills, sort } = search;
 
   const setParams = (changes: Record<string, string>, { replace = false } = {}) => {
     const params = new URLSearchParams(searchParams);
@@ -109,14 +91,13 @@ export default function Search() {
   // Si carica solo l'elenco della modalità attiva; i dati restano in cache passando da una all'altra.
   // Filtri, ordinamento e pagine li applica il server.
   const roommatesQuery = useRoommates({ city, minBudget: budget, enabled: intent === 'coinquilino' });
-  const listingsQuery = useListings(
-    { city, maxPrice: budget, roomType: roomType as RoomType | '', billsIncluded: bills as 'true' | 'false' | '', sort },
-    { enabled: intent === 'stanza' },
-  );
+  const listingsQuery = useListings(listingFilters(search), { enabled: intent === 'stanza' });
   const query = intent === 'coinquilino' ? roommatesQuery : listingsQuery;
   const listings = listingsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const roommates = roommatesQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const count = intent === 'stanza' ? listings.length : roommates.length;
+  // La foto della prima stanza (in vista) arriva prima delle altre
+  const lead = useLeadImage(listings[0]?.coverUrl);
 
   const startChat = useStartChat();
   const [contacting, setContacting] = useState<string | null>(null);
@@ -182,7 +163,16 @@ export default function Search() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-6 md:py-10">
-      <PageMeta title={`${title}${city ? ` a ${city}` : ''} | RoomDate`} description={intent === 'stanza' ? 'Stanze in affitto con foto, prezzi e contatto diretto con chi affitta.' : 'Persone che cercano casa e coinquilini, con cosa avete in comune.'} />
+      {/* Le stanze si indicizzano (la città fa parte dell'indirizzo canonico, gli altri filtri no); i
+          coinquilini sono persone: per riservatezza no */}
+      <PageMeta
+        title={`${title}${city ? ` a ${city}` : ''} | RoomDate`}
+        description={intent === 'stanza'
+          ? `Stanze in affitto${city ? ` a ${city}` : ''} con foto, prezzi e contatto diretto con chi affitta.`
+          : 'Persone che cercano casa e coinquilini, con cosa avete in comune.'}
+        noindex={intent === 'coinquilino'}
+        canonical={city ? `/ricerca?${new URLSearchParams({ citta: city })}` : '/ricerca'}
+      />
 
       <div className="mb-6 flex flex-col gap-4 md:mb-8 md:flex-row md:items-end md:justify-between">
         <div>
@@ -205,7 +195,7 @@ export default function Search() {
               {query.isPending ? 'Ricerca in corso…' : query.isError && !query.data ? '' : `${count}${query.hasNextPage ? '+' : ''} ${noun}`}
             </p>
             <div className="flex items-center gap-2">
-              <Button variant="secondary" className="lg:hidden" onClick={() => setFiltersOpen(true)} aria-haspopup="dialog">
+              <Button variant="secondary" className="lg:hidden" onClick={openFilters} aria-haspopup="dialog">
                 <SlidersHorizontal /> Filtri{active.length > 0 && <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">{active.length}</span>}
               </Button>
               {intent === 'stanza' && (
@@ -255,7 +245,16 @@ export default function Search() {
             />
           ) : intent === 'stanza' ? (
             <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-              {listings.map((listing, i) => <ListingCard key={listing.id} listing={listing} eager={i < 3} headingLevel="h2" />)}
+              {listings.map((listing, i) => (
+                <ListingCard
+                  key={listing.id}
+                  listing={listing}
+                  eager={i === 0}
+                  deferImage={i > 0 && lead.waiting}
+                  onImageSettled={i === 0 ? lead.settle : undefined}
+                  headingLevel="h2"
+                />
+              ))}
             </div>
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
@@ -276,14 +275,14 @@ export default function Search() {
       </div>
 
       {/* Sul telefono i filtri stanno in un pannello dal basso: si applicano subito, sotto si vede quanti risultati ci sono */}
-      <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
-        <SheetContent side="bottom" title="Filtri">
+      {FiltersSheet && (
+        <FiltersSheet open={filtersOpen} onOpenChange={setFiltersOpen}>
           {filters}
           <Button size="lg" className="w-full" onClick={() => setFiltersOpen(false)}>
             {query.isPending ? 'Mostra i risultati' : `Mostra ${count}${query.hasNextPage ? '+' : ''} ${noun}`}
           </Button>
-        </SheetContent>
-      </Sheet>
+        </FiltersSheet>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import (
 
 	"roomdate-backend/internal/auth"
 	"roomdate-backend/internal/moderation"
+	"roomdate-backend/internal/storage"
 )
 
 // Store esegue le query sulla tabella roomdate_app.users.
@@ -178,7 +179,8 @@ func (s *Store) UpdatePassword(ctx context.Context, id, passwordHash string, kdf
 	return err
 }
 
-// Delete elimina l'utente e restituisce le chiavi delle foto dei suoi annunci, da cancellare dallo storage.
+// Delete elimina l'utente e restituisce le chiavi delle foto dei suoi annunci (con le versioni
+// ridotte), da cancellare dallo storage.
 // Il database elimina a cascata gli annunci; conversazioni e messaggi restano all'altro partecipante.
 // La copia dei messaggi cifrata per l'utente eliminato non serve più a nessuno e viene cancellata.
 func (s *Store) Delete(ctx context.Context, id string) ([]string, error) {
@@ -189,16 +191,25 @@ func (s *Store) Delete(ctx context.Context, id string) ([]string, error) {
 	defer tx.Rollback(ctx)
 
 	rows, err := tx.Query(ctx, `
-        SELECT i.storage_key
+        SELECT i.storage_key, i.widths
         FROM roomdate_app.listing_images i
         JOIN roomdate_app.listings l ON i.listing_id = l.id
         WHERE l.user_id = $1`, id)
 	if err != nil {
 		return nil, err
 	}
-	keys, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	photos, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) ([]string, error) {
+		var key string
+		var widths []int32
+		err := row.Scan(&key, &widths)
+		return storage.ImageKeys(key, widths), err
+	})
 	if err != nil {
 		return nil, err
+	}
+	keys := []string{}
+	for _, k := range photos {
+		keys = append(keys, k...)
 	}
 	if _, err := tx.Exec(ctx, `UPDATE roomdate_app.messages SET sender_content = NULL WHERE sender_id = $1`, id); err != nil {
 		return nil, err

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { cn } from '../ui/cn';
+import InstallApp from '../../pwa/InstallApp';
 import Logo from './Logo';
 import ThemeSelect from './ThemeSelect';
 
@@ -16,6 +17,7 @@ export default function SiteFooter({ className }: { className?: string }) {
             Stanze in affitto e coinquilini, con contatto diretto tra utenti e chat cifrata end-to-end.
           </p>
           <ThemeSelect onDark className="mt-8 max-w-xs" />
+          <InstallApp onDark className="mt-6" />
         </div>
         <nav aria-label="Esplora">
           <h2 className="mb-4 text-sm font-bold text-white">Esplora</h2>

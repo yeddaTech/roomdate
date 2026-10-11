@@ -75,6 +75,7 @@ After pulling changes that touch `package.json`, run `npm ci` again: modules M2.
 * `internal/users`, `internal/listings`, `internal/chat`, `internal/moderation` — one package per area, each with a `handlers.go` (HTTP), `service.go` (rules, validation, authorization) and `store.go` (SQL through pgx). `moderation` also owns the block rules that the other areas apply in their queries (`moderation.NotBlockedSQL`).
 * `internal/httpx` — middleware applied to every request: request ID and structured logs, panic recovery, security headers, 64 KB body limit, cross-origin (CSRF) protection and JSON-only request bodies.
 * `internal/auth` (session cookie and passwords), `internal/validate` (input rules and text normalization), `internal/apperr` (errors shown to users; everything else is logged and answered with a generic message), `internal/config`, `internal/db`, `internal/realtime`, `internal/storage` (listing photos on Cloudflare R2 or any S3-compatible storage).
+* `internal/push` (push subscriptions and message notifications), `internal/webpush` (Web Push encryption and VAPID), `internal/seo` (sitemap and link previews), since module M2.8.
 * `shared/options.json` — the closed lists shared by backend and frontend: cities, occupations, lifestyle tags, listing amenities and report reasons. The Go package `shared` embeds it and validates input against it; the frontend imports it in `src/api/options.ts`. To add a value, edit only this file (a new city, occupation or tag needs no migration; renaming or removing a key does, for the rows that use it).
 
 User text is stored as typed (only surrounding spaces and invisible control characters are removed). It is never rendered as HTML: React escapes it on display.
@@ -89,6 +90,8 @@ Both lists answer `{"items": [...], "nextCursor": "…"}` and are paginated by c
 
 Public profiles show the age, never the birth date. For a signed-in viewer, profiles also carry `compatibility`: what the two profiles have in common (same city, budgets within 100 €, shared lifestyle tags) and whether one smokes and the other does not. There is deliberately no percentage score, so every item shown to users has a stated reason.
 
+* Push notifications: `push/key` (the server's public key), `me/push-subscriptions` (PUT to subscribe this browser, DELETE with `{"endpoint"}` to unsubscribe).
+* Outside `/api`: `/sitemap.xml`, and `/dettagli/{id}` for link-preview crawlers only (`vercel.json`).
 * Chat: `conversations` (list, start), `conversations/{id}` (one conversation, as in the list), `conversations/{id}/messages` (read, send), `conversations/{id}/read`, and `realtime/auth` (signature for private real-time channels).
   * The conversation list carries the last message, the unread count, the caller's last read time (`lastReadAt`) and the other participant.
   * The other participant comes with `profileVisible`: the same rule as the profile page (public, not suspended, no block).
@@ -292,8 +295,41 @@ The interface is built on tokens and a small set of accessible components. Every
   * The alert names the sender, never the text, which stays encrypted until the chat is opened. One alert per conversation (`tag`), and clicking it opens the chat.
   * The choice is per device and needs the browser's permission. A test alert shows straight away.
   * If the alerts are blocked, the section explains how to allow them again. If the browser rejects alerts outside an installed app (Chrome on Android), it says so.
-  * With RoomDate closed nothing arrives: that would need push notifications (with the PWA, M2.8).
+  * With RoomDate closed, alerts arrive through push notifications (module M2.8).
 * **Account deletion fix:** since M3.4 the server checks a key derived from the password, but the settings page still sent the password itself. Deletion failed with "password non corretta" for every account that had signed in at least once with the new method. Now the browser derives the proof (`deleteAccount` in `accountKeys.ts`), as password change and recovery key already did.
+
+### Quality: speed, accessibility, SEO, installable app and push (module M2.8)
+
+* **Deploy order:** run migration `00013` first (`listing_images.widths`, `push_subscriptions`), then deploy: the new code reads the new column.
+* **Responsive photos:**
+  * On upload the browser also makes 480 px and 960 px JPEG versions of each photo (`src/api/photos.ts`). The API signs their upload next to the original, checks each one on confirmation (size, type, real JPEG content) and moves it to `listings/<id>/…-w480.jpg` and `-w960.jpg`. A missing or invalid version is dropped and never blocks the photo.
+  * `listing_images.widths` records which versions exist. Responses carry `srcset` (`coverSrcset` in lists), and each page tells the browser how wide the photo is shown (`sizes`, in `src/components/listings/photoSizes.ts`: update it when the layout changes), so a phone downloads 65 KB instead of 270.
+  * Photos uploaded before M2.8 have no versions and keep using the original.
+* **Main photo first (LCP):**
+  * `src/boot.ts` is a tiny separate entry, loaded with `async` before the app (the `boot` plugin in `vite.config.js` adds its tag to `index.html`). On `/dettagli/:id` and `/ricerca` it requests the page data and, as soon as they arrive, preloads the main photo with the same `srcset` and `sizes`, while the app is still downloading. The app then uses that response instead of asking again (`takeEarly` in `src/api/client.ts`).
+  * Route loaders (`src/api/prefetch.ts`) do the same when navigating inside the app: the API request starts together with the page code.
+  * The other photos wait for the main one (`useLeadImage`), and only one gallery layout (phone strip or desktop mosaic) is in the page: a hidden image would download anyway.
+  * The full-screen viewer, the filter panel and the report dialog are separate files (`useLazyComponent`). Code needed only later downloads after the page has loaded (`afterPageLoad`).
+  * On a simulated phone (CPU 4× slower, 1.6 Mbit/s, 150 ms latency) the largest element appears after: search 8.7 → 2.2 s, listing 6.3 → 2.2 s, home 1.5 s, profile 1.9 s, sign-in 2.0 s.
+* **Accessibility (WCAG 2.2 AA):**
+  * axe finds no violation on any page, in both themes, on desktop and phone, with menus and dialogs open.
+  * Checked by script: touch targets of at least 24×24 px; focus never hidden under the sticky header or the phone's bottom bar (`scroll-padding` in `src/index.css`); no horizontal scrolling at 320 px (buttons wrap their text instead of overflowing); distinct titles; skip link; sign-in fields that work with password managers.
+* **SEO:**
+  * Each page sets its title, description and canonical address (`PageMeta`). The search's canonical address keeps only the city.
+  * Private pages are `noindex`, and so are people's profiles and the roommate search: they describe people, and keeping them out of search engines is a privacy choice. To index them, remove `noindex` in `RoommateDetails.tsx` and `Search.tsx` and add them to the sitemap.
+  * `/sitemap.xml` is generated by the API (`internal/seo`): fixed pages, search by city and every listing visible to everyone, with its last update. `robots.txt` excludes the personal area and the API.
+  * Link previews: social and chat apps do not run JavaScript. `index.html` therefore carries a preview for the whole site (`og-image.png`). For `/dettagli/:id`, `vercel.json` sends their crawlers (recognised by user agent, never search engines) to a small page with the listing's title, price, place and 960 px photo. To check after deploying: `curl -A WhatsApp https://roomdate.vercel.app/dettagli/<id>`.
+* **Installable app (PWA):**
+  * `public/manifest.webmanifest` and icons (also maskable, and `apple-touch-icon.png` for iOS) drawn from the logo, now also the vector favicon.
+  * The service worker (`public/sw.js`, registered only in the production build) serves the hashed app files from its cache, and pages from the network with the last saved app as offline fallback. The API, photos and Pusher never go through it: personal data and messages are not stored by it.
+  * It controls pages from the next navigation: taking over a page while it loads (`clients.claim()`) would download the preloaded photo twice.
+  * "Installa l'app" appears in the footer and in the phone menu when the browser offers installation; on iPhone, a one-line instruction. A notice at the top says when the device is offline.
+* **Push notifications for messages:**
+  * Settings → Avvisi dei messaggi has a second option, "Anche con RoomDate chiuso". The browser subscribes to its push service (Google, Apple, Mozilla or Microsoft) and the API stores the subscription together with the session (`push_subscriptions`). Signing out, closing that session from another device, or deleting the account removes it.
+  * On a new message the API sends each recipient's browsers a notification carrying only the conversation and the sender's first name. It is encrypted for that browser (RFC 8291) and signed with the server's VAPID key (RFC 8292), using the Go standard library (`internal/webpush`, checked against the RFC example).
+  * The server contacts only the known push services (no requests to arbitrary addresses), deletes subscriptions the service reports as expired (404/410) and skips sessions unused for a week.
+  * The service worker shows "Nuovo messaggio da …" unless a RoomDate window is in focus; tapping it opens the conversation. With push on, the page stops showing its own alerts, so nothing appears twice. Alerts now also work in Chrome on Android; on iPhone and iPad they need the installed app (iOS 16.4 or later).
+  * **Setup:** `go run ./cmd/vapid` prints `VAPID_PRIVATE_KEY=…`. Add it in Vercel → Settings → Environment Variables (Production) and redeploy. Without it push stays off and the option is not shown. A new key invalidates the existing subscriptions: people turn the option on again.
 
 ### Tests
 
@@ -325,7 +361,7 @@ Migrations are SQL files in `internal/db/migrations` (goose format), embedded in
 
 ### Listing photos (Cloudflare R2)
 
-The browser resizes each photo (longest side 1600 px, JPEG, metadata such as GPS location removed) and uploads it straight to R2 with a URL signed by the API, so photos never pass through the Vercel functions. The file lands in `pending/`; the API then checks its size and real format, moves it to `listings/<id>/` and adds it to the listing. Without the `R2_*` variables the app works, but photo upload answers "not available".
+The browser resizes each photo (longest side 1600 px, JPEG, metadata such as GPS location removed), makes the 480 and 960 px versions (module M2.8) and uploads them straight to R2 with URLs signed by the API, so photos never pass through the Vercel functions. The file lands in `pending/`; the API then checks its size and real format, moves it to `listings/<id>/` and adds it to the listing. Without the `R2_*` variables the app works, but photo upload answers "not available".
 
 One-time setup:
 

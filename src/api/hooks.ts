@@ -1,5 +1,15 @@
 // Hook per leggere e modificare i dati: le pagine usano questi, non le chiamate API dirette.
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryClient, type QueryKey } from '@tanstack/react-query';
+import {
+  infiniteQueryOptions,
+  queryOptions,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+  type QueryClient,
+  type QueryKey,
+} from '@tanstack/react-query';
 import { getConversation, getUnreadCount, listConversations, listMessages, markConversationRead, sendMessage, startChat } from './chat';
 import {
   createListing,
@@ -66,19 +76,35 @@ export function useRevokeOtherSessions() {
   });
 }
 
+// Le query delle pagine pubbliche, condivise con il caricamento anticipato (src/api/prefetch.ts):
+// stessa chiave e stessa funzione, così la pagina trova la richiesta già partita invece di rifarla.
+export const publicProfileQuery = (id: string) =>
+  queryOptions({ queryKey: queryKeys.publicProfile(id), queryFn: () => getPublicProfile(id) });
+
+export const roommatesQuery = (city: string, minBudget: string) => infiniteQueryOptions({
+  queryKey: queryKeys.roommatesList(`${city}|${minBudget}`),
+  queryFn: ({ pageParam }) => listRoommates({ city, minBudget, cursor: pageParam }),
+  initialPageParam: '',
+  getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+});
+
+export const listingsSearchQuery = (filters: ListingFilters) => infiniteQueryOptions({
+  queryKey: queryKeys.listingsSearch(JSON.stringify(filters)),
+  queryFn: ({ pageParam }) => listListings(filters, { cursor: pageParam }),
+  initialPageParam: '',
+  getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+});
+
+export const listingQuery = (id: string | number) =>
+  queryOptions({ queryKey: queryKeys.listing(String(id)), queryFn: () => getListing(id) });
+
 export function usePublicProfile(id: string) {
-  return useQuery({ queryKey: queryKeys.publicProfile(id), queryFn: () => getPublicProfile(id) });
+  return useQuery(publicProfileQuery(id));
 }
 
 /** Coinquilini a pagine: fetchNextPage carica i successivi finché hasNextPage è true. */
 export function useRoommates({ city = '', minBudget = '', enabled = true } = {}) {
-  return useInfiniteQuery({
-    queryKey: queryKeys.roommatesList(`${city}|${minBudget}`),
-    queryFn: ({ pageParam }) => listRoommates({ city, minBudget, cursor: pageParam }),
-    initialPageParam: '',
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled,
-  });
+  return useInfiniteQuery({ ...roommatesQuery(city, minBudget), enabled });
 }
 
 /** Gli annunci più recenti per la home (una pagina sola). */
@@ -92,13 +118,7 @@ export function useLatestListings({ limit = 8 } = {}) {
 
 /** Annunci a pagine, filtrati e ordinati dal server. */
 export function useListings(filters: ListingFilters, { enabled = true } = {}) {
-  return useInfiniteQuery({
-    queryKey: queryKeys.listingsSearch(JSON.stringify(filters)),
-    queryFn: ({ pageParam }) => listListings(filters, { cursor: pageParam }),
-    initialPageParam: '',
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled,
-  });
+  return useInfiniteQuery({ ...listingsSearchQuery(filters), enabled });
 }
 
 /** Le città con annunci, per la home. */
@@ -151,7 +171,7 @@ export function useSetListingSaved() {
 }
 
 export function useListing(id: string | number, { enabled = true } = {}) {
-  return useQuery({ queryKey: queryKeys.listing(String(id)), queryFn: () => getListing(id), enabled });
+  return useQuery({ ...listingQuery(id), enabled });
 }
 
 export function useMyListings({ enabled = true } = {}) {

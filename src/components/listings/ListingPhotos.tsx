@@ -76,7 +76,7 @@ export default function ListingPhotos({ listing }: { listing: ListingDetail }) {
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Foto dell’annuncio">
         {listing.images.map((image, index) => (
           <li key={image.id} className="relative aspect-[4/3] overflow-hidden rounded-control border border-line bg-surface-muted">
-            <img src={image.url} alt={`Foto ${index + 1}`} className="size-full object-cover" />
+            <img src={image.url} srcSet={image.srcset ?? undefined} sizes="(min-width: 640px) 200px, 50vw" alt={`Foto ${index + 1}`} className="size-full object-cover" />
             {index === 0 && (
               <span className="absolute top-2 left-2 rounded-full bg-neutral-950/75 px-2.5 py-1 text-xs font-bold text-white">Copertina</span>
             )}

@@ -43,6 +43,7 @@ type listingDetail struct {
 	IsActive      bool
 	Removed       bool
 	CoverURL      *string
+	CoverSrcset   *string
 	Images        []struct {
 		ID  int
 		URL string
@@ -312,6 +313,12 @@ type pendingUpload struct {
 	URL      string
 	Headers  map[string]string
 	MaxBytes int
+	Variants []struct {
+		Width   int
+		Key     string
+		URL     string
+		Headers map[string]string
+	}
 }
 
 func (a *testApp) prepareUpload(cookie string, listingID int, contentType string) (*pendingUpload, int, string) {
@@ -563,4 +570,135 @@ func TestCreateDraftListing(t *testing.T) {
 	// Senza "draft" l'annuncio nasce pubblicato, come prima; nelle modifiche "draft" non conta
 	published := app.createListing(landlord.Cookie, nil)
 	expect(t, app.do(http.MethodPut, "/api/v1/listings/"+itoa(published), listingWith(map[string]any{"draft": true}), withSession(landlord.Cookie)), http.StatusOK, `"isActive":true`)
+}
+
+// Il browser carica anche le versioni ridotte della foto (480 e 960 px): le pagine scaricano la più
+// piccola che basta (srcset). Sono facoltative, e una non valida si scarta senza bloccare la foto.
+func TestListingImageVariants(t *testing.T) {
+	app := newApp(t)
+	owner := app.registerUser("Marco", "affitta", false)
+	id := app.createListing(owner.Cookie, nil)
+	type image struct {
+		ID     int
+		URL    string
+		Srcset *string
+	}
+	confirm := func(up *pendingUpload) image {
+		t.Helper()
+		rec := app.confirmUpload(owner.Cookie, id, up.Key)
+		expect(t, rec, http.StatusCreated, "")
+		var img image
+		decode(t, rec, &img)
+		return img
+	}
+	widths := func(imageID int) string {
+		var w string
+		if err := testPool.QueryRow(context.Background(), `SELECT array_to_string(widths, ',') FROM roomdate_app.listing_images WHERE id = $1`, imageID).Scan(&w); err != nil {
+			t.Fatal(err)
+		}
+		return w
+	}
+
+	up, _, body := app.prepareUpload(owner.Cookie, id, "image/png")
+	if up == nil || len(up.Variants) != 2 {
+		t.Fatalf("caricamento = %+v %s", up, body)
+	}
+	base := strings.TrimSuffix(up.Key, ".png")
+	if up.Variants[0].Width != 480 || up.Variants[0].Key != base+"-w480.jpg" || up.Variants[1].Key != base+"-w960.jpg" ||
+		up.Variants[0].Headers["Content-Type"] != "image/jpeg" {
+		t.Fatalf("versioni = %+v", up.Variants)
+	}
+
+	t.Run("originale e versioni ridotte", func(t *testing.T) {
+		app.storage.put(up.Key, append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 50)...))
+		app.storage.put(up.Variants[0].Key, jpegBytes(100))
+		app.storage.put(up.Variants[1].Key, jpegBytes(200))
+		img := confirm(up)
+		final := strings.TrimPrefix(img.URL, "https://img.test/")
+		finalBase := strings.TrimSuffix(final, ".png")
+		want := "https://img.test/" + finalBase + "-w480.jpg 480w, https://img.test/" + finalBase + "-w960.jpg 960w, " + img.URL + " 1600w"
+		if img.Srcset == nil || *img.Srcset != want {
+			t.Fatalf("srcset = %v, atteso %q", img.Srcset, want)
+		}
+		if widths(img.ID) != "480,960" {
+			t.Errorf("larghezze nel database = %q", widths(img.ID))
+		}
+		keys := app.storage.keys()
+		for _, k := range []string{final, finalBase + "-w480.jpg", finalBase + "-w960.jpg"} {
+			if !slices.Contains(keys, k) {
+				t.Errorf("manca %s nello storage: %v", k, keys)
+			}
+		}
+		for _, k := range keys {
+			if strings.HasPrefix(k, "pending/") {
+				t.Errorf("rimasto in pending: %s", k)
+			}
+		}
+		detail, _ := app.listing(id, "")
+		if len(detail.Images) != 1 || detail.CoverSrcset == nil || *detail.CoverSrcset != want {
+			t.Fatalf("dettaglio: copertina %v", detail.CoverSrcset)
+		}
+		expect(t, app.do(http.MethodGet, "/api/v1/listings", nil), http.StatusOK, `"coverSrcset":"`+want+`"`)
+	})
+
+	t.Run("una versione non valida si scarta, la foto resta", func(t *testing.T) {
+		second, _, _ := app.prepareUpload(owner.Cookie, id, "image/jpeg")
+		app.storage.put(second.Key, jpegBytes(300))
+		app.storage.put(second.Variants[0].Key, []byte("<html>non una foto</html>"))
+		app.storage.put(second.Variants[1].Key, jpegBytes(150))
+		img := confirm(second)
+		if widths(img.ID) != "960" || img.Srcset == nil || strings.Contains(*img.Srcset, "480w") {
+			t.Fatalf("larghezze %q, srcset %v", widths(img.ID), img.Srcset)
+		}
+		if slices.Contains(app.storage.keys(), second.Variants[0].Key) {
+			t.Error("la versione non valida va eliminata")
+		}
+	})
+
+	t.Run("senza versioni ridotte, come le foto di prima", func(t *testing.T) {
+		third, _, _ := app.prepareUpload(owner.Cookie, id, "image/jpeg")
+		app.storage.put(third.Key, jpegBytes(300))
+		img := confirm(third)
+		if img.Srcset != nil || widths(img.ID) != "" {
+			t.Fatalf("srcset %v, larghezze %q", img.Srcset, widths(img.ID))
+		}
+	})
+
+	t.Run("una versione non si conferma come foto", func(t *testing.T) {
+		fourth, _, _ := app.prepareUpload(owner.Cookie, id, "image/jpeg")
+		app.storage.put(fourth.Variants[0].Key, jpegBytes(100))
+		expect(t, app.confirmUpload(owner.Cookie, id, fourth.Variants[0].Key), http.StatusBadRequest, "invalid_upload")
+	})
+
+	t.Run("eliminando foto, annuncio o account si cancellano anche le versioni", func(t *testing.T) {
+		detail, _ := app.listing(id, "")
+		first := detail.Images[0]
+		expect(t, app.do(http.MethodDelete, "/api/v1/listings/"+itoa(id)+"/images/"+itoa(first.ID), nil, withSession(owner.Cookie)), http.StatusNoContent, "")
+		finalBase := strings.TrimSuffix(strings.TrimPrefix(first.URL, "https://img.test/"), ".png")
+		for _, k := range app.storage.keys() {
+			if strings.HasPrefix(k, finalBase) {
+				t.Errorf("rimasta nello storage: %s", k)
+			}
+		}
+
+		second := app.createListing(owner.Cookie, nil)
+		up, _, _ := app.prepareUpload(owner.Cookie, second, "image/jpeg")
+		app.storage.put(up.Key, jpegBytes(10))
+		app.storage.put(up.Variants[0].Key, jpegBytes(10))
+		expect(t, app.confirmUpload(owner.Cookie, second, up.Key), http.StatusCreated, "")
+		expect(t, app.do(http.MethodDelete, "/api/v1/listings/"+itoa(second), nil, withSession(owner.Cookie)), http.StatusNoContent, "")
+		for _, k := range app.storage.keys() {
+			if strings.HasPrefix(k, "listings/"+itoa(second)+"/") {
+				t.Errorf("rimasta dopo l'eliminazione dell'annuncio: %s", k)
+			}
+		}
+
+		expect(t, app.do(http.MethodDelete, "/api/v1/me", map[string]string{"password": owner.Password}, withSession(owner.Cookie)), http.StatusNoContent, "")
+		// Restano solo i caricamenti mai confermati in "pending/", che la regola di scadenza del bucket elimina
+		for _, k := range app.storage.keys() {
+			if !strings.HasPrefix(k, "pending/") {
+				t.Errorf("dopo l'eliminazione dell'account resta: %s", k)
+			}
+		}
+	})
 }

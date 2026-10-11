@@ -46,10 +46,17 @@ type Service struct {
 	blocks *moderation.Store
 	// photos dà l'indirizzo della foto dell'annuncio nella scheda della conversazione
 	photos storage.Storage
+	// notifier avvisa dei messaggi nuovi anche a sito chiuso (notifiche push); nil se spento
+	notifier MessageNotifier
 }
 
-func NewService(store *Store, publisher realtime.Publisher, authorizer realtime.Authorizer, blocks *moderation.Store, photos storage.Storage) *Service {
-	return &Service{store: store, publisher: publisher, authorizer: authorizer, blocks: blocks, photos: photos}
+// MessageNotifier avvisa i destinatari di un messaggio nuovo con le notifiche push (modulo M2.8).
+type MessageNotifier interface {
+	MessageReceived(ctx context.Context, recipientIDs []string, senderID string, conversationID int)
+}
+
+func NewService(store *Store, publisher realtime.Publisher, authorizer realtime.Authorizer, blocks *moderation.Store, photos storage.Storage, notifier MessageNotifier) *Service {
+	return &Service{store: store, publisher: publisher, authorizer: authorizer, blocks: blocks, photos: photos, notifier: notifier}
 }
 
 // StartChatInput identifica l'annuncio (chat su annuncio) o l'utente (chat diretta).
@@ -168,6 +175,8 @@ type Listing struct {
 	City     string  `json:"city"`
 	Price    int     `json:"price"`
 	CoverURL *string `json:"coverUrl"`
+	// CoverSrcset elenca le versioni della foto per <img srcset> (null se non ne ha).
+	CoverSrcset *string `json:"coverSrcset"`
 	// Mine: l'annuncio è di chi guarda.
 	Mine bool `json:"mine"`
 	// Available: l'annuncio è ancora visibile all'altro partecipante (attivo, non rimosso, nessun
@@ -279,6 +288,9 @@ func (s *Service) conversation(r ConversationRow) Conversation {
 		if r.ListingCoverKey != nil {
 			if url := s.photos.PublicURL(*r.ListingCoverKey); url != "" {
 				c.Listing.CoverURL = &url
+			}
+			if srcset := storage.Srcset(s.photos, *r.ListingCoverKey, r.ListingCoverWidths); srcset != "" {
+				c.Listing.CoverSrcset = &srcset
 			}
 		}
 	}
@@ -433,15 +445,21 @@ func (s *Service) SendMessage(ctx context.Context, userID, rawConversationID str
 	}
 
 	// Il messaggio è salvato: se la notifica in tempo reale fallisce, i client lo vedranno al prossimo aggiornamento
+	var recipients []string
 	for _, p := range participants {
 		if p.UserID == userID {
 			continue
 		}
+		recipients = append(recipients, p.UserID)
 		err := s.publisher.Publish(ctx, realtime.UserChannel(p.UserID), realtime.EventNewMessage,
 			map[string]int{"conversationId": conversationID, "messageId": saved.ID})
 		if err != nil {
 			logx.From(ctx).Warn("notifica nuovo messaggio non inviata", "err", err)
 		}
+	}
+	// E a sito chiuso, sui browser dove i destinatari hanno attivato le notifiche
+	if s.notifier != nil {
+		s.notifier.MessageReceived(ctx, recipients, userID, conversationID)
 	}
 	return message(saved), true, nil
 }

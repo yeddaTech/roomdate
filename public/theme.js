@@ -5,7 +5,7 @@
   var choice = null;
   try {
     choice = window.localStorage.getItem('roomdate-theme');
-  } catch (e) {
+  } catch {
     // archivio non disponibile (navigazione privata con blocchi): vale il tema del dispositivo
   }
   var dark = choice === 'dark' || (choice !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);

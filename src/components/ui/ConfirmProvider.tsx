@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { afterPageLoad } from './afterPageLoad';
 import { ConfirmContext, type ConfirmOptions } from './confirm';
 
 const loadView = () => import('./ConfirmDialogView');
@@ -12,15 +13,7 @@ export default function ConfirmProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<ConfirmOptions | null>(null);
   const resolver = useRef<((ok: boolean) => void) | null>(null);
 
-  useEffect(() => {
-    const preload = () => { loadView().catch(() => {}); };
-    if ('requestIdleCallback' in window) {
-      const id = window.requestIdleCallback(preload, { timeout: 5000 });
-      return () => window.cancelIdleCallback(id);
-    }
-    const timer = setTimeout(preload, 2000);
-    return () => clearTimeout(timer);
-  }, []);
+  useEffect(() => afterPageLoad(() => { loadView().catch(() => {}); }, 5000), []);
 
   const confirm = useCallback((next: ConfirmOptions) => {
     resolver.current?.(false);

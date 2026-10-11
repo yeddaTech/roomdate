@@ -171,8 +171,10 @@ type ConversationRow struct {
 	ListingID                 *int
 	ListingTitle, ListingCity string
 	ListingPrice              int
-	// ListingCoverKey è la chiave della prima foto dell'annuncio, se ne ha.
-	ListingCoverKey *string
+	// ListingCoverKey è la chiave della prima foto dell'annuncio, se ne ha, con le larghezze delle
+	// sue versioni ridotte.
+	ListingCoverKey    *string
+	ListingCoverWidths []int32
 	// ListingMine: l'annuncio è di chi guarda. ListingActive: attivo, non rimosso dalla
 	// moderazione e di un account non sospeso, cioè visibile agli altri (blocchi a parte).
 	ListingMine, ListingActive bool
@@ -217,6 +219,7 @@ func (s *Store) Conversations(ctx context.Context, q ConversationsQuery) ([]Conv
 	rows, err := s.db.Query(ctx, `
         SELECT c.id, l.id, COALESCE(l.title, ''), COALESCE(l.city, ''), COALESCE(l.price, 0),
                (SELECT i.storage_key FROM roomdate_app.listing_images i WHERE i.listing_id = l.id ORDER BY i.position, i.id LIMIT 1),
+               COALESCE((SELECT i.widths FROM roomdate_app.listing_images i WHERE i.listing_id = l.id ORDER BY i.position, i.id LIMIT 1), '{}'),
                COALESCE(l.user_id = me.user_id, false),
                COALESCE(l.is_active AND l.removed_at IS NULL AND listing_owner.suspended_at IS NULL, false),
                c.listing_id IS NULL AND COALESCE(c.dedup_key LIKE 'listing:%', false),
@@ -265,7 +268,7 @@ func (s *Store) Conversations(ctx context.Context, q ConversationsQuery) ([]Conv
 		var messageID *int
 		var m MessageRow
 		err := row.Scan(&c.ID, &c.ListingID, &c.ListingTitle, &c.ListingCity, &c.ListingPrice,
-			&c.ListingCoverKey, &c.ListingMine, &c.ListingActive, &c.ListingDeleted,
+			&c.ListingCoverKey, &c.ListingCoverWidths, &c.ListingMine, &c.ListingActive, &c.ListingDeleted,
 			&c.OtherID, &c.OtherFirstName, &c.OtherPublicKey, &c.BlockedByMe, &c.BlockedByOther, &c.OtherSuspended, &c.OtherPublic,
 			&c.UnreadCount, &c.LastReadAt, &c.LastActivity,
 			&messageID, &m.SenderID, &m.Format, &m.Body, &m.IV, &m.WrappedKey, &m.CreatedAt)

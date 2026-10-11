@@ -56,7 +56,7 @@ function MyListingCard({ listing }: { listing: ListingSummary }) {
     <li className="flex flex-col overflow-hidden rounded-card border border-line bg-surface shadow-card sm:flex-row" data-testid="my-listing">
       <div className="relative aspect-[4/3] shrink-0 bg-surface-muted sm:aspect-auto sm:w-48">
         {listing.coverUrl
-          ? <img src={listing.coverUrl} alt="" className="size-full object-cover" loading="lazy" />
+          ? <img src={listing.coverUrl} srcSet={listing.coverSrcset ?? undefined} sizes="(min-width: 640px) 192px, 100vw" alt="" className="size-full object-cover" loading="lazy" />
           : (
             <div className="flex size-full min-h-32 flex-col items-center justify-center gap-1.5 text-sm font-bold text-foreground-subtle">
               <ImageOff className="size-6" aria-hidden="true" /> Nessuna foto
