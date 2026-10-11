@@ -56,7 +56,7 @@ Chat messages are encrypted and decrypted in the browser; the server stores and 
 
 ## Local Development
 
-Requirements: Go 1.25+, Node.js 20+ and a **development** PostgreSQL database (a dedicated Neon branch or a local Postgres). Never point local tools at the production database.
+Requirements: Go 1.26+ (the `go` command downloads the version in `go.mod` by itself), Node.js 20+ and a **development** PostgreSQL database (a dedicated Neon branch or a local Postgres). Never point local tools at the production database.
 
 1. Copy `.env.example` to `.env.local` and fill in the values.
 2. Install dependencies: `npm ci`
@@ -331,6 +331,18 @@ The interface is built on tokens and a small set of accessible components. Every
   * The service worker shows "Nuovo messaggio da …" unless a RoomDate window is in focus; tapping it opens the conversation. With push on, the page stops showing its own alerts, so nothing appears twice. Alerts now also work in Chrome on Android; on iPhone and iPad they need the installed app (iOS 16.4 or later).
   * **Setup:** `go run ./cmd/vapid` prints `VAPID_PRIVATE_KEY=…`. Add it in Vercel → Settings → Environment Variables (Production) and redeploy. Without it push stays off and the option is not shown. A new key invalidates the existing subscriptions: people turn the option on again.
 
+### Platform security (module M3.7)
+
+* **Strict Content Security Policy** (`vercel.json`): `script-src` and `style-src` only from the site itself, no `'unsafe-inline'`; `object-src 'none'`, `base-uri 'none'`, `form-action 'self'`, `frame-ancestors 'none'`. Photos are allowed only from the bucket's public address (`img-src`). **If `R2_PUBLIC_URL` changes** (another bucket or a custom domain), update `img-src` in `vercel.json` too, or photos stop loading. Also `Permissions-Policy` (camera, microphone, location, payments and similar are off) and `Cross-Origin-Opener-Policy: same-origin`; Vercel already sends HSTS.
+* **No `<style>` elements written at runtime:**
+  * The `index.html` loader is styled by `src/loader.css`; the spinner shows only when JavaScript runs (`public/theme.js` sets the `js` class), otherwise the `<noscript>` notice does.
+  * sonner's CSS comes from `sonner/dist/styles.css`, imported in `Toaster.tsx`; the `sonner-css` plugin in `vite.config.js` removes sonner's own `<style>` injection from the build and stops the build if a sonner update changes that code.
+  * Radix dialogs lock page scrolling through react-remove-scroll, which writes `<style>` elements via react-style-singleton. `vite.config.js` aliases that package to `src/vendor/styleSingleton.ts`, same API, which uses constructed stylesheets (`document.adoptedStyleSheets`): the CSP does not block them, just as it does not block styles set from JavaScript (`element.style`, which React and Radix use).
+  * A new library that injects `<style>` elements will be blocked in production: check it under the real CSP (the production build with the headers of `vercel.json`) before adding it.
+* **Go version:** 1.26.9, the latest release of a supported line. 1.27 fixes the same vulnerabilities, but `gosec` (v2.29.0) cannot read code compiled by Go 1.27 yet. When `govulncheck` reports standard-library vulnerabilities fixed only in a newer Go, raise `go` in `go.mod` (`go get go@<version>`), then run the tests and `scripts/check-vercel-build.sh`.
+* **Checks** (also in CI): `go vet ./...`, `go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...`, `go run github.com/securego/gosec/v2/cmd/gosec@v2.29.0 -exclude-dir node_modules ./...`, `npm audit`, `npm audit signatures`. Each `#nosec` in the code says why the finding does not apply.
+* **Argon2 parameters** read from a stored password hash are bounded (`internal/auth/password.go`), so a hash planted in the database cannot make every sign-in allocate gigabytes of memory.
+
 ### Tests
 
 `npm run test:api` runs the Go tests. Unit tests need nothing else; the integration tests in `server/` (every endpoint through the real router, middleware and database, with an in-memory photo storage) run when `TEST_DATABASE_URL` is set, and are skipped otherwise. They create a temporary `roomdate_test_…` database, migrate it from scratch and drop it at the end.
@@ -374,7 +386,7 @@ One-time setup:
    Add your preview or local origins (e.g. `http://127.0.0.1:5173`) to a separate development bucket, not to the production one. Test uploads from `https://roomdate.vercel.app` itself: the per-deployment addresses opened by Vercel's **Visit** button are different origins and are rejected.
 4. Bucket → Settings → **Object Lifecycle Rules** → Add rule: prefix `pending/`, delete objects after 1 day (uploads that were never confirmed).
 5. R2 overview → **API Tokens** → Manage → Create Account API token, with **Object Read and Write** on this bucket only. Its Access Key ID and Secret Access Key (shown only once) are `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`; the S3 endpoint, **without** the bucket name at the end, is `R2_ENDPOINT` (it contains `.eu.` for an EU bucket).
-6. Add the five `R2_*` variables in Vercel → Settings → Environment Variables, then redeploy: variables only apply to new deployments. `vercel.json` already allows images from `*.r2.dev` and uploads to `*.r2.cloudflarestorage.com` in the Content Security Policy; with a custom domain, add it to `img-src`.
+6. Add the five `R2_*` variables in Vercel → Settings → Environment Variables, then redeploy: variables only apply to new deployments. In the Content Security Policy, `vercel.json` allows uploads to `*.r2.cloudflarestorage.com` and images only from the bucket's public address: put your `R2_PUBLIC_URL` host in `img-src` (since module M3.7 there is no `*.r2.dev` wildcard), and change it there if you move to a custom domain.
 
 ### Neon branches and Vercel previews
 
@@ -382,35 +394,37 @@ Create a Neon branch for development and use its connection string locally. In V
 
 ## Development Workflow
 
-To maintain code quality and stability, direct pushes to the `main` branch are strictly prohibited. All contributions must go through a Pull Request (PR) review process.
+`main` is the production branch: Vercel deploys every push to it.
+
+* **Continuous integration** (`.github/workflows/ci.yml`) runs on every push and pull request to `main`. Backend: `gofmt`, `go vet`, the Go tests against PostgreSQL, `govulncheck`, `gosec` and `scripts/check-vercel-build.sh` (builds the function the way Vercel does, so an `internal/` import from `api/` fails here and not at deploy time). Frontend: `npm ci`, registry signatures (`npm audit signatures`), `npm audit`, ESLint, type check and build.
+* **Dependabot** (`.github/dependabot.yml`) opens pull requests for npm and Go updates every week and for GitHub Actions every month. Merge them once CI is green.
+* **Branch protection** (repository rulesets): nobody can force-push to `main` or delete it. Changes from other people arrive as pull requests and need a green CI; the owner may push directly.
+* **Security issues:** see [SECURITY.md](SECURITY.md).
 
 ### For Contributors
 
-If you wish to contribute to the project, please follow the standard Fork & Pull Request workflow:
+Use the standard Fork & Pull Request workflow:
 
-1. **Fork the repository:** Click the "Fork" button at the top right of this page to create a copy of the project in your own GitHub account.
-2. **Clone your fork locally:**
+1. **Fork the repository** with the "Fork" button at the top right of this page.
+2. **Clone your fork:**
    ```bash
-   git clone [https://github.com/YOUR_USERNAME/roomdate.git](https://github.com/YOUR_USERNAME/roomdate.git)
+   git clone https://github.com/YOUR_USERNAME/roomdate.git
    cd roomdate
    ```
-3. **Create a feature branch:** Never work directly on `main`.
+3. **Create a feature branch** (never work directly on `main`):
    ```bash
    git checkout -b feature/your-feature-name
    ```
-4. **Commit your changes:** Ensure your code is well-tested and adheres to the project's architectural standards.
+4. **Commit your changes,** with tests where it makes sense:
    ```bash
    git add .
-   git commit -m "feat: description of the feature implemented"
+   git commit -m "feat: description of the feature"
    ```
 5. **Push to your fork:**
    ```bash
    git push origin feature/your-feature-name
    ```
-6. **Open a Pull Request:** Navigate back to the original `yeddaTech/roomdate` repository on GitHub and open a Pull Request. The lead maintainer will review your code. Once approved, it will be merged into the production branch and automatically deployed via Vercel.
-
-### For Approved Maintainers
-Even approved core contributors must operate on separate branches (e.g., `feature/...` or `fix/...`) and submit a Pull Request. Merges to `main` require at least one approving review to pass the branch protection rules.
+6. **Open a Pull Request** against `yeddaTech/roomdate`. The maintainer reviews it; once CI passes it can be merged, and Vercel deploys it.
 
 ## Author
 

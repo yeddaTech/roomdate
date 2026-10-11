@@ -601,7 +601,7 @@ func (s *Service) confirmVariants(ctx context.Context, pendingKey, finalKey stri
 			logx.From(ctx).Warn("versione ridotta della foto non spostata", "key", from, "err", err)
 			continue
 		}
-		widths = append(widths, int32(width))
+		widths = append(widths, int32(width)) // #nosec G115 -- larghezze fisse di storage.VariantWidths (480, 960)
 	}
 	return widths
 }

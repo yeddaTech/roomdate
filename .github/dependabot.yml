@@ -1,0 +1,32 @@
+# Aggiornamenti delle dipendenze proposti come pull request (modulo M3.7): ognuna passa dalla CI
+# prima di essere unita. Gli aggiornamenti minori e le correzioni arrivano raggruppati, uno per
+# ecosistema alla settimana; le versioni maggiori in pull request separate, da guardare con calma.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      npm-minori:
+        update-types: [minor, patch]
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      go-minori:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      azioni:
+        patterns: ["*"]

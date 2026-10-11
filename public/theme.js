@@ -10,6 +10,8 @@
   }
   var dark = choice === 'dark' || (choice !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.classList.toggle('dark', dark);
+  // JavaScript attivo: si mostra il caricatore (src/loader.css), altrimenti resta l'avviso del <noscript>
+  document.documentElement.classList.add('js');
   var meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', dark ? '#1c1824' : '#fafaf9');
 })();

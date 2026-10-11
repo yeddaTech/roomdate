@@ -1,0 +1,87 @@
+# Controlli automatici a ogni push e a ogni pull request su main (modulo M3.7). Le azioni sono
+# fissate al commit (il tag tra commenti è solo un promemoria): un tag spostato non può cambiare
+# cosa gira qui. Dependabot (.github/dependabot.yml) propone gli aggiornamenti.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend Go
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # I test di integrazione creano e poi eliminano un database temporaneo (server/main_test.go)
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Formattazione (gofmt)
+        run: |
+          unformatted="$(gofmt -l api cmd internal server shared)"
+          if [ -n "$unformatted" ]; then
+            echo "File da formattare con gofmt -w:"
+            echo "$unformatted"
+            exit 1
+          fi
+      - name: go vet
+        run: go vet ./...
+      - name: Test (con PostgreSQL)
+        run: go test ./... -count=1
+      - name: Vulnerabilità note (govulncheck)
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: Analisi di sicurezza (gosec)
+        run: go run github.com/securego/gosec/v2/cmd/gosec@v2.29.0 ./...
+      - name: Build della funzione come su Vercel
+        run: ./scripts/check-vercel-build.sh
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Dipendenze (dal package-lock)
+        run: npm ci
+      - name: Firme dei pacchetti del registro npm
+        run: npm audit signatures
+      - name: Vulnerabilità note (npm audit)
+        run: npm audit --audit-level=high
+      - name: Lint
+        run: npm run lint
+      - name: Controllo dei tipi e build
+        run: npm run build

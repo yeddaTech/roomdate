@@ -15,7 +15,7 @@ import (
 // Load legge il file indicato (formato KEY=VALUE) e imposta le variabili che non sono già
 // definite nell'ambiente. Restituisce false se il file non esiste.
 func Load(path string) (bool, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) // #nosec G304 -- il file .env lo sceglie chi avvia lo strumento di sviluppo
 	if errors.Is(err, fs.ErrNotExist) {
 		return false, nil
 	}
@@ -42,7 +42,9 @@ func Load(path string) (bool, error) {
 		value = unquote(strings.TrimSpace(value))
 
 		if _, exists := os.LookupEnv(key); !exists {
-			os.Setenv(key, value)
+			if err := os.Setenv(key, value); err != nil {
+				return true, fmt.Errorf("%s:%d: %w", path, lineNo, err)
+			}
 		}
 	}
 	return true, scanner.Err()

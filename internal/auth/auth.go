@@ -108,6 +108,7 @@ func (m *Manager) ClearCookie(w http.ResponseWriter) {
 }
 
 func (m *Manager) setCookie(w http.ResponseWriter, value string, expires time.Time) {
+	// #nosec G124 -- Secure è falso solo nel server di sviluppo locale (HTTP); HttpOnly e SameSite sempre
 	cookie := &http.Cookie{
 		Name:     m.CookieName(),
 		Value:    value,

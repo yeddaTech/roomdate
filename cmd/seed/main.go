@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	seedPassword     = "roomdate-dev"
+	seedPassword     = "roomdate-dev" // #nosec G101 -- password pubblica dei dati di esempio (README); il seed rifiuta un database con utenti reali
 	seedDomain       = "@seed.roomdate.test"
 	seedEmailPattern = "%" + seedDomain
 
@@ -157,7 +157,7 @@ func main() {
 		log.Fatal("DATABASE_URL non impostata: copia .env.example in .env.local e compilala")
 	}
 	host, dbname := devenv.DescribeDSN(dsn)
-	log.Printf("Database: %s / %s", host, dbname)
+	log.Printf("Database: %s / %s", host, dbname) // #nosec G706 -- dal DATABASE_URL di chi avvia lo strumento
 
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {

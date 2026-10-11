@@ -24,6 +24,15 @@ const (
 	argonThreads = 1
 	argonKeyLen  = 32
 	argonSaltLen = 16
+
+	// Limiti dei parametri letti da un hash salvato (modulo M3.7): margine per aumentarli in futuro,
+	// ma un hash scritto apposta nel database (es. memoria da 4 GiB) non può trasformare ogni accesso
+	// in un attacco alla memoria e al processore del server.
+	maxArgonMemory  = 256 * 1024
+	maxArgonTime    = 10
+	maxArgonThreads = 16
+	minArgonKeyLen  = 16
+	maxArgonKeyLen  = 64
 )
 
 var commonPasswords = sync.OnceValue(func() map[string]bool {
@@ -83,8 +92,12 @@ func checkArgon2(hash, password string) bool {
 	if err != nil {
 		return false
 	}
+	if memory < 1 || memory > maxArgonMemory || time < 1 || time > maxArgonTime || threads < 1 || threads > maxArgonThreads ||
+		len(expected) < minArgonKeyLen || len(expected) > maxArgonKeyLen {
+		return false
+	}
 	// I parametri arrivano dall'hash salvato: un hash vecchio resta verificabile anche se cambiano
-	key := argon2.IDKey([]byte(password), salt, uint32(time), uint32(memory), uint8(threads), uint32(len(expected)))
+	key := argon2.IDKey([]byte(password), salt, uint32(time), uint32(memory), uint8(threads), uint32(len(expected))) // #nosec G115 -- valori controllati qui sopra
 	return subtle.ConstantTimeCompare(key, expected) == 1
 }
 

@@ -127,6 +127,35 @@ func TestPasswordHashing(t *testing.T) {
 	}
 }
 
+// Parametri fuori misura in un hash salvato (scritto apposta nel database): rifiutati subito, senza
+// calcolare la chiave. Con 4 GiB di memoria il calcolo bloccherebbe il server.
+func TestPasswordHashParameterLimits(t *testing.T) {
+	hash, err := HashPassword("una-password-lunga")
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts := strings.Split(hash, "$")
+	salt, key := parts[4], parts[5]
+	for _, params := range []string{"m=4194304,t=2,p=1", "m=19456,t=1000,p=1", "m=19456,t=2,p=300", "m=0,t=2,p=1", "m=19456,t=0,p=1", "m=19456,t=2,p=0", "m=-1,t=2,p=1"} {
+		forged := "$argon2id$v=19$" + params + "$" + salt + "$" + key
+		start := time.Now()
+		if ok, _ := CheckPassword(forged, "una-password-lunga"); ok {
+			t.Errorf("parametri %s accettati", params)
+		}
+		if elapsed := time.Since(start); elapsed > 50*time.Millisecond {
+			t.Errorf("parametri %s: %v per rifiutarli, la chiave è stata calcolata", params, elapsed)
+		}
+	}
+	shortKey := "$argon2id$v=19$m=19456,t=2,p=1$" + salt + "$" + key[:10]
+	if ok, _ := CheckPassword(shortKey, "una-password-lunga"); ok {
+		t.Error("chiave troppo corta accettata")
+	}
+	// I parametri attuali restano dentro i limiti
+	if ok, _ := CheckPassword(hash, "una-password-lunga"); !ok {
+		t.Error("l'hash attuale non si verifica più")
+	}
+}
+
 // Gli account registrati prima hanno hash bcrypt: vanno accettati e segnalati per l'aggiornamento.
 func TestLegacyBcryptHash(t *testing.T) {
 	// Hash bcrypt di "password-di-prova", come li generava la versione precedente

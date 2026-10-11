@@ -94,7 +94,7 @@ func encrypt(plaintext, uaPublic, authSecret []byte, asPrivate *ecdh.PrivateKey,
 	header := make([]byte, 0, 86+len(plaintext)+1+gcm.Overhead())
 	header = append(header, salt...)
 	header = binary.BigEndian.AppendUint32(header, recordSize)
-	header = append(header, byte(len(asPublic)))
+	header = append(header, byte(len(asPublic))) // #nosec G115 -- punto P-256 non compresso: sempre 65 byte
 	header = append(header, asPublic...)
 	// Un solo record, che è anche l'ultimo: il contenuto seguito dal delimitatore 0x02
 	record := append(append(make([]byte, 0, len(plaintext)+1), plaintext...), 0x02)

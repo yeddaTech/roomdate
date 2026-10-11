@@ -1,4 +1,7 @@
 import { Toaster as Sonner } from 'sonner';
+// Lo stile di sonner come file (modulo M3.7): sonner lo scriverebbe in un <style> all'avvio, che la
+// CSP non ammette; il plugin "sonner-css" di vite.config.js toglie quella scrittura dalla build
+import 'sonner/dist/styles.css';
 import { useTheme } from '../../theme/theme';
 
 /**

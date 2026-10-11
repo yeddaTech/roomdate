@@ -17,7 +17,8 @@ import (
 func JSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	// Lo stato è già partito: un errore qui è solo il client che ha chiuso la connessione
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 // Text scrive un messaggio di testo semplice, come http.Error (formato delle API legacy).

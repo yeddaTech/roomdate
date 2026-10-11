@@ -58,38 +58,16 @@
         ]
       }
     </script>
-    <!-- Senza JavaScript la rotella di caricamento girerebbe per sempre: al suo posto un avviso -->
-    <noscript><style>.roomdate-loader-container { display: none !important; }</style></noscript>
+    <!-- Stili del caricatore: niente <style> nella pagina, la CSP non li ammette -->
+    <link rel="stylesheet" href="/src/loader.css" />
   </head>
   <body>
     <div id="root">
-      <!-- INIZIO LOADER PRE-REACT -->
-      <style>
-        body { margin: 0; background-color: #FAFAFA; }
-        /* Stessi colori del tema scuro (src/index.css): public/theme.js mette .dark prima di questo punto */
-        .dark body { background-color: #1c1824; }
-        .dark .roomdate-spinner { border-color: #3f374b; border-top-color: #fb923c; }
-        .dark .roomdate-logo { color: #f4eee8; }
-        .dark .roomdate-logo span { color: #fb923c; }
-        .roomdate-loader-container { 
-          display: flex; flex-direction: column; align-items: center; justify-content: center; 
-          height: 100vh; width: 100vw; font-family: system-ui, sans-serif; 
-        }
-        .roomdate-spinner { 
-          width: 50px; height: 50px; border: 4px solid #f3e8e0; border-top: 4px solid #F97316; 
-          border-radius: 50%; animation: roomdate-spin 1s linear infinite; margin-bottom: 20px; 
-        }
-        .roomdate-logo { font-size: 26px; font-weight: 800; color: #171717; letter-spacing: -0.5px; font-family: Georgia, serif; }
-        .roomdate-logo span { color: #F97316; }
-        .roomdate-noscript { max-width: 36rem; margin: 15vh auto; padding: 0 1rem; font-family: system-ui, sans-serif; color: #1c1917; line-height: 1.5; }
-        @keyframes roomdate-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-      </style>
-      
+      <!-- Caricatore, finché React non sostituisce il contenuto di #root (stili in src/loader.css) -->
       <div class="roomdate-loader-container">
         <div class="roomdate-spinner"></div>
         <div class="roomdate-logo">Room<span>Date</span></div>
       </div>
-      <!-- FINE LOADER -->
     </div>
     <noscript>
       <main class="roomdate-noscript">

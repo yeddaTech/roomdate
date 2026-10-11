@@ -89,7 +89,7 @@ func main() {
 	if role == "" {
 		role = "non indicato"
 	}
-	log.Printf("Database: %s / %s, ruolo %s", host, dbname, role)
+	log.Printf("Database: %s / %s, ruolo %s", host, dbname, role) // #nosec G706 -- dal DATABASE_URL di chi avvia lo strumento
 	if direct {
 		log.Print("Uso la connessione diretta: tolto \"-pooler\" dall'host")
 	}
